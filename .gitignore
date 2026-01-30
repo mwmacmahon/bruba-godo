@@ -1,5 +1,8 @@
 # Bruba-godo gitignore
 
+# Local context files (machine-specific, not committed)
+LOCAL*.md
+
 # User configuration (use config.yaml.example as template)
 config.yaml
 
@@ -12,7 +15,13 @@ mirror/
 sessions/
 intake/
 reference/
-bundles/
+exports/
+
+# Assembled outputs (generated from templates + components + user)
+assembled/
+
+# User customizations (personal, not committed)
+user/
 
 # Planning docs (internal only)
 docs/meta/

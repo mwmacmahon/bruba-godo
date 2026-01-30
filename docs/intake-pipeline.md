@@ -72,7 +72,7 @@ Move processed content to `reference/` for syncing back to the bot.
 ./tools/push.sh --verbose
 ```
 
-This syncs `bundles/bot/` to the bot's memory directory.
+This syncs `exports/bot/` to the bot's memory directory.
 
 ---
 
@@ -114,7 +114,7 @@ Good for quick extraction of specific content.
 3. Generate variants (redacted versions for different audiences)
 4. Automatic mining into reference docs
 
-Required for filtered bundles with redaction. This would require a more sophisticated document processing pipeline.
+Required for filtered exports with redaction. This would require a more sophisticated document processing pipeline.
 
 ---
 
@@ -216,7 +216,7 @@ myproject: MyProject
 | `sessions/.pulled` | List of already-pulled session IDs |
 | `intake/*.md` | Converted markdown awaiting processing |
 | `reference/*.md` | Processed reference documents |
-| `bundles/bot/*.md` | Content ready to push to bot |
+| `exports/bot/*.md` | Content ready to push to bot |
 
 ---
 

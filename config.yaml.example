@@ -17,4 +17,5 @@ local:
   logs: logs
   intake: intake
   reference: reference
-  bundles: bundles
+  exports: exports
+  assembled: assembled

@@ -16,19 +16,19 @@ find reference -name "*.md" -type f | wc -l
 
 If no content in `reference/`, inform user they need to add content first.
 
-### 2. Generate Bundle (if needed)
+### 2. Generate Export (if needed)
 
-Check if bundles/bot/ exists and is up-to-date:
+Check if exports/bot/ exists and is up-to-date:
 
 ```bash
-ls -la bundles/bot/ 2>/dev/null || echo "No bundle found"
+ls -la exports/bot/ 2>/dev/null || echo "No export found"
 ```
 
-If no bundle or user requests regeneration, the bundle needs to be built from `reference/` with filters from `bundles.yaml`. This is a simplified pipeline — for now, manual copy:
+If no export or user requests regeneration, the export needs to be built from `reference/` with filters from `exports.yaml`. This is a simplified pipeline — for now, manual copy:
 
 ```bash
-mkdir -p bundles/bot
-cp reference/*.md bundles/bot/
+mkdir -p exports/bot
+cp reference/*.md exports/bot/
 ```
 
 For full filtering/redaction support, a more advanced document processing pipeline would be used.
@@ -47,7 +47,7 @@ Or with options:
 ```
 
 This:
-1. Rsyncs `bundles/bot/` → Bot's `~/clawd/memory/`
+1. Rsyncs `exports/bot/` → Bot's `~/clawd/memory/`
 2. Triggers `clawdbot memory index` to reindex
 
 ## Arguments
@@ -56,23 +56,23 @@ $ARGUMENTS
 
 ## What Gets Synced
 
-Bundles are defined in `bundles.yaml`:
+Exports are defined in `exports.yaml`:
 
-| Bundle | Include | Exclude | Redaction |
+| Export | Include | Exclude | Redaction |
 |--------|---------|---------|-----------|
-| bot | scope: meta, reference | sensitivity: sensitive, restricted | names, health |
+| bot | scope: meta, reference, transcripts | sensitivity: sensitive, restricted | names, health |
 
-Content in `reference/` with appropriate tags gets filtered into `bundles/bot/`.
+Content in `reference/` with appropriate tags gets filtered into `exports/bot/`.
 
 ## Example
 
 ```
 User: /push
 
-Claude: [generates bundle, syncs]
+Claude: [generates export, syncs]
 
 Reference files: 12
-Bundle 'bot': 10 files (2 excluded by filters)
+Export 'bot': 10 files (2 excluded by filters)
 
 === Starting push ===
 Syncing to bruba:~/clawd/memory/...

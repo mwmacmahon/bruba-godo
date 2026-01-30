@@ -1,13 +1,13 @@
 #!/bin/bash
-# Push content bundles to bot memory
+# Push content exports to bot memory
 #
 # Usage:
-#   ./tools/push.sh              # Push default bundle (bot)
+#   ./tools/push.sh              # Push default export (bot)
 #   ./tools/push.sh --dry-run    # Show what would be synced
 #   ./tools/push.sh --verbose    # Detailed output
 #   ./tools/push.sh --no-index   # Skip memory reindex
 #
-# Reads bundles.yaml for filter configuration, syncs bundles/bot/ to bot's memory/
+# Reads exports.yaml for filter configuration, syncs exports/bot/ to bot's memory/
 #
 # IMPORTANT: This script ADDS files to bot memory. It does NOT delete existing files.
 # To sync with deletion, use rsync --delete manually with the full content set.
@@ -59,16 +59,16 @@ rotate_log "$LOG_FILE"
 
 log "=== Pushing Content to Bot ==="
 
-# Check if bundles directory exists
-if [[ ! -d "$BUNDLES_DIR/bot" ]]; then
-    log "No bundle found at $BUNDLES_DIR/bot"
-    log "Run bundle generation first (content from reference/ with filters from bundles.yaml)"
-    echo "No bundle found. Generate bundles first."
+# Check if exports directory exists
+if [[ ! -d "$EXPORTS_DIR/bot" ]]; then
+    log "No export found at $EXPORTS_DIR/bot"
+    log "Run export generation first (content from reference/ with filters from exports.yaml)"
+    echo "No export found. Generate exports first."
     exit 1
 fi
 
 # Count files to sync
-FILE_COUNT=$(find "$BUNDLES_DIR/bot" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+FILE_COUNT=$(find "$EXPORTS_DIR/bot" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
 log "Files to sync: $FILE_COUNT"
 
 if [[ "$FILE_COUNT" -eq 0 ]]; then
@@ -93,9 +93,9 @@ log "Syncing to $SSH_HOST:$REMOTE_WORKSPACE/memory/"
 
 if [[ "$DRY_RUN" == "true" ]]; then
     log "[DRY RUN] Would sync $FILE_COUNT files"
-    rsync $RSYNC_OPTS "$BUNDLES_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/memory/"
+    rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/memory/"
 else
-    rsync $RSYNC_OPTS "$BUNDLES_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/memory/"
+    rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/memory/"
     log "Synced $FILE_COUNT files"
 
     # Trigger reindex

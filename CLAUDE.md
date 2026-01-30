@@ -6,13 +6,22 @@ Instructions for Claude Code when working in bruba-godo.
 
 Operator workspace for managing a personal AI assistant bot running Clawdbot. This repo contains the tools and skills to control the bot from the operator's machine.
 
+## Local Context
+
+If any files matching `LOCAL*.md` exist in the repo root, read them at session start and briefly acknowledge to the user. These contain machine-specific context that isn't committed to the repo.
+
+Common patterns:
+- `LOCAL.md` — primary local context (includes migration docs)
+
+**For development tasks:** If the user is working on bruba-godo tooling/features (not just operating the bot), check `LOCAL.md` for links to migration planning docs in PKM. These explain what's being extracted from PKM, current status, and design decisions.
+
 **On session start, show ONLY this skills list:**
 
 ```
 Bot Skills:
   Daemon:    /status, /launch, /stop, /restart
-  Files:     /mirror, /pull, /push
-  Config:    /config, /update
+  Files:     /mirror, /pull, /push, /sync
+  Config:    /config, /update, /component
   Code:      /code
   Convo:     /convo
   Setup:     (run tools/setup-agent.sh)
@@ -23,13 +32,14 @@ Bot Skills:
 ```
 bruba-godo/
 ├── config.yaml.example      # Bot connection settings template
-├── bundles.yaml             # Bundle definitions for content sync
+├── exports.yaml             # Export definitions for content sync
 ├── tools/
 │   ├── bot                  # SSH wrapper
 │   ├── lib.sh               # Shared functions
 │   ├── mirror.sh            # Mirror bot files
 │   ├── pull-sessions.sh     # Pull closed sessions
 │   ├── push.sh              # Push content to bot
+│   ├── assemble-prompts.sh  # Assemble prompts from templates + components
 │   ├── setup-agent.sh       # Agent provisioning
 │   └── helpers/
 │       ├── parse-yaml.py    # YAML parsing for shell
@@ -37,15 +47,30 @@ bruba-godo/
 ├── .claude/
 │   ├── settings.json        # Permission allowlists
 │   └── commands/            # Skill definitions
-├── templates/               # Bot starter files
+├── templates/               # BASE PROMPTS (committed)
 │   ├── prompts/             # IDENTITY, AGENTS, TOOLS, etc.
 │   ├── config/              # clawdbot.json, exec-approvals templates
 │   └── tools/               # Sample scripts
+├── components/              # OPTIONAL CAPABILITIES (committed)
+│   ├── signal/              # Signal messaging channel
+│   ├── voice/               # Voice input/output (planned)
+│   ├── distill/             # Conversation → knowledge pipeline
+│   └── ...                  # Other components
+├── user/                    # USER CUSTOMIZATIONS (gitignored)
+│   ├── prompts/             # Personal prompt additions
+│   └── exports.yaml         # Personal export profiles
+├── assembled/               # ASSEMBLED PROMPTS (gitignored)
+│   └── prompts/             # Final AGENTS.md, TOOLS.md, etc.
+├── mirror/                  # BOT STATE (gitignored)
+│   └── prompts/             # Current bot prompts
+├── sessions/                # RAW SESSIONS (gitignored)
+│   ├── *.jsonl              # JSONL files from bot
+│   └── converted/           # Markdown conversions
+├── reference/               # PROCESSED CONTENT (gitignored)
+│   └── transcripts/         # Canonicalized conversations
+├── exports/                 # SYNC OUTPUTS (gitignored)
+│   └── bot/                 # Content ready to push to bot memory
 ├── intake/                  # Raw files awaiting processing (gitignored)
-├── reference/               # Processed canonical files (gitignored)
-├── bundles/                 # Generated output (gitignored)
-├── mirror/                  # Local copy of bot files (gitignored)
-├── sessions/                # Pulled transcripts (gitignored)
 └── logs/                    # Script logs (gitignored)
 ```
 
@@ -69,19 +94,20 @@ local:
   logs: logs
   intake: intake
   reference: reference
-  bundles: bundles
+  exports: exports
+  assembled: assembled
 ```
 
-Bundle definitions in `bundles.yaml`:
+Export definitions in `exports.yaml`:
 
 ```yaml
-bundles:
+exports:
   bot:
-    description: "Content for bot memory"
-    output_dir: bundles/bot
+    description: "Content synced to bot memory"
+    output_dir: exports/bot
     remote_path: memory
     include:
-      scope: [meta, reference]
+      scope: [meta, reference, transcripts]
     exclude:
       sensitivity: [sensitive, restricted]
     redaction: [names, health]
@@ -125,10 +151,36 @@ Common paths (on bot machine):
 | `/mirror` | Pull bot files locally |
 | `/pull` | Pull closed sessions |
 | `/push` | Push content to bot memory |
+| `/sync` | Assemble prompts + push (with conflict detection) |
 | `/config` | Configure heartbeat, exec allowlist |
+| `/component` | Manage optional components (signal, voice, distill, etc.) |
 | `/update` | Update clawdbot version |
 | `/code` | Review and migrate staged code |
 | `/convo` | Load active conversation |
+
+## Prompt Assembly Pipeline
+
+Prompts come from multiple sources, assembled in order:
+
+```
+templates/prompts/AGENTS.md           (base template)
+  + components/signal/prompts/AGENTS.snippet.md
+  + components/voice/prompts/AGENTS.snippet.md
+  + user/prompts/AGENTS.snippet.md    (personal additions)
+  = assembled/prompts/AGENTS.md       (final output)
+```
+
+Run assembly with:
+```bash
+./tools/assemble-prompts.sh
+```
+
+Component snippets are wrapped with markers:
+```markdown
+<!-- COMPONENT: voice -->
+...component additions...
+<!-- /COMPONENT: voice -->
+```
 
 ## State Files
 
@@ -136,6 +188,7 @@ Common paths (on bot machine):
 - `logs/mirror.log` — Mirror script log
 - `logs/pull.log` — Pull script log
 - `logs/push.log` — Push script log
+- `logs/assemble.log` — Assembly log
 - `logs/updates.md` — Update history
 
 ## Templates
@@ -148,16 +201,33 @@ The `templates/` directory contains starter files for new agents:
 
 Use `./tools/setup-agent.sh` to provision a new agent with these templates.
 
+## Components
+
+Optional capabilities in `components/`:
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| signal | Ready | Signal messaging channel |
+| voice | Planned | Voice input/output (whisper, TTS) |
+| distill | Core | Conversation → knowledge pipeline |
+| reminders | Planned | Apple Reminders integration |
+| web-search | Planned | Web search capability |
+
+Each component can contribute:
+- `setup.sh` — Interactive setup
+- `validate.sh` — Configuration validation
+- `prompts/*.snippet.md` — Prompt additions
+
 ## Content Pipeline
 
 For syncing content to bot memory:
 
 1. Add markdown files to `reference/`
-2. Generate bundle: `cp reference/*.md bundles/bot/` (or use full filtering)
+2. Generate export: `cp reference/*.md exports/bot/` (or use full filtering)
 3. Push to bot: `./tools/push.sh`
 
-Bundles are filtered according to `bundles.yaml` definitions.
+Exports are filtered according to `exports.yaml` definitions.
 
 ## Git Policy
 
-Mirror, sessions, logs, intake, reference, and bundles are gitignored. Only commit tool/skill changes after review.
+Mirror, sessions, logs, intake, reference, exports, assembled, and user are gitignored. Only commit tool/skill/component changes after review.

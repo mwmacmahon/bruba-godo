@@ -1,0 +1,24 @@
+# bruba-godo export definitions
+# Defines how content is filtered and synced to destinations
+version: 1
+
+exports:
+  bot:
+    description: "Content synced to bot memory"
+    output_dir: exports/bot
+    remote_path: memory               # Relative to workspace
+    include:
+      scope: [meta, reference, transcripts]
+    exclude:
+      sensitivity: [sensitive, restricted]
+    redaction: [names, health]
+
+  rag:
+    description: "Content for external RAG systems"
+    output_dir: exports/rag
+    include:
+      scope: [reference, transcripts]
+    format: chunked                   # Split for embedding
+
+defaults:
+  redaction: []

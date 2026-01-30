@@ -1,7 +1,71 @@
 # Vision: Bot-Agnostic Operator Design
 
-**Version:** 1.0.0
+**Version:** 2.0.0
 **Last Updated:** 2026-01-30
+
+---
+
+## The Value Proposition
+
+bruba-godo isn't just "Clawdbot installer with SSH access." The real value is:
+
+**"A managed AI assistant where conversations become knowledge that feeds back in."**
+
+The component setup (signal, voice, etc.) is table stakes. The **conversation→knowledge loop** is the differentiator.
+
+The distill component doesn't just help your bot learn — it produces **condensed records usable by any modern AI ecosystem**. Your conversations become RAG-ready knowledge for:
+- Your bot's memory
+- Claude Code sessions
+- Other AI assistants
+- Your own reference
+
+---
+
+## Core vs Components
+
+bruba-godo has two layers:
+
+### Core: Managing the Bot
+
+The fundamental operator-bot relationship:
+
+| Capability | Skills | Purpose |
+|------------|--------|---------|
+| Daemon control | `/status`, `/launch`, `/stop`, `/restart` | Bot lifecycle |
+| Prompt sync | `/mirror`, `/push` | Bidirectional config management |
+| Conflict detection | `/review` | Review bot's changes before overwrite |
+| Code review | `/code` | Review bot's drafted scripts |
+| Session access | `/convo` | Load active conversation |
+| Configuration | `/config`, `/update` | Settings and updates |
+
+Core is about **managing the bot**.
+
+### Components: What the Bot Can Do
+
+Optional capabilities that extend the bot:
+
+```
+components/
+├── signal/      # Messaging channel
+├── voice/       # Audio I/O (adds 🎤 check)
+├── http-api/    # Siri/Shortcuts (adds 📬 check)
+├── reminders/   # Apple Reminders
+├── calendar/    # Apple Calendar
+├── distill/     # Conversation→knowledge loop
+├── continuity/  # Session reset with context (lightweight)
+└── web-search/  # Research capability
+```
+
+Components are about **what the bot can do**.
+
+**How components work:** Each component contributes:
+- Setup scripts (`setup.sh`, `validate.sh`)
+- Prompt snippets (additions to AGENTS.md, TOOLS.md, etc.)
+- Config fragments (for clawdbot.json)
+
+Some components are heavyweight (distill has a full pipeline). Others are lightweight — continuity just adds a few lines to AGENTS.md telling the bot to write/read a context file on session reset.
+
+The `/component` skill manages all of these: `list`, `setup`, `validate`, `status`.
 
 ---
 
@@ -135,7 +199,7 @@ Everything else:
 - All `tools/*.sh` scripts
 - All `templates/prompts/*.md` files
 - Operator workflows (mirror, push, pull, snapshot)
-- Content pipeline (bundles, intake, reference)
+- Content pipeline (exports, intake, reference)
 - Security model (exec allowlist pattern)
 
 ---
@@ -207,6 +271,163 @@ The allowlist is our security boundary.
 
 ---
 
+## Pre-Response Check Pattern
+
+A key behavior pattern baked into AGENTS.md: before responding to any message, the bot runs a quick check.
+
+**The pattern is core.** Every agent does this check — it's the forcing function that makes the assistant reliable.
+
+**The content is component-driven.** What the check includes depends on which components are installed:
+
+| Component | Adds to Check | Example |
+|-----------|---------------|---------|
+| voice | 🎤 audio detection | "Is there a new voice message?" |
+| http-api | 📬 HTTP log relay | "Are there recent API messages?" |
+| (future) | other triggers | Continuation packets, etc. |
+
+This pattern ensures the bot doesn't miss async inputs that arrived between messages.
+
+---
+
+## Bidirectional Sync
+
+**The problem:** Bot edits AGENTS.md. Operator pushes updates from bruba-godo. Whose version wins? Changes get lost.
+
+**The solution:** Conflict detection that extends the `/code` review pattern.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     BIDIRECTIONAL SYNC                               │
+│                                                                      │
+│   bruba-godo/mirror/          ◄── /mirror ──►      Bot's ~/clawd/   │
+│   (operator's copy)                                (bot's live)      │
+│                                                                      │
+│   templates/prompts/          ─── /push ───►      (only if clean)   │
+│   (canonical source)                                                 │
+│                                                                      │
+│   WORKFLOW:                                                          │
+│   1. /mirror pulls latest                                            │
+│   2. Compare mirror/ to last-known state                            │
+│   3. If bot changed files → flag for review                         │
+│   4. /review shows diffs, operator decides                          │
+│   5. /push only after conflicts resolved                            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+This is what `/code` already does for bot-drafted scripts. Extend the same pattern to prompts and config.
+
+---
+
+## The Distill Component
+
+The flagship component that makes bruba-godo more than a bot manager.
+
+**Purpose:** Transform sprawling conversations into manageable, referenceable knowledge.
+
+```
+conversations  →  distill  →  knowledge  →  bot memory
+(raw JSONL)       (process)    (curated)     (pushed back)
+```
+
+Two modes:
+
+| Mode | Who | What |
+|------|-----|------|
+| **Simple** | Most users | Pull → parse → review → push |
+| **Full** | Advanced | Pull → canonicalize → redact → mine → export → push |
+
+Without distill, conversations are write-only. With distill, **your bot learns from its own history**.
+
+---
+
+## Prompt Management Pipeline
+
+The core infrastructure that makes everything work.
+
+### The Problem
+
+Your bot's prompts (AGENTS.md, TOOLS.md, etc.) come from multiple sources:
+- Base templates (shipped with bruba-godo)
+- Component snippets (each component adds its own sections)
+- User customizations (your personal additions)
+- Bot's own edits (changes made during operation)
+
+How do you assemble these into final prompts without losing anyone's changes?
+
+### The Solution
+
+The `/sync` command assembles final prompts from layered sources:
+
+```
+templates/prompts/AGENTS.md     (base)
+    + components/voice/prompts/AGENTS.snippet.md
+    + components/http-api/prompts/AGENTS.snippet.md
+    + user/prompts/AGENTS.snippet.md
+    = final AGENTS.md pushed to bot
+```
+
+**With conflict detection:**
+1. `/mirror` pulls bot's current prompts
+2. Compare to last-pushed version
+3. If bot made changes → preserve them or prompt for review
+4. Assemble new version incorporating all sources
+5. `/push` the result
+
+This pipeline recreates your current setup once all components are in place. Add a component → its snippets get woven into the prompts automatically.
+
+---
+
+## User Customization
+
+bruba-godo separates "repo proper" from "user files":
+
+| Directory | Purpose | Committed? |
+|-----------|---------|------------|
+| `templates/` | Base prompts shipped with bruba-godo | Yes |
+| `components/` | Optional capabilities | Yes |
+| `user/` | Your personal customizations | No (gitignored) |
+
+**Where to put your stuff:**
+
+- `user/prompts/` — Extra snippets to add to AGENTS.md, TOOLS.md, etc.
+- `user/exports.yaml` — Custom export configurations
+- `user/config.yaml` — Override default settings (if needed)
+
+This keeps your personal stuff separate from upstream updates.
+
+---
+
+## Future: Multi-Bot
+
+bruba-godo is designed for one operator managing **multiple bots**:
+
+- **Work bot** — Professional context, work calendar, formal tone
+- **Home bot** — Personal context, family reminders, casual tone
+- **Local bot** — Runs on local LLM, privacy-sensitive tasks
+
+### How It Will Work
+
+```bash
+# Different config files
+./tools/bot --config config-work.yaml status
+./tools/bot --config config-home.yaml push
+
+# Or environment variable
+BRUBA_CONFIG=config-work.yaml ./tools/bot status
+```
+
+Each config points to a different:
+- SSH host
+- Remote paths
+- Agent ID
+- Component set
+
+The prompts, scripts, and components are shared. Only the config differs.
+
+**Not implemented yet** — but the architecture supports it.
+
+---
+
 ## Summary
 
 Build for portability:
@@ -216,3 +437,9 @@ Build for portability:
 4. **SSH wrapper** that abstracts framework paths
 
 The bot framework is just a runtime. The real value is in the scripts, prompts, and operator tools that sit on top of it.
+
+Build for value:
+1. **Core skills** manage the bot relationship
+2. **Components** extend what the bot can do
+3. **Distill** closes the conversation→knowledge loop
+4. **Bidirectional sync** preserves bot's changes

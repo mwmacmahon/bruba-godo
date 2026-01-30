@@ -6,6 +6,8 @@
       "Bash(./tools/pull-sessions.sh *)",
       "Bash(./tools/push.sh *)",
       "Bash(./tools/setup-agent.sh *)",
+      "Bash(./components/*/setup.sh *)",
+      "Bash(./components/*/validate.sh *)",
       "Bash(python3 tools/helpers/*)",
       "Bash(ssh bruba clawdbot *)",
       "Bash(ssh bruba jq *)",
