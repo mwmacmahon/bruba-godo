@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./tools/bot *)",
+      "Bash(./tools/mirror.sh *)",
+      "Bash(./tools/pull-sessions.sh *)",
+      "Bash(./tools/push.sh *)",
+      "Bash(./tools/setup-agent.sh *)",
+      "Bash(python3 tools/helpers/*)",
+      "Bash(ssh bruba clawdbot *)",
+      "Bash(ssh bruba jq *)",
+      "Bash(find mirror *)",
+      "Bash(find reference *)",
+      "Bash(find bundles *)",
+      "Bash(wc *)",
+      "Bash(ls *)",
+      "Bash(echo *)",
+      "Bash(sleep *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(chmod *)"
+    ]
+  }
+}

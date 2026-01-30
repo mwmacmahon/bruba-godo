@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "defaults": {
+    "security": "allowlist",
+    "ask": "never"
+  },
+  "agents": {
+    "${AGENT_ID}": {
+      "allowlist": [
+        {
+          "pattern": "/usr/bin/grep",
+          "id": "grep-${AGENT_ID}"
+        },
+        {
+          "pattern": "/usr/bin/wc",
+          "id": "wc-${AGENT_ID}"
+        },
+        {
+          "pattern": "/usr/bin/head",
+          "id": "head-${AGENT_ID}"
+        },
+        {
+          "pattern": "/usr/bin/tail",
+          "id": "tail-${AGENT_ID}"
+        },
+        {
+          "pattern": "/usr/bin/du",
+          "id": "du-${AGENT_ID}"
+        },
+        {
+          "pattern": "/bin/ls",
+          "id": "ls-${AGENT_ID}"
+        },
+        {
+          "pattern": "/bin/cat",
+          "id": "cat-${AGENT_ID}"
+        },
+        {
+          "pattern": "/bin/echo",
+          "id": "echo-${AGENT_ID}"
+        }
+      ]
+    }
+  }
+}

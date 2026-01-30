@@ -1,0 +1,29 @@
+# Bruba-godo gitignore
+
+# User configuration (use config.yaml.example as template)
+config.yaml
+
+# Environment variables
+.env
+
+# Local state and output
+logs/
+mirror/
+sessions/
+intake/
+reference/
+bundles/
+
+# Planning docs (internal only)
+docs/meta/
+
+# macOS
+.DS_Store
+
+# Editor files
+*.swp
+*~
+
+# Python
+__pycache__/
+*.pyc

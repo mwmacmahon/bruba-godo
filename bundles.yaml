@@ -1,0 +1,17 @@
+# bruba-godo bundle definitions
+# Defines how content is filtered and synced to bot memory
+version: 1
+
+bundles:
+  bot:
+    description: "Content for bot memory"
+    output_dir: bundles/bot
+    remote_path: memory               # Relative to workspace
+    include:
+      scope: [meta, reference]
+    exclude:
+      sensitivity: [sensitive, restricted]
+    redaction: [names, health]
+
+defaults:
+  redaction: []

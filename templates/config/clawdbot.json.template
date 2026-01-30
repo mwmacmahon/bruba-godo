@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "lastTouchedVersion": "${CLAWDBOT_VERSION}",
+    "lastTouchedAt": "${SETUP_DATE}"
+  },
+  "auth": {
+    "profiles": {
+      "anthropic:clawdbot": {
+        "provider": "anthropic",
+        "mode": "token"
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "opus",
+        "fallbacks": [
+          "anthropic/claude-sonnet-4-5",
+          "anthropic/claude-haiku-4-5"
+        ]
+      },
+      "workspace": "${WORKSPACE}",
+      "memorySearch": {
+        "enabled": true,
+        "sources": ["memory"],
+        "provider": "local",
+        "fallback": "none"
+      },
+      "compaction": {
+        "mode": "safeguard"
+      },
+      "maxConcurrent": 4,
+      "sandbox": {
+        "mode": "off",
+        "workspaceAccess": "rw",
+        "scope": "session"
+      },
+      "heartbeat": {
+        "every": "1h"
+      }
+    },
+    "list": [
+      {
+        "id": "${AGENT_ID}",
+        "default": true,
+        "name": "${AGENT_NAME}",
+        "workspace": "${WORKSPACE}",
+        "agentDir": "${CLAWDBOT_DIR}/agents/${AGENT_ID}",
+        "model": "opus",
+        "tools": {
+          "allow": [
+            "read",
+            "write",
+            "edit",
+            "exec",
+            "memory_search",
+            "memory_get",
+            "group:memory",
+            "group:sessions",
+            "image"
+          ],
+          "deny": [
+            "web_fetch",
+            "web_search",
+            "browser",
+            "process",
+            "nodes",
+            "cron",
+            "gateway",
+            "canvas"
+          ]
+        }
+      }
+    ]
+  },
+  "tools": {
+    "allow": [
+      "read",
+      "write",
+      "edit",
+      "exec",
+      "memory_search",
+      "memory_get",
+      "group:memory",
+      "group:sessions",
+      "image"
+    ],
+    "deny": [
+      "process",
+      "browser",
+      "canvas",
+      "nodes",
+      "cron",
+      "gateway"
+    ],
+    "exec": {
+      "host": "gateway",
+      "security": "allowlist"
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "auth": {
+      "mode": "token"
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto"
+  }
+}

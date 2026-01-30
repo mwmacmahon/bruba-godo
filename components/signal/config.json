@@ -1,0 +1,12 @@
+{
+  "_comment": "Config fragment for Signal channel. Merge into clawdbot.json.",
+  "channels": {
+    "signal": {
+      "enabled": true,
+      "phoneNumber": "+1PHONENUMBER"
+    }
+  },
+  "http": {
+    "port": 8088
+  }
+}

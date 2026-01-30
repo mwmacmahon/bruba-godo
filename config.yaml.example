@@ -1,0 +1,20 @@
+# bruba-godo configuration
+# Copy this file to config.yaml and customize for your setup
+version: 2
+
+ssh:
+  host: <your-ssh-host>            # SSH host alias from ~/.ssh/config
+
+remote:
+  home: /Users/<bot-username>      # Or /home/<bot-username> on Linux
+  workspace: /Users/<bot-username>/clawd
+  clawdbot: /Users/<bot-username>/.clawdbot
+  agent_id: <your-agent-id>        # e.g., mybot-main
+
+local:
+  mirror: mirror
+  sessions: sessions
+  logs: logs
+  intake: intake
+  reference: reference
+  bundles: bundles

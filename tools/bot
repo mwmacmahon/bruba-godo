@@ -1,0 +1,38 @@
+#!/bin/bash
+# SSH wrapper for running commands on the bot
+#
+# Usage:
+#   ./tools/bot <command>           # Run command on bot
+#   ./tools/bot clawdbot status     # Example: check status
+#   ./tools/bot cat ~/clawd/FILE    # Example: read a file
+#
+# This wrapper exists to simplify Claude Code permission whitelisting.
+# Non-destructive commands can be pre-approved via .claude/settings.json
+#
+# Configuration is read from config.yaml (ssh.host)
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Read host from config.yaml
+if [[ -f "$ROOT_DIR/config.yaml" ]]; then
+    HOST=$(grep "^  host:" "$ROOT_DIR/config.yaml" 2>/dev/null | awk '{print $2}' | tr -d '"')
+fi
+HOST="${HOST:-bruba}"
+
+if [[ $# -eq 0 ]]; then
+    echo "Usage: bot <command>"
+    echo ""
+    echo "Examples:"
+    echo "  bot clawdbot status"
+    echo "  bot cat ~/clawd/AGENTS.md"
+    echo "  bot 'ls -la ~/clawd/'"
+    echo ""
+    echo "Host: $HOST (from config.yaml)"
+    exit 1
+fi
+
+# Join all arguments as the remote command
+ssh "$HOST" "$*"
