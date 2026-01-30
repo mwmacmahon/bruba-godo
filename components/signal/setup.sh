@@ -20,6 +20,7 @@ source "$ROOT_DIR/tools/lib.sh"
 DRY_RUN=false
 PHONE_NUMBER=""
 LINK_MODE=false
+BOT_NAME=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -36,6 +37,10 @@ while [[ $# -gt 0 ]]; do
             LINK_MODE=true
             shift
             ;;
+        --name)
+            BOT_NAME="$2"
+            shift 2
+            ;;
         --help|-h)
             cat << 'EOF'
 Usage: setup.sh [options]
@@ -45,6 +50,7 @@ Set up Signal channel for the bot.
 Options:
   --phone NUMBER     Bot's phone number (E.164 format: +1234567890)
   --link             Link to existing Signal account (generates QR code)
+  --name NAME        Device name shown in Signal (default: prompt)
   --dry-run, -n      Show what would be done without doing it
   --help, -h         Show this help
 
@@ -179,16 +185,23 @@ echo "---"
 
 if [[ "$LINK_MODE" == "true" ]]; then
     # Link mode - generate QR code
-    echo "  Generating QR code for linking..."
+
+    # Prompt for device name if not provided
+    if [[ -z "$BOT_NAME" ]]; then
+        read -p "  Device name for Signal (shown in Linked Devices): " BOT_NAME
+        BOT_NAME="${BOT_NAME:-Bot}"
+    fi
+
+    echo "  Generating QR code for linking as '$BOT_NAME'..."
     echo ""
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "  [dry-run] Would run: signal-cli link -n 'Bot'"
+        echo "  [dry-run] Would run: signal-cli link -n '$BOT_NAME'"
         echo "  [dry-run] Would generate QR code at qr.io"
     else
         # Generate link URI
         echo "  Running signal-cli link on remote..."
-        LINK_URI=$(ssh "$SSH_HOST" "signal-cli link -n 'ClawdBot' 2>&1 | grep -o 'sgnl://.*'" || echo "")
+        LINK_URI=$(ssh "$SSH_HOST" "signal-cli link -n '$BOT_NAME' 2>&1 | grep -o 'sgnl://.*'" || echo "")
 
         if [[ -z "$LINK_URI" ]]; then
             echo "  ERROR: Could not generate link URI" >&2
