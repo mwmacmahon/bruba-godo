@@ -6,11 +6,17 @@ Usage:
     parse-jsonl.py <file>                    # Convert to markdown
     parse-jsonl.py <file> --extract <lines>  # Extract specific line range
     parse-jsonl.py <file> --search <term>    # Find lines mentioning term
+    parse-jsonl.py <file> --corrections      # Apply transcription corrections
 
 Examples:
     parse-jsonl.py session.jsonl
+    parse-jsonl.py session.jsonl --corrections
     parse-jsonl.py session.jsonl --extract 150-160
     parse-jsonl.py session.jsonl --search "cleanup-reminders.py"
+
+Options:
+    --corrections    Apply transcription corrections from config/corrections.yaml
+    --corrections-file <path>  Use custom corrections file
 
 Output format:
     ## Session: <id>
@@ -25,7 +31,107 @@ Output format:
 
 import sys
 import json
+import re
+import os
 from datetime import datetime
+from pathlib import Path
+
+
+def load_corrections(corrections_file=None):
+    """Load transcription corrections from YAML file."""
+    if corrections_file is None:
+        # Default location: config/corrections.yaml relative to repo root
+        script_dir = Path(__file__).parent
+        repo_root = script_dir.parent.parent
+        corrections_file = repo_root / "config" / "corrections.yaml"
+    else:
+        corrections_file = Path(corrections_file)
+
+    if not corrections_file.exists():
+        return {}
+
+    corrections = {}
+    try:
+        # Simple YAML parsing without external dependency
+        with open(corrections_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                # Skip comments and empty lines
+                if not line or line.startswith('#'):
+                    continue
+                # Parse key: value pairs
+                if ':' in line:
+                    # Handle quoted values
+                    match = re.match(r'^"?([^"]+)"?\s*:\s*"?([^"]*)"?$', line)
+                    if match:
+                        wrong, correct = match.groups()
+                        # Skip if value is explicitly empty (removal entries)
+                        corrections[wrong.strip()] = correct.strip()
+    except Exception as e:
+        print(f"Warning: Could not load corrections file: {e}", file=sys.stderr)
+        return {}
+
+    return corrections
+
+
+def apply_corrections(text, corrections):
+    """Apply transcription corrections to text."""
+    if not corrections or not text:
+        return text
+
+    result = text
+
+    # Apply simple replacements (case-insensitive)
+    for wrong, correct in corrections.items():
+        if not wrong:
+            continue
+        # Create case-insensitive pattern
+        pattern = re.compile(re.escape(wrong), re.IGNORECASE)
+
+        def replace_match(m):
+            # If correct is empty, remove the match
+            if not correct:
+                return ''
+            # Try to preserve case of first character
+            matched = m.group(0)
+            if matched[0].isupper() and correct[0].islower():
+                return correct[0].upper() + correct[1:]
+            elif matched[0].islower() and correct[0].isupper():
+                return correct[0].lower() + correct[1:]
+            return correct
+
+        result = pattern.sub(replace_match, result)
+
+    # Clean up whisper artifacts
+    result = clean_whisper_artifacts(result)
+
+    return result
+
+
+def clean_whisper_artifacts(text):
+    """Remove common whisper-cpp artifacts from text."""
+    if not text:
+        return text
+
+    # Remove timestamp patterns like [00:00:00.000 --> 00:00:05.000]
+    text = re.sub(r'\[\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?\s*(?:-->|->)\s*\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?\]', '', text)
+
+    # Remove standalone timestamps like [00:00] or [00:00:00]
+    text = re.sub(r'\[\d{2}:\d{2}(?::\d{2})?\]', '', text)
+
+    # Remove speaker labels like [SPEAKER_00]
+    text = re.sub(r'\[SPEAKER_\d+\]', '', text)
+
+    # Clean up multiple spaces
+    text = re.sub(r'  +', ' ', text)
+
+    # Clean up spaces around punctuation
+    text = re.sub(r'\s+([.,!?;:])', r'\1', text)
+
+    # Clean up leading/trailing whitespace
+    text = text.strip()
+
+    return text
 
 
 def parse_timestamp(ts):
@@ -70,8 +176,12 @@ def extract_message_text(entry):
     if isinstance(content, list):
         texts = []
         for item in content:
-            if isinstance(item, dict) and item.get('type') == 'text':
-                texts.append(item.get('text', ''))
+            if isinstance(item, dict):
+                if item.get('type') == 'text':
+                    texts.append(item.get('text', ''))
+                # Skip thinking blocks
+                elif item.get('type') == 'thinking':
+                    continue
             elif isinstance(item, str):
                 texts.append(item)
         return '\n'.join(texts)
@@ -79,6 +189,31 @@ def extract_message_text(entry):
         return content
 
     return str(msg)
+
+
+def should_skip_entry(entry):
+    """Determine if an entry should be skipped in output."""
+    # Skip session metadata
+    if entry.get('type') == 'session':
+        return True
+    if entry.get('type') == 'custom':
+        return True
+
+    # Skip delivery mirrors (duplicates)
+    if entry.get('model') == 'delivery-mirror':
+        return True
+
+    # Get message content
+    msg = entry.get('message', entry)
+    role = msg.get('role', entry.get('role', ''))
+
+    # Skip system messages about session start
+    if role == 'system':
+        text = extract_message_text(entry)
+        if 'New session started' in text or 'Session started' in text:
+            return True
+
+    return False
 
 
 def parse_jsonl(filepath):
@@ -95,7 +230,7 @@ def parse_jsonl(filepath):
                 continue
 
 
-def to_markdown(filepath, line_range=None):
+def to_markdown(filepath, line_range=None, corrections=None):
     """Convert JSONL session to markdown format."""
     output = []
     session_id = None
@@ -107,6 +242,10 @@ def to_markdown(filepath, line_range=None):
             start, end = line_range
             if line_num < start or line_num > end:
                 continue
+
+        # Skip entries that shouldn't appear in output
+        if should_skip_entry(entry):
+            continue
 
         # Get session metadata from first entry
         if session_id is None and 'sessionId' in entry:
@@ -124,6 +263,13 @@ def to_markdown(filepath, line_range=None):
         if not role or not text:
             continue
 
+        # Apply corrections if provided
+        if corrections:
+            text = apply_corrections(text, corrections)
+
+        # Clean up [message_id: N] markers
+        text = re.sub(r'\[message_id:\s*\d+\]', '', text)
+
         speaker = get_speaker(role)
         ts_str = format_timestamp(timestamp) if timestamp else ''
 
@@ -134,7 +280,7 @@ def to_markdown(filepath, line_range=None):
         header += f" | {speaker}"
 
         output.append(header)
-        output.append(text[:500] + ('...' if len(text) > 500 else ''))
+        output.append(text[:2000] + ('...' if len(text) > 2000 else ''))
         output.append('')
 
     # Add header
@@ -165,31 +311,51 @@ def main():
         sys.exit(1)
 
     filepath = sys.argv[1]
+    corrections = None
+    corrections_file = None
 
-    if len(sys.argv) >= 4 and sys.argv[2] == '--extract':
-        # Extract line range
-        try:
-            parts = sys.argv[3].split('-')
-            line_range = (int(parts[0]), int(parts[1]))
-        except (ValueError, IndexError):
-            print("Error: Range must be in format START-END (e.g., 150-160)", file=sys.stderr)
-            sys.exit(1)
-        print(to_markdown(filepath, line_range))
+    # Parse arguments
+    i = 2
+    while i < len(sys.argv):
+        arg = sys.argv[i]
 
-    elif len(sys.argv) >= 4 and sys.argv[2] == '--search':
-        # Search for term
-        term = sys.argv[3]
-        matches = search_jsonl(filepath, term)
-        if matches:
-            print(f"Found {len(matches)} matches:")
-            for m in matches:
-                print(f"  L{m}")
+        if arg == '--corrections':
+            corrections = load_corrections(corrections_file)
+            i += 1
+
+        elif arg == '--corrections-file' and i + 1 < len(sys.argv):
+            corrections_file = sys.argv[i + 1]
+            corrections = load_corrections(corrections_file)
+            i += 2
+
+        elif arg == '--extract' and i + 1 < len(sys.argv):
+            try:
+                parts = sys.argv[i + 1].split('-')
+                line_range = (int(parts[0]), int(parts[1]))
+            except (ValueError, IndexError):
+                print("Error: Range must be in format START-END (e.g., 150-160)", file=sys.stderr)
+                sys.exit(1)
+            print(to_markdown(filepath, line_range, corrections))
+            return
+            i += 2
+
+        elif arg == '--search' and i + 1 < len(sys.argv):
+            term = sys.argv[i + 1]
+            matches = search_jsonl(filepath, term)
+            if matches:
+                print(f"Found {len(matches)} matches:")
+                for m in matches:
+                    print(f"  L{m}")
+            else:
+                print("No matches found")
+            return
+            i += 2
+
         else:
-            print("No matches found")
+            i += 1
 
-    else:
-        # Full conversion
-        print(to_markdown(filepath))
+    # Default: full conversion
+    print(to_markdown(filepath, corrections=corrections))
 
 
 if __name__ == '__main__':

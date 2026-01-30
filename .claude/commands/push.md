@@ -31,7 +31,7 @@ mkdir -p bundles/bot
 cp reference/*.md bundles/bot/
 ```
 
-For full filtering/redaction support, the PKM convo-processor pipeline would be used.
+For full filtering/redaction support, a more advanced document processing pipeline would be used.
 
 ### 3. Push to Bot
 

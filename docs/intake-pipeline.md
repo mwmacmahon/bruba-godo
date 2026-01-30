@@ -48,6 +48,14 @@ This produces a clean transcript with:
 - Timestamps
 - Tool calls summarized
 
+**With transcription corrections** (for voice messages):
+
+```bash
+python tools/helpers/parse-jsonl.py sessions/session.jsonl --corrections > intake/topic.md
+```
+
+See [Transcription Corrections](#transcription-corrections) below.
+
 ### Step 4: Process for Reference
 
 Review the markdown and extract valuable content:
@@ -99,14 +107,14 @@ Each line in a session file is a JSON object:
 
 Good for quick extraction of specific content.
 
-### Full Pipeline (PKM)
+### Full Pipeline (Advanced)
 
 1. Pull sessions with full processing
 2. Canonicalize with frontmatter and tagging
 3. Generate variants (redacted versions for different audiences)
 4. Automatic mining into reference docs
 
-Required for filtered bundles with redaction. Use PKM's convo-processor for this.
+Required for filtered bundles with redaction. This would require a more sophisticated document processing pipeline.
 
 ---
 
@@ -136,6 +144,70 @@ Tool outputs (especially file reads) can dominate transcripts. The parse-jsonl h
 
 ---
 
+## Transcription Corrections
+
+Voice messages transcribed by Whisper often have errors. The parser supports automatic corrections.
+
+### Enabling Corrections
+
+```bash
+# Use default corrections file (config/corrections.yaml)
+python tools/helpers/parse-jsonl.py session.jsonl --corrections
+
+# Use custom corrections file
+python tools/helpers/parse-jsonl.py session.jsonl --corrections-file /path/to/my-corrections.yaml
+```
+
+### Corrections File Format
+
+The corrections file (`config/corrections.yaml`) uses simple YAML format:
+
+```yaml
+# AI/Tech Terms
+chatgpt: ChatGPT
+chat gpt: ChatGPT
+openai: OpenAI
+claude: Claude
+clawdbot: Clawdbot
+llm: LLM
+api: API
+
+# Programming Terms
+javascript: JavaScript
+github: GitHub
+
+# Whisper Artifacts (removed entirely)
+"[music]": ""
+"[applause]": ""
+```
+
+Corrections are:
+- Case-insensitive matching
+- Case-preserving replacement (when possible)
+- Empty values remove the match entirely
+
+### Built-in Whisper Cleanup
+
+Even without `--corrections`, the parser removes:
+- Timestamp patterns (`[00:00:00.000 --> 00:00:05.000]`)
+- Speaker labels (`[SPEAKER_00]`)
+- Multiple spaces and orphaned punctuation
+
+### Customizing Corrections
+
+Edit `config/corrections.yaml` to add your own corrections:
+
+```yaml
+# Your name variations
+john: John
+johnny: John
+
+# Project-specific terms
+myproject: MyProject
+```
+
+---
+
 ## Files Reference
 
 | File | Purpose |
@@ -159,6 +231,9 @@ Tool outputs (especially file reads) can dominate transcripts. The parse-jsonl h
 
 # Convert JSONL to markdown
 python tools/helpers/parse-jsonl.py sessions/session.jsonl > intake/doc.md
+
+# Convert with transcription corrections (for voice)
+python tools/helpers/parse-jsonl.py sessions/session.jsonl --corrections > intake/doc.md
 
 # Push content to bot memory
 ./tools/push.sh

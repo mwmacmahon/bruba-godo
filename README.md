@@ -34,6 +34,8 @@ Before using bruba-godo, you need:
 4. **Claude Code** on your operator machine (optional but recommended for skills)
 
 For detailed setup instructions, see:
+- [Quick start (new machine)](docs/quickstart-new-machine.md) — Condensed setup
+- [Full setup guide](docs/full-setup-guide.md) — Comprehensive configuration
 - [Setting up the remote machine](docs/setup-remote-machine.md) — Create service account, enable SSH
 - [Setting up operator SSH access](docs/setup-operator-ssh.md) — SSH keys, config, troubleshooting
 
@@ -104,7 +106,12 @@ Bot Skills:
 bruba-godo/
 ├── config.yaml.example      # Connection settings template
 ├── bundles.yaml             # Bundle definitions
+├── config/                  # Configuration files
+│   └── corrections.yaml     # Transcription corrections
 ├── docs/                    # Documentation
+│   ├── full-setup-guide.md  # Comprehensive setup
+│   ├── operations-guide.md  # Day-to-day operations
+│   ├── security-model.md    # Security reference
 │   ├── setup-remote-machine.md
 │   ├── setup-operator-ssh.md
 │   └── intake-pipeline.md
@@ -116,6 +123,7 @@ bruba-godo/
 │   ├── push.sh              # Push content to bot
 │   ├── provision-bot.sh     # Full bot provisioning
 │   ├── setup-agent.sh       # Agent template setup
+│   ├── snapshot.sh          # Config/memory backup
 │   └── helpers/             # Python utilities
 ├── components/              # Optional add-ons
 │   ├── signal/              # Signal messenger
@@ -153,6 +161,9 @@ bruba-godo/
 
 # Setup a new agent
 ./tools/setup-agent.sh --agent-id my-agent --user-name "Your Name"
+
+# Create a backup snapshot
+./tools/snapshot.sh --verbose
 ```
 
 ## Provisioning a New Bot
@@ -198,6 +209,17 @@ After provisioning, add optional features:
 | jq | Recommended | JSON manipulation (Python fallback) |
 | rsync | Yes | File sync |
 | Clawdbot | On remote | Bot runtime |
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [Full Setup Guide](docs/full-setup-guide.md) | Complete setup from scratch |
+| [Operations Guide](docs/operations-guide.md) | Day-to-day usage reference |
+| [Security Model](docs/security-model.md) | Threat model, permissions, hardening |
+| [Intake Pipeline](docs/intake-pipeline.md) | Session processing workflow |
+| [Setup Remote Machine](docs/setup-remote-machine.md) | Bot machine preparation |
+| [Setup Operator SSH](docs/setup-operator-ssh.md) | SSH configuration |
 
 ## License
 

@@ -10,7 +10,7 @@
 # Reads bundles.yaml for filter configuration, syncs bundles/bot/ to bot's memory/
 #
 # IMPORTANT: This script ADDS files to bot memory. It does NOT delete existing files.
-# To sync with deletion, use PKM's sync-to-bruba.sh which has the full content set.
+# To sync with deletion, use rsync --delete manually with the full content set.
 #
 # Logs: logs/push.log
 
