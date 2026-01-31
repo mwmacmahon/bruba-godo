@@ -15,15 +15,14 @@ Optional add-ons for extending your bot's capabilities.
 | [Workspace](workspace/) | Prompt Ready | ✅ | Generated content paths |
 | [HTTP-API](http-api/) | Prompt Ready | ✅ | Siri/Shortcuts integration |
 | [Continuity](continuity/) | Prompt Ready | ✅ | Continuation packet announce |
-| [Distill](distill/) | **Core** | ✅ | Conversation → knowledge pipeline |
+| [Distill](distill/) | **Ready** | ✅ | Conversation → knowledge pipeline (full) |
 | [Reminders](reminders/) | Planned | — | Scheduled reminders |
 | [Web Search](web-search/) | Planned | — | Web search integration |
 | Calendar | Planned | — | Apple Calendar integration |
 
 **Status key:**
-- **Ready** — Full setup.sh, validate.sh, and prompts
+- **Ready** — Full setup.sh, validate.sh, prompts, and working code
 - **Prompt Ready** — Prompt snippet extracted, setup TBD
-- **Core** — Code complete, testing needed
 - **Planned** — README only
 
 ## How Components Work

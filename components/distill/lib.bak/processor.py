@@ -29,22 +29,64 @@ def process_session(
     # Load config
     config = _load_config()
 
-    # Parse JSONL
-    messages = []
+    # Parse JSONL (clawdbot format)
+    raw_entries = []
     with open(input_path, 'r') as f:
         for line in f:
             line = line.strip()
             if line:
                 try:
-                    messages.append(json.loads(line))
+                    raw_entries.append(json.loads(line))
                 except json.JSONDecodeError as e:
                     print(f"  Warning: Invalid JSON line: {e}")
+
+    # Extract actual messages from clawdbot format
+    # Format: {"type":"message", "message": {"role":"...", "content":[...]}}
+    messages = []
+    for entry in raw_entries:
+        if entry.get('type') == 'message' and 'message' in entry:
+            msg = entry['message']
+            # Flatten content array if present
+            content = msg.get('content', '')
+            if isinstance(content, list):
+                # Extract text from content blocks
+                text_parts = []
+                for block in content:
+                    if isinstance(block, dict):
+                        if block.get('type') == 'text':
+                            text_parts.append(block.get('text', ''))
+                        elif block.get('type') == 'tool_use':
+                            # Preserve tool_use blocks as separate messages
+                            messages.append({
+                                'role': 'tool_use',
+                                'name': block.get('name', 'unknown'),
+                                'input': block.get('input', {})
+                            })
+                        elif block.get('type') == 'tool_result':
+                            messages.append({
+                                'role': 'tool_result',
+                                'content': block.get('content', '')
+                            })
+                    elif isinstance(block, str):
+                        text_parts.append(block)
+                content = '\n'.join(text_parts)
+
+            # Map roles (clawdbot uses 'user' not 'human')
+            role = msg.get('role', 'unknown')
+            if role == 'user':
+                role = 'human'
+
+            if content:  # Only add if there's actual content
+                messages.append({
+                    'role': role,
+                    'content': content
+                })
 
     if not messages:
         raise ValueError(f"No valid messages found in {input_path}")
 
-    # Extract metadata
-    metadata = _extract_metadata(messages, input_path)
+    # Extract metadata (from raw entries, not filtered messages)
+    metadata = _extract_metadata(raw_entries, input_path)
 
     # Convert to markdown
     content = canonicalize.messages_to_markdown(messages, config)

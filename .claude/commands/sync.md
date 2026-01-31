@@ -1,177 +1,281 @@
-# /sync - Assemble and Push Prompts
+# /sync - Full Pipeline Sync
 
-Assemble prompts from config-driven sections, detect conflicts with bot's changes, and push to remote.
-
-## Instructions
-
-### 1. Mirror Current State
-
-Pull bot's current prompts to detect changes:
-
-```bash
-./tools/mirror.sh
-```
-
-### 2. Detect Conflicts
-
-Run the conflict detection script:
-
-```bash
-./tools/detect-conflicts.sh
-```
-
-This checks for:
-- **New bot sections:** BOT-MANAGED blocks in mirror not listed in config
-- **Bot edits to components:** Content in mirror differs from component source
-
-**If conflicts are found, resolve them before proceeding** (see Conflict Resolution below).
-
-### 3. Assemble Prompts
-
-Build final prompts from config-driven section order:
-
-```bash
-./tools/assemble-prompts.sh --verbose
-```
-
-### 4. Push to Remote
-
-Sync assembled prompts to bot:
-
-```bash
-rsync -avz --delete assembled/prompts/ bruba:/Users/bruba/clawd/
-```
-
-Or for specific files:
-```bash
-scp assembled/prompts/AGENTS.md bruba:/Users/bruba/clawd/AGENTS.md
-```
-
-## Conflict Resolution
-
-### New Bot Section Detected
-
-When mirror has `<!-- BOT-MANAGED: X -->` not in config:
-
-1. **Show the section:**
-   ```bash
-   ./tools/detect-conflicts.sh --show-section X
-   ```
-
-2. **Ask user:** "Bot added section 'X'. Keep it?"
-
-3. **If yes:**
-   - Determine position (look at surrounding sections in mirror)
-   - Edit `config.yaml` to add `bot:X` at correct position
-   - Example: If section appears after `safety`, add after `- safety` line
-
-4. **If no:**
-   - Section will be removed on push
-   - Warn user this is destructive
-
-### Bot Edited Component
-
-When mirror's content for a section differs from assembled component:
-
-1. **Show the diff:**
-   ```bash
-   ./tools/detect-conflicts.sh --diff session
-   ```
-
-2. **Ask user:** "Bot modified 'session'. Use bot's version?"
-
-3. **If yes (keep bot's changes):**
-   - Change `session` to `bot:session` in config
-   - Bot must have wrapped with `<!-- BOT-MANAGED: session -->`
-   - If not wrapped, help user add markers on remote
-
-4. **If no (use component version):**
-   - Bot's changes will be overwritten on push
-   - Confirm this is intentional
+Unified sync command for prompts and content pipeline. Interactive menu to choose what to sync.
 
 ## Arguments
 
 $ARGUMENTS
 
 Options:
-- `--force` — Push without conflict check
-- `--dry-run` — Show what would happen without pushing
+- `--prompts` - Run prompt sync only (same as `/prompt-sync`)
+- `--content` - Run content pipeline only
+- `--all` - Run both without prompting
+- `--status` - Show status only, no sync
 
-## Quick Sync (No Conflicts)
+## Instructions
 
-If you're confident there are no conflicts:
+### 1. Gather Status
+
+Run these checks in parallel:
+
+**Prompts status:**
+```bash
+# Last prompt sync (check assembled/ timestamps)
+ls -la assembled/prompts/*.md 2>/dev/null | head -5
+
+# Check for pending prompt changes
+./tools/detect-conflicts.sh --quiet 2>/dev/null || echo "conflicts unknown"
+```
+
+**Content pipeline status:**
+```bash
+# Files in intake/ (pending)
+ls intake/*.md 2>/dev/null | wc -l
+
+# Files needing CONFIG
+grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null | wc -l
+
+# Files ready for canonicalization
+grep -l "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null | wc -l
+
+# Canonical files
+ls reference/transcripts/*.md 2>/dev/null | wc -l
+
+# Export files ready
+ls exports/bot/*.md 2>/dev/null | wc -l
+```
+
+### 2. Show Status Dashboard
+
+Present current state:
+
+```
+=== Sync Status ===
+
+PROMPTS
+  Last sync: [timestamp or "never"]
+  Pending: [conflicts detected / clean / unknown]
+
+CONTENT PIPELINE
+  intake/           [N] files
+    - Ready:        [X] (have CONFIG)
+    - Need convert: [Y] (no CONFIG)
+  reference/        [Z] canonical files
+  exports/bot/      [W] export files
+
+OPTIONS
+  [1] Prompts only     — assemble + push prompts
+  [2] Content only     — pull → convert → intake → export → push
+  [3] Full sync        — both prompts and content
+  [4] Status only      — (shown above, done)
+```
+
+### 3. Handle User Choice
+
+Based on argument or user selection:
+
+**[1] Prompts only** → Run `/prompt-sync`
+- This runs the full prompt assembly pipeline
+- Mirror → conflict detection → assemble → push
+
+**[2] Content only** → Run content pipeline steps
+- Follow the content pipeline below
+
+**[3] Full sync** → Run both
+- First: `/prompt-sync`
+- Then: Content pipeline
+
+**[4] Status only** → Done
+- Already shown above, exit
+
+### 4. Content Pipeline
+
+When running content sync, follow these steps in order:
+
+#### Step 1: Pull new sessions
 
 ```bash
-./tools/mirror.sh && ./tools/assemble-prompts.sh && rsync -avz assembled/prompts/ bruba:/Users/bruba/clawd/
+./tools/pull-sessions.sh --verbose
 ```
 
-## Config-Driven Assembly
+Report: new sessions pulled, converted to intake/
 
-Sections are defined in `config.yaml`:
+#### Step 2: Convert files needing CONFIG
 
-```yaml
-agents_sections:
-  - header              # template section
-  - http-api            # component
-  - bot:exec-approvals  # bot-managed (preserved)
-  - safety              # template section
-  ...
+Check for files without CONFIG:
+```bash
+grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
 ```
 
-Resolution order for each entry:
-1. `bot:name` → extract from mirror's BOT-MANAGED blocks
-2. Component → `components/{name}/prompts/AGENTS.snippet.md`
-3. Template section → `templates/prompts/sections/{name}.md`
+If files need CONFIG:
+```
+Files needing CONFIG:
+  1. intake/abc12345.md (45 messages, 12KB)
+  2. intake/def67890.md (23 messages, 8KB)
 
-## Example Flow
+Options:
+  [a] Convert all interactively (recommended)
+  [s] Skip conversion, continue with ready files
+  [q] Stop here
+
+Which files to convert? [a/s/q]
+```
+
+If user chooses to convert:
+- Run `/convert` for each file interactively
+- User reviews and approves each CONFIG
+
+#### Step 3: Canonicalize ready files
+
+```bash
+# Check what's ready
+grep -l "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
+```
+
+If files are ready:
+```bash
+python -m components.distill.lib.cli canonicalize intake/<file>.md \
+    -o reference/transcripts/ \
+    -c components/distill/config/corrections.yaml \
+    --verbose
+```
+
+Move processed files:
+```bash
+mv intake/<file>.md intake/processed/
+```
+
+#### Step 4: Generate exports
+
+```bash
+python -m components.distill.lib.cli export --profile bot --verbose
+```
+
+#### Step 5: Push to bot memory
+
+```bash
+./tools/push.sh --verbose
+```
+
+### 5. Summary
+
+Show final summary:
+
+```
+=== Sync Complete ===
+
+PROMPTS: [synced / skipped]
+  - Assembled: X files
+  - Pushed to: bruba:/Users/bruba/clawd/
+
+CONTENT: [synced / skipped]
+  - Pulled: N new sessions
+  - Converted: X files
+  - Canonicalized: Y files
+  - Exported: Z files (profile: bot)
+  - Pushed to: bruba:/Users/bruba/clawd/memory/
+```
+
+## Example Session
 
 ```
 User: /sync
 
-Claude: [mirrors]
-$ ./tools/mirror.sh
+Claude:
+=== Sync Status ===
+
+PROMPTS
+  Last sync: 2026-01-30 14:23
+  Pending: clean (no conflicts)
+
+CONTENT PIPELINE
+  intake/           3 files
+    - Ready:        1 (have CONFIG)
+    - Need convert: 2 (no CONFIG)
+  reference/        12 canonical files
+  exports/bot/      10 export files
+
+OPTIONS
+  [1] Prompts only     — assemble + push prompts
+  [2] Content only     — pull → convert → intake → export → push
+  [3] Full sync        — both prompts and content
+  [4] Status only      — (shown above, done)
+
+User: 3
+
+Claude: Running full sync...
+
+=== Prompts ===
+[runs /prompt-sync]
 Mirror: 15 files
-
-Claude: [checks conflicts]
-$ ./tools/detect-conflicts.sh
-
-⚠️  Conflicts detected:
-
-1. NEW BOT SECTION: "my-notes"
-   Location: after "heartbeats" section
-   Preview:
-   ## My Notes
-   Some things I learned...
-
-2. BOT EDITED: "memory" component
-   Lines changed: 3 added, 1 removed
-
-Options:
-1. Resolve conflicts interactively
-2. Show details
-3. Force push (overwrite bot changes)
-4. Abort
-
-User: 1
-
-Claude: [resolves each]
-Keep bot section "my-notes"? [y/n]: y
-→ Added "bot:my-notes" to config after "heartbeats"
-
-Use bot's version of "memory"? [y/n]: n
-→ Component version will be used (bot changes overwritten)
-
-Claude: [assembles and pushes]
-$ ./tools/assemble-prompts.sh
+Conflicts: none
 Assembled: AGENTS.md (18 sections)
+Pushed to bot.
 
-$ rsync -avz assembled/prompts/ bruba:/Users/bruba/clawd/
-Synced to bot.
+=== Content Pipeline ===
+
+[1/5] Pulling sessions...
+  Pulled: 1 new session → intake/ghi11111.md
+  Skipped: 24 already pulled
+
+[2/5] Converting files...
+  Files needing CONFIG: 3
+    1. intake/abc12345.md
+    2. intake/def67890.md
+    3. intake/ghi11111.md
+
+  Convert all? [a/s/q]: a
+
+  [runs /convert for each, user approves]
+
+[3/5] Canonicalizing...
+  3 files ready
+  → reference/transcripts/2026-01-30-topic-a.md
+  → reference/transcripts/2026-01-30-topic-b.md
+  → reference/transcripts/2026-01-30-topic-c.md
+
+[4/5] Exporting...
+  Profile: bot
+  Processed: 15 files
+  Skipped: 2 (filtered)
+  → exports/bot/
+
+[5/5] Pushing to bot...
+  Synced 13 files
+  Memory reindexed.
+
+=== Sync Complete ===
+
+PROMPTS: synced
+  - Assembled: 8 files
+  - Pushed to: bruba:/Users/bruba/clawd/
+
+CONTENT: synced
+  - Pulled: 1 new session
+  - Converted: 3 files
+  - Canonicalized: 3 files
+  - Exported: 13 files
+  - Pushed to: bruba:/Users/bruba/clawd/memory/
+```
+
+## Quick Sync (No Prompts)
+
+For content-only sync with defaults:
+```
+/sync --content
+```
+
+For prompts-only sync:
+```
+/sync --prompts
 ```
 
 ## Related Skills
 
-- `/prompts` - Explain config system, manual conflict resolution
-- `/mirror` - Mirror bot files locally
-- `/push` - Push content to bot memory
-- `/component` - Manage components
+- `/prompt-sync` - Prompt assembly only (detailed conflict resolution)
+- `/pull` - Pull sessions only
+- `/convert` - Convert single file (AI-assisted CONFIG)
+- `/intake` - Batch canonicalize
+- `/export` - Generate exports
+- `/push` - Push to bot memory
+- `/status` - Quick bot status check

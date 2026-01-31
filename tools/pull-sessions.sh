@@ -1,16 +1,21 @@
 #!/bin/bash
-# Pull closed bot sessions locally
+# Pull closed bot sessions locally and convert to delimited markdown
 #
 # Usage:
 #   ./tools/pull-sessions.sh              # Pull new closed sessions (quiet)
 #   ./tools/pull-sessions.sh --verbose    # Show detailed output
 #   ./tools/pull-sessions.sh --dry-run    # Show what would be pulled
 #   ./tools/pull-sessions.sh --force UUID # Force re-pull specific session
+#   ./tools/pull-sessions.sh --no-convert # Skip markdown conversion
 #
 # Closed sessions are immutable - once pulled, they never need re-pulling.
 # Active session is skipped (still being written).
 #
-# Output: sessions/*.jsonl (raw JSONL files)
+# Pipeline:
+#   1. Pull JSONL to sessions/
+#   2. Convert to delimited markdown in intake/ (via distill CLI)
+#
+# Output: sessions/*.jsonl (raw JSONL), intake/*.md (delimited markdown)
 # State: sessions/.pulled (list of pulled session IDs)
 # Logs: logs/pull.log
 
@@ -20,9 +25,23 @@ set -e
 source "$(dirname "$0")/lib.sh"
 
 FORCE_SESSION=""
+NO_CONVERT=false
 
-# Parse arguments
-parse_common_args "$@"
+# Parse arguments (parse_common_args returns 1 for --help)
+if ! parse_common_args "$@"; then
+    # Show help was requested
+    echo "Usage: $0 [--dry-run] [--verbose] [--force UUID] [--no-convert]"
+    echo ""
+    echo "Pull closed bot sessions locally and convert to delimited markdown."
+    echo ""
+    echo "Options:"
+    echo "  --dry-run, -n     Show what would be pulled"
+    echo "  --verbose, -v     Show detailed output"
+    echo "  --quiet, -q       Summary output only (default)"
+    echo "  --force, -f UUID  Force re-pull a specific session"
+    echo "  --no-convert      Skip conversion to markdown (raw JSONL only)"
+    exit 0
+fi
 set -- "${REMAINING_ARGS[@]}"
 
 while [[ $# -gt 0 ]]; do
@@ -31,17 +50,9 @@ while [[ $# -gt 0 ]]; do
             FORCE_SESSION="$2"
             shift 2
             ;;
-        --help|-h)
-            echo "Usage: $0 [--dry-run] [--verbose] [--force UUID]"
-            echo ""
-            echo "Pull closed bot sessions locally."
-            echo ""
-            echo "Options:"
-            echo "  --dry-run, -n     Show what would be pulled"
-            echo "  --verbose, -v     Show detailed output"
-            echo "  --quiet, -q       Summary output only (default)"
-            echo "  --force, -f UUID  Force re-pull a specific session"
-            exit 0
+        --no-convert)
+            NO_CONVERT=true
+            shift
             ;;
         *)
             echo "Unknown option: $1"
@@ -56,10 +67,16 @@ load_config
 # Set up paths and logging
 STATE_FILE="$SESSIONS_DIR/.pulled"
 LOG_FILE="$LOG_DIR/pull.log"
+INTAKE_DIR="${INTAKE_DIR:-intake}"
 
-mkdir -p "$SESSIONS_DIR" "$LOG_DIR"
+mkdir -p "$SESSIONS_DIR" "$LOG_DIR" "$INTAKE_DIR"
 touch "$STATE_FILE"
 rotate_log "$LOG_FILE"
+
+# Track newly pulled sessions for conversion
+NEWLY_PULLED=()
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 log "=== Pulling Bot Sessions ==="
 log "Sessions dir: $SESSIONS_DIR"
@@ -140,6 +157,9 @@ for session_file in $SESSION_FILES; do
     fi
     echo "$session_id" >> "$STATE_FILE"
 
+    # Track for conversion
+    NEWLY_PULLED+=("$output_file")
+
     log "    OK"
     PULLED=$((PULLED + 1))
 done
@@ -153,4 +173,31 @@ else
     log "Pulled: $PULLED"
 fi
 
-echo "Sessions: $PULLED new, $SKIPPED_PULLED skipped"
+# Convert newly pulled sessions to delimited markdown
+CONVERTED=0
+if [[ "$NO_CONVERT" != "true" ]] && [[ "$DRY_RUN" != "true" ]] && [[ ${#NEWLY_PULLED[@]} -gt 0 ]]; then
+    log ""
+    log "=== Converting to Markdown ==="
+
+    for jsonl_file in "${NEWLY_PULLED[@]}"; do
+        session_id=$(basename "$jsonl_file" .jsonl)
+        log "  Converting: ${session_id:0:8}..."
+
+        if python3 -m components.distill.lib.cli parse-jsonl "$jsonl_file" -o "$INTAKE_DIR" 2>/dev/null; then
+            log "    -> $INTAKE_DIR/$session_id.md"
+            CONVERTED=$((CONVERTED + 1))
+        else
+            log "    ERROR: Conversion failed"
+        fi
+    done
+
+    log "Converted: $CONVERTED sessions"
+fi
+
+if [[ "$NO_CONVERT" == "true" ]]; then
+    echo "Sessions: $PULLED new, $SKIPPED_PULLED skipped (conversion skipped)"
+elif [[ "$CONVERTED" -gt 0 ]]; then
+    echo "Sessions: $PULLED new, $SKIPPED_PULLED skipped, $CONVERTED converted to intake/"
+else
+    echo "Sessions: $PULLED new, $SKIPPED_PULLED skipped"
+fi
