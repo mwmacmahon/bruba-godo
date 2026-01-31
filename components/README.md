@@ -4,16 +4,27 @@ Optional add-ons for extending your bot's capabilities.
 
 ## Available Components
 
-| Component | Status | Description |
-|-----------|--------|-------------|
-| [Signal](signal/) | **Ready** | Connect via Signal messenger |
-| [Voice](voice/) | Planned | Voice input/output (whisper, TTS) |
-| [Reminders](reminders/) | Planned | Scheduled reminders and notifications |
-| [Web Search](web-search/) | Planned | Web search integration |
-| [Distill](distill/) | **Core** | Conversation → knowledge pipeline |
-| [HTTP-API](http-api/) | Planned | Siri/Shortcuts integration |
-| [Calendar](calendar/) | Planned | Apple Calendar integration |
-| [Continuity](continuity/) | Planned | Session reset with context preservation |
+| Component | Status | Prompts | Description |
+|-----------|--------|---------|-------------|
+| [Signal](signal/) | **Ready** | ✅ | Connect via Signal messenger |
+| [Voice](voice/) | Prompt Ready | ✅ | Voice input/output (whisper, TTS) |
+| [Session](session/) | Prompt Ready | ✅ | Every Session, Greeting, Continuation |
+| [Memory](memory/) | Prompt Ready | ✅ | Memory management workflow |
+| [Heartbeats](heartbeats/) | Prompt Ready | ✅ | Proactive behavior on heartbeat polls |
+| [Group-chats](group-chats/) | Prompt Ready | ✅ | Social behavior in group contexts |
+| [Workspace](workspace/) | Prompt Ready | ✅ | Generated content paths |
+| [HTTP-API](http-api/) | Prompt Ready | ✅ | Siri/Shortcuts integration |
+| [Continuity](continuity/) | Prompt Ready | ✅ | Continuation packet announce |
+| [Distill](distill/) | **Core** | ✅ | Conversation → knowledge pipeline |
+| [Reminders](reminders/) | Planned | — | Scheduled reminders |
+| [Web Search](web-search/) | Planned | — | Web search integration |
+| Calendar | Planned | — | Apple Calendar integration |
+
+**Status key:**
+- **Ready** — Full setup.sh, validate.sh, and prompts
+- **Prompt Ready** — Prompt snippet extracted, setup TBD
+- **Core** — Code complete, testing needed
+- **Planned** — README only
 
 ## How Components Work
 
@@ -39,7 +50,7 @@ components/voice/
     └── TOOLS.snippet.md     # Added to TOOLS.md
 ```
 
-Snippets are assembled into final prompts by the `/sync` skill.
+Snippets are assembled into final prompts by the prompt assembly system. See `templates/prompts/README.md` for details, or use the `/prompts` skill.
 
 ## Usage
 

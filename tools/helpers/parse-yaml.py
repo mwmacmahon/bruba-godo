@@ -26,15 +26,28 @@ def parse_yaml_simple(content):
     result = {}
     stack = [(result, -1)]  # (dict, indent_level)
     current_key = None
+    current_list = None
+    list_indent = -1
 
     for line in content.split('\n'):
-        # Skip comments and empty lines
+        # Skip empty lines (but not lines that are just whitespace for structure)
+        if not line.strip():
+            continue
+
+        # Skip comment-only lines
         stripped = line.lstrip()
-        if not stripped or stripped.startswith('#'):
+        if stripped.startswith('#'):
             continue
 
         # Calculate indent
         indent = len(line) - len(stripped)
+
+        # Strip inline comments from stripped (but preserve the stripped content)
+        if '#' in stripped and not stripped.startswith('#'):
+            # Split on # but be careful about # in quotes
+            comment_idx = stripped.find('#')
+            # Simple approach: just strip from #
+            stripped = stripped[:comment_idx].rstrip()
 
         # Pop stack to correct level
         while len(stack) > 1 and stack[-1][1] >= indent:
@@ -45,8 +58,13 @@ def parse_yaml_simple(content):
         # Handle list items
         if stripped.startswith('- '):
             value = stripped[2:].strip()
-            if current_key and isinstance(current_dict.get(current_key), list):
+            # Track list context
+            if current_list is not None and indent >= list_indent:
+                current_list.append(value)
+            elif current_key and isinstance(current_dict.get(current_key), list):
                 current_dict[current_key].append(value)
+                current_list = current_dict[current_key]
+                list_indent = indent
             continue
 
         # Handle key-value pairs
@@ -67,18 +85,24 @@ def parse_yaml_simple(content):
                 value = [item.strip().strip('"\'') for item in items if item.strip()]
 
             if value == '':
-                # Nested dict or list coming
-                value = {}
-                current_dict[key] = value
-                stack.append((value, indent))
+                # Check if next non-empty line is a list item at higher indent
+                # For now, assume list if key is typical list name
+                current_dict[key] = []
                 current_key = key
+                current_list = current_dict[key]
+                list_indent = indent
+                stack.append((current_dict, indent))
             elif value.startswith('-'):
                 # Inline list indicator
                 current_dict[key] = []
                 current_key = key
+                current_list = current_dict[key]
+                list_indent = indent
             else:
                 current_dict[key] = value
                 current_key = key
+                current_list = None
+                list_indent = -1
 
     return result
 

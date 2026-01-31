@@ -1,63 +1,93 @@
 # /sync - Assemble and Push Prompts
 
-Assemble prompts from templates + components + user, detect conflicts, and push to bot.
+Assemble prompts from config-driven sections, detect conflicts with bot's changes, and push to remote.
 
 ## Instructions
 
 ### 1. Mirror Current State
 
-First, get the bot's current prompts to detect changes:
+Pull bot's current prompts to detect changes:
 
 ```bash
-./tools/mirror.sh --verbose
+./tools/mirror.sh
 ```
 
-### 2. Assemble Prompts
+### 2. Detect Conflicts
 
-Build final prompts from all sources:
+Run the conflict detection script:
+
+```bash
+./tools/detect-conflicts.sh
+```
+
+This checks for:
+- **New bot sections:** BOT-MANAGED blocks in mirror not listed in config
+- **Bot edits to components:** Content in mirror differs from component source
+
+**If conflicts are found, resolve them before proceeding** (see Conflict Resolution below).
+
+### 3. Assemble Prompts
+
+Build final prompts from config-driven section order:
 
 ```bash
 ./tools/assemble-prompts.sh --verbose
 ```
 
-This combines:
-- `templates/prompts/` — Base prompts
-- `components/*/prompts/*.snippet.md` — Component additions
-- `user/prompts/*.snippet.md` — User customizations
+### 4. Push to Remote
 
-Output goes to `assembled/prompts/`.
-
-### 3. Detect Conflicts
-
-Compare bot's current prompts (in `mirror/prompts/`) to assembled prompts:
+Sync assembled prompts to bot:
 
 ```bash
-# For each prompt file, check if bot has changes
-for prompt in AGENTS.md TOOLS.md MEMORY.md; do
-    if [[ -f "mirror/prompts/$prompt" ]] && [[ -f "assembled/prompts/$prompt" ]]; then
-        diff -q "mirror/prompts/$prompt" "assembled/prompts/$prompt" || echo "Changed: $prompt"
-    fi
-done
+rsync -avz --delete assembled/prompts/ bruba:/Users/bruba/clawd/
 ```
 
-**If conflicts detected:**
-- Show which files differ
-- Offer to show diff: `diff mirror/prompts/AGENTS.md assembled/prompts/AGENTS.md`
-- Ask user: push anyway, review, or abort
-
-### 4. Push Assembled Prompts
-
-If no conflicts (or user approves), sync assembled prompts to bot:
-
+Or for specific files:
 ```bash
-# Rsync assembled prompts to bot workspace
-rsync -avz assembled/prompts/ $SSH_HOST:$REMOTE_WORKSPACE/
+scp assembled/prompts/AGENTS.md bruba:/Users/bruba/clawd/AGENTS.md
 ```
 
-Or use full push script for content as well:
-```bash
-./tools/push.sh --verbose
-```
+## Conflict Resolution
+
+### New Bot Section Detected
+
+When mirror has `<!-- BOT-MANAGED: X -->` not in config:
+
+1. **Show the section:**
+   ```bash
+   ./tools/detect-conflicts.sh --show-section X
+   ```
+
+2. **Ask user:** "Bot added section 'X'. Keep it?"
+
+3. **If yes:**
+   - Determine position (look at surrounding sections in mirror)
+   - Edit `config.yaml` to add `bot:X` at correct position
+   - Example: If section appears after `safety`, add after `- safety` line
+
+4. **If no:**
+   - Section will be removed on push
+   - Warn user this is destructive
+
+### Bot Edited Component
+
+When mirror's content for a section differs from assembled component:
+
+1. **Show the diff:**
+   ```bash
+   ./tools/detect-conflicts.sh --diff session
+   ```
+
+2. **Ask user:** "Bot modified 'session'. Use bot's version?"
+
+3. **If yes (keep bot's changes):**
+   - Change `session` to `bot:session` in config
+   - Bot must have wrapped with `<!-- BOT-MANAGED: session -->`
+   - If not wrapped, help user add markers on remote
+
+4. **If no (use component version):**
+   - Bot's changes will be overwritten on push
+   - Confirm this is intentional
 
 ## Arguments
 
@@ -65,78 +95,83 @@ $ARGUMENTS
 
 Options:
 - `--force` — Push without conflict check
-- `--dry-run` — Show what would happen
+- `--dry-run` — Show what would happen without pushing
 
-## Assembly Sources
+## Quick Sync (No Conflicts)
 
-| Source | Directory | Priority |
-|--------|-----------|----------|
-| Base templates | `templates/prompts/` | Applied first |
-| Component snippets | `components/*/prompts/` | Added in order |
-| User snippets | `user/prompts/` | Added last |
+If you're confident there are no conflicts:
 
-### Snippet Format
-
-Snippets are wrapped with markers when assembled:
-
-```markdown
-<!-- COMPONENT: voice -->
-## Voice Message Handling
-
-When you receive a message with `[Audio]` tag...
-<!-- /COMPONENT: voice -->
+```bash
+./tools/mirror.sh && ./tools/assemble-prompts.sh && rsync -avz assembled/prompts/ bruba:/Users/bruba/clawd/
 ```
 
-## Conflict Handling
+## Config-Driven Assembly
 
-**What counts as a conflict:**
-- Bot's version differs from what we last pushed
-- Bot made edits to prompts during operation
+Sections are defined in `config.yaml`:
 
-**Resolution options:**
-1. **Push anyway** — Overwrites bot's changes
-2. **Review diff** — See what bot changed
-3. **Abort** — Keep bot's version, update templates manually
+```yaml
+agents_sections:
+  - header              # template section
+  - http-api            # component
+  - bot:exec-approvals  # bot-managed (preserved)
+  - safety              # template section
+  ...
+```
 
-## Example
+Resolution order for each entry:
+1. `bot:name` → extract from mirror's BOT-MANAGED blocks
+2. Component → `components/{name}/prompts/AGENTS.snippet.md`
+3. Template section → `templates/prompts/sections/{name}.md`
+
+## Example Flow
 
 ```
 User: /sync
 
-Claude: [mirrors current state]
-Mirror: 8 files
+Claude: [mirrors]
+$ ./tools/mirror.sh
+Mirror: 15 files
 
-Claude: [assembles prompts]
-Assembled: 6 prompts (2 component snippets)
+Claude: [checks conflicts]
+$ ./tools/detect-conflicts.sh
 
-Claude: [checks for conflicts]
-Comparing to bot's current prompts...
-⚠️ AGENTS.md has local changes on bot
+⚠️  Conflicts detected:
 
-Changed sections:
-  - Added note about specific tool behavior
+1. NEW BOT SECTION: "my-notes"
+   Location: after "heartbeats" section
+   Preview:
+   ## My Notes
+   Some things I learned...
+
+2. BOT EDITED: "memory" component
+   Lines changed: 3 added, 1 removed
 
 Options:
-1. Push anyway (overwrites bot's changes)
-2. Show full diff
-3. Abort
+1. Resolve conflicts interactively
+2. Show details
+3. Force push (overwrite bot changes)
+4. Abort
 
-User: 2
+User: 1
 
-Claude: [shows diff]
---- mirror/prompts/AGENTS.md
-+++ assembled/prompts/AGENTS.md
-@@ -45,0 +46,3 @@
-+Note: When using remindctl, always specify timezone...
+Claude: [resolves each]
+Keep bot section "my-notes"? [y/n]: y
+→ Added "bot:my-notes" to config after "heartbeats"
 
-User: push anyway
+Use bot's version of "memory"? [y/n]: n
+→ Component version will be used (bot changes overwritten)
 
-Claude: [pushes]
-Synced 6 prompts to bot.
+Claude: [assembles and pushes]
+$ ./tools/assemble-prompts.sh
+Assembled: AGENTS.md (18 sections)
+
+$ rsync -avz assembled/prompts/ bruba:/Users/bruba/clawd/
+Synced to bot.
 ```
 
 ## Related Skills
 
+- `/prompts` - Explain config system, manual conflict resolution
 - `/mirror` - Mirror bot files locally
 - `/push` - Push content to bot memory
-- `/component` - Manage components (which add snippets)
+- `/component` - Manage components
