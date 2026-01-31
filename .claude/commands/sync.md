@@ -1,94 +1,14 @@
 # /sync - Full Pipeline Sync
 
-Unified sync command for prompts and content pipeline. Interactive menu to choose what to sync.
-
-## Arguments
-
-$ARGUMENTS
-
-Options:
-- `--prompts` - Run prompt sync only (same as `/prompt-sync`)
-- `--content` - Run content pipeline only
-- `--all` - Run both without prompting
-- `--status` - Show status only, no sync
+Runs full sync: prompts + content pipeline. No menu, just runs everything.
 
 ## Instructions
 
-### 1. Gather Status
+### 1. Prompt Sync
 
-Run these checks in parallel:
+Run `/prompt-sync` (mirror → conflict detection → assemble → push).
 
-**Prompts status:**
-```bash
-# Last prompt sync (check exports/bot/core-prompts/ timestamps)
-ls -la exports/bot/core-prompts/*.md 2>/dev/null | head -5
-
-# Check for pending prompt changes
-./tools/detect-conflicts.sh --quiet 2>/dev/null || echo "conflicts unknown"
-```
-
-**Content pipeline status:**
-```bash
-# Files in intake/ (pending)
-ls intake/*.md 2>/dev/null | wc -l
-
-# Files needing CONFIG
-grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null | wc -l
-
-# Files ready for canonicalization
-grep -l "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null | wc -l
-
-# Canonical files
-ls reference/transcripts/*.md 2>/dev/null | wc -l
-
-# Export files ready (all subdirectories)
-find exports/bot -name "*.md" 2>/dev/null | wc -l
-```
-
-### 2. Show Status Dashboard
-
-Present current state:
-
-```
-=== Sync Status ===
-
-PROMPTS
-  Last sync: [timestamp or "never"]
-  Pending: [conflicts detected / clean / unknown]
-
-CONTENT PIPELINE
-  intake/           [N] files
-    - Ready:        [X] (have CONFIG)
-    - Need convert: [Y] (no CONFIG)
-  reference/        [Z] canonical files
-  exports/bot/      [W] export files
-
-OPTIONS
-  [1] Prompts only     — assemble + push prompts
-  [2] Content only     — pull → convert → intake → export → push
-  [3] Full sync        — both prompts and content
-  [4] Status only      — (shown above, done)
-```
-
-### 3. Handle User Choice
-
-Based on argument or user selection:
-
-**[1] Prompts only** → Run `/prompt-sync`
-- This runs the full prompt assembly pipeline
-- Mirror → conflict detection → assemble → push
-
-**[2] Content only** → Run content pipeline steps
-- Follow the content pipeline below
-
-**[3] Full sync** → Run both
-- First: `/prompt-sync`
-- Then: Content pipeline
-
-**[4] Status only** → Done
-- Already shown above, exit
-
-### 4. Content Pipeline
+### 2. Content Pipeline
 
 When running content sync, follow these steps in order:
 
@@ -138,30 +58,36 @@ Check for files without CONFIG:
 grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
 ```
 
-If files need CONFIG, show in batches (10 at a time) with auto-config preview:
+If files need CONFIG, show full list with date column:
 
 ```bash
-python -m components.distill.lib.cli auto-config intake/<files> 2>/dev/null
+for f in intake/*.md; do
+    msgs=$(grep -c "^=== MESSAGE" "$f" 2>/dev/null || echo 0)
+    size=$(wc -c < "$f" | tr -d ' ')
+    name=$(basename "$f" .md | cut -c1-12)
+    # Extract date from file (look for timestamp in header)
+    date=$(grep -m1 "^Date:" "$f" 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+    printf "%s  %s  %3d msgs  %6d\n" "$name" "$date" "$msgs" "$size"
+done
 ```
 
 Present as:
 ```
-=== Files Needing CONFIG (batch 1/3) ===
+=== Files Needing CONFIG (25 files) ===
 
- #  Date        Source   Title (auto-detected)
- 1  2026-01-27  bruba    "can you check my reminders for today"
- 2  2026-01-27  bruba    "quick question about the API"
+ #  Session       Date        Msgs   Size
+ 1  867bb508...   2026-01-28     5   1.3K
+ 2  9bd86045...   2026-01-29    63  29.7K
+ 3  a05bd263...   2026-01-29    34  10.1K
 ...
-10  2026-01-28  bruba    "did you read the packet?"
 
 Options:
-  [A] Auto-CONFIG this batch (minimal CONFIG, continue)
-  [C] Convert interactively (/convert for each)
-  [N] Next batch (skip this batch for now)
-  [Q] Continue to intake (unconverted files stay in intake/)
+  [A] Auto-CONFIG subset (specify files or search criteria)
+  [C] Convert document-by-document (clears context between each)
+  [S] Skip (leave unconverted, continue pipeline)
 ```
 
-Unconverted files are fine — they'll just sit in intake/ until the next sync or manual `/convert`.
+**Note:** Unconverted files stay in intake/ until next sync or manual `/convert`.
 
 #### Step 3: Canonicalize ready files
 
@@ -190,129 +116,9 @@ python -m components.distill.lib.cli export --profile bot --verbose
 ./tools/push.sh --verbose
 ```
 
-### 5. Summary
+### 3. Summary
 
-Show final summary:
-
-```
-=== Sync Complete ===
-
-PROMPTS: [synced / skipped]
-  - Assembled: X files
-  - Pushed to: bruba:/Users/bruba/clawd/
-
-CONTENT: [synced / skipped]
-  - Pulled: N new sessions
-  - Converted: X files
-  - Canonicalized: Y files
-  - Exported: Z files (profile: bot)
-  - Pushed to: bruba:/Users/bruba/clawd/memory/
-```
-
-## Example Session
-
-```
-User: /sync
-
-Claude:
-=== Sync Status ===
-
-PROMPTS
-  Last sync: 2026-01-30 14:23
-  Pending: clean (no conflicts)
-
-CONTENT PIPELINE
-  intake/           3 files
-    - Ready:        1 (have CONFIG)
-    - Need convert: 2 (no CONFIG)
-  reference/        12 canonical files
-  exports/bot/      10 export files
-
-OPTIONS
-  [1] Prompts only     — assemble + push prompts
-  [2] Content only     — pull → convert → intake → export → push
-  [3] Full sync        — both prompts and content
-  [4] Status only      — (shown above, done)
-
-User: 3
-
-Claude: Running full sync...
-
-=== Prompts ===
-[runs /prompt-sync]
-Mirror: 15 files
-Conflicts: none
-Assembled: AGENTS.md (18 sections)
-Pushed to bot.
-
-=== Content Pipeline ===
-
-[1/5] Pulling sessions...
-  Pulled: 1 new session → intake/ghi11111.md
-  Skipped: 24 already pulled
-
-[2/5] Triage & Convert...
-
-  === Trivial Conversations ===
-  Found 2 trivial files (≤4 msgs or <800 chars):
-    1. abc11111.md (1 msg, 63 chars) - [bot greeting only]
-    2. def22222.md (2 msgs, 120 chars) - "test" / "Pong"
-
-  Delete trivial files? [D/r/s]: d
-  Deleted 2 trivial files (intake + sessions/)
-
-  === Files Needing CONFIG (batch 1/1) ===
-  3 files need CONFIG:
-    1. 2026-01-30  bruba  "can you help with the API?"
-    2. 2026-01-30  bruba  "quick question about auth"
-    3. 2026-01-30  bruba  "project planning discussion"
-
-  Options: [A]uto-CONFIG / [C]onvert / [Q]uit to intake
-  User: a
-
-  Applied auto-CONFIG to 3 files
-
-[3/5] Canonicalizing...
-  3 files ready
-  → reference/transcripts/2026-01-30-topic-a.md
-  → reference/transcripts/2026-01-30-topic-b.md
-  → reference/transcripts/2026-01-30-topic-c.md
-
-[4/5] Exporting...
-  Profile: bot
-  Processed: 15 files
-  Skipped: 2 (filtered)
-  → exports/bot/
-
-[5/5] Pushing to bot...
-  Synced 13 files
-  Memory reindexed.
-
-=== Sync Complete ===
-
-PROMPTS: synced
-  - Assembled: 8 files
-  - Pushed to: bruba:/Users/bruba/clawd/
-
-CONTENT: synced
-  - Pulled: 1 new session
-  - Converted: 3 files
-  - Canonicalized: 3 files
-  - Exported: 13 files
-  - Pushed to: bruba:/Users/bruba/clawd/memory/
-```
-
-## Quick Sync (No Prompts)
-
-For content-only sync with defaults:
-```
-/sync --content
-```
-
-For prompts-only sync:
-```
-/sync --prompts
-```
+Show brief summary of what was synced.
 
 ## Related Skills
 
