@@ -71,7 +71,8 @@ bruba-godo/
 │   ├── *.md                 # Awaiting CONFIG (from /pull)
 │   └── processed/           # Originals after canonicalization
 ├── reference/               # PROCESSED CONTENT (gitignored)
-│   └── transcripts/         # Canonicalized conversations
+│   ├── transcripts/         # Canonicalized conversations
+│   └── refdocs/             # Reference documents (PKM docs, guides)
 ├── exports/                 # SYNC OUTPUTS (gitignored)
 │   ├── bot/                 # Content for bot memory
 │   └── rag/                 # Content for RAG systems
@@ -262,8 +263,11 @@ Full pipeline for processing conversations to bot memory:
 **Quick reference:**
 - `intake/` — Delimited markdown awaiting CONFIG
 - `intake/processed/` — Originals after canonicalization
-- `reference/transcripts/` — Canonical files with frontmatter
+- `reference/transcripts/` — Canonical conversation files
+- `reference/refdocs/` — Reference documents (synced to bot memory)
 - `exports/bot/` — Filtered + redacted for bot
+
+**Note:** `/export` scans all of `reference/` recursively. Files need YAML frontmatter with `scope` tags to be included.
 
 Export profiles in `exports.yaml` control filtering and redaction per destination.
 

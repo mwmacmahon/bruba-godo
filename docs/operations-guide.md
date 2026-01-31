@@ -309,28 +309,47 @@ The mirror script pulls from the bot:
 
 ### Session Import Workflow
 
-Full pipeline for importing transcripts:
+Full pipeline for importing transcripts to bot memory:
 
 ```
-1. PULL                    2. CONVERT                3. REVIEW
-──────                     ──────────                ──────
-
-~/.clawdbot/sessions/      sessions/                 intake/
-*.jsonl                    *.md                      reviewed.md
-     │                          │                         │
-     │ pull-sessions.sh         │ parse-jsonl.py          │ manual
-     │                          │                         │
-     ▼                          ▼                         ▼
-Closed sessions           Readable markdown         Ready to use
+/pull → /convert → /intake → /export → /push
+  │         │          │         │         │
+  ▼         ▼          ▼         ▼         ▼
+intake/   CONFIG    reference/  exports/  bot
+*.md      blocks    transcripts/ bot/     memory
 ```
 
-**Typical workflow:**
+**Using /sync (recommended):**
 ```bash
-./tools/pull-sessions.sh                           # Pull closed sessions
-python tools/helpers/parse-jsonl.py sessions/session.jsonl > intake/topic.md  # Convert
-# Review and extract valuable content
-./tools/push.sh                                    # Push to bot memory
+# Full pipeline with prompts + content
+/sync     # Choose option 3 for full sync
+
+# Or content pipeline only
+/sync     # Choose option 2
 ```
+
+**Manual steps:**
+```bash
+./tools/pull-sessions.sh              # Pull JSONL → intake/*.md
+/convert intake/<file>.md             # AI-assisted: add CONFIG block
+/intake                               # Canonicalize → reference/transcripts/
+/export                               # Filter → exports/bot/
+./tools/push.sh                       # Sync to bot memory
+```
+
+**Reference documents (non-transcripts):**
+
+Place markdown files with YAML frontmatter in `reference/refdocs/`:
+```yaml
+---
+title: My Guide
+scope: [reference]
+---
+```
+
+These are included in `/export` and synced alongside transcripts.
+
+See [Intake Pipeline](intake-pipeline.md) for full details.
 
 ### Sync Troubleshooting
 

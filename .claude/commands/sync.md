@@ -114,11 +114,9 @@ Files needing CONFIG:
   2. intake/def67890.md (23 messages, 8KB)
 
 Options:
-  [a] Convert all interactively (recommended)
-  [s] Skip conversion, continue with ready files
-  [q] Stop here
-
-Which files to convert? [a/s/q]
+  1. Convert all interactively (recommended)
+  2. Skip conversion, continue with ready files
+  3. Stop here
 ```
 
 If user chooses to convert:
@@ -137,12 +135,7 @@ If files are ready:
 python -m components.distill.lib.cli canonicalize intake/<file>.md \
     -o reference/transcripts/ \
     -c components/distill/config/corrections.yaml \
-    --verbose
-```
-
-Move processed files:
-```bash
-mv intake/<file>.md intake/processed/
+    --move intake/processed
 ```
 
 #### Step 4: Generate exports
@@ -224,7 +217,12 @@ Pushed to bot.
     2. intake/def67890.md
     3. intake/ghi11111.md
 
-  Convert all? [a/s/q]: a
+  Options:
+    1. Convert all interactively
+    2. Skip conversion, continue with ready files
+    3. Stop here
+
+  User: 1
 
   [runs /convert for each, user approves]
 

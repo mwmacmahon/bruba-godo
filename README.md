@@ -95,8 +95,10 @@ Open in Claude Code and use the skills:
 ```
 Bot Skills:
   Daemon:    /status, /launch, /stop, /restart
-  Files:     /mirror, /pull, /push, /sync
+  Files:     /mirror, /pull, /push
+  Sync:      /sync (full pipeline), /prompt-sync (prompts only)
   Config:    /config, /update, /component, /prompts
+  Pipeline:  /convert, /intake, /export
   Code:      /code
   Convo:     /convo
   Setup:     (run tools/setup-agent.sh)
@@ -142,6 +144,11 @@ bruba-godo/
 ├── assembled/               # Assembled prompts (gitignored)
 ├── mirror/                  # Local file backup (gitignored)
 ├── sessions/                # Pulled sessions (gitignored)
+├── intake/                  # Raw conversations awaiting CONFIG (gitignored)
+├── reference/
+│   ├── transcripts/         # Canonical conversation files (gitignored)
+│   └── refdocs/             # Reference documents for bot memory (gitignored)
+├── exports/                 # Filtered exports for sync (gitignored)
 └── logs/                    # Script logs (gitignored)
 ```
 
