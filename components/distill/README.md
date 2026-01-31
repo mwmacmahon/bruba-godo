@@ -87,18 +87,39 @@ exports:
   bot:
     description: "Content synced to bot memory"
     output_dir: exports/bot
+    remote_path: memory
     include:
-      scope: [transcripts]
+      scope: [meta, reference, transcripts]
+      type: [prompt]
     exclude:
       sensitivity: [sensitive, restricted]
     redaction: [names, health]
 
-  rag:
-    description: "Content for external RAG systems"
-    output_dir: exports/rag
+  claude:
+    description: "Prompts for Claude Projects / Claude Code"
+    output_dir: exports/claude
     include:
-      scope: [reference, transcripts]
+      type: [prompt]
 ```
+
+### Prompt Profile Targeting
+
+Prompts can target specific export profiles using the `profile` field in frontmatter:
+
+```yaml
+---
+type: prompt
+profile: bot      # Only exported to bot profile
+output_name: "Export"  # Output as "Prompt - Export.md"
+---
+```
+
+| Field | Description |
+|-------|-------------|
+| `profile` | Target profile (bot, claude, etc.). If set, prompt only goes to that profile |
+| `output_name` | Custom output filename. "Export" → "Prompt - Export.md" |
+
+This allows different prompt variants for different contexts (e.g., Export.md for bot vs Export-Claude.md for Claude Code).
 
 ### corrections.yaml (voice transcription fixes)
 

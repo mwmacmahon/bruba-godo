@@ -290,18 +290,26 @@ def cmd_export(args):
             sys.exit(1)
         exports = {args.profile: exports[args.profile]}
 
-    # Find canonical files
+    # Find canonical files in reference/
     input_dir = Path(args.input) if args.input else Path('reference')
-    if not input_dir.exists():
-        print(f"Error: Input directory {input_dir} not found")
-        sys.exit(1)
+    canonical_files = []
+    if input_dir.exists():
+        canonical_files = list(input_dir.rglob("*.md"))
 
-    canonical_files = list(input_dir.rglob("*.md"))
+    # Also scan component prompts
+    prompt_files = []
+    for prompt_path in Path('components').glob('*/prompts/*.md'):
+        if prompt_path.name == 'AGENTS.snippet.md':
+            continue
+        prompt_files.append(prompt_path)
+        canonical_files.append(prompt_path)
+
     if not canonical_files:
-        print(f"No canonical files found in {input_dir}")
+        print("No files found to export")
         sys.exit(0)
 
-    print(f"Found {len(canonical_files)} canonical files in {input_dir}")
+    ref_count = len(canonical_files) - len(prompt_files)
+    print(f"Found {len(canonical_files)} files ({ref_count} in reference/, {len(prompt_files)} prompts)")
 
     logger = logging.getLogger(__name__)
     if args.verbose:
@@ -330,33 +338,61 @@ def cmd_export(args):
         for canonical_path in canonical_files:
             try:
                 content = canonical_path.read_text(encoding='utf-8')
-                config, main_content, backmatter = parse_canonical_file(content)
+                is_prompt = 'components' in str(canonical_path)
 
-                # Apply include/exclude filters
-                if not _matches_filters(config, include_rules, exclude_rules):
-                    if args.verbose:
-                        print(f"  Skip (filtered): {canonical_path.name}")
-                    skipped += 1
-                    continue
+                if is_prompt:
+                    # Prompts: simple frontmatter + content, no backmatter
+                    config = _parse_prompt_frontmatter(content)
+                    if config is None:
+                        if args.verbose:
+                            print(f"  Skip (no frontmatter): {canonical_path.name}")
+                        skipped += 1
+                        continue
 
-                # Generate variants with redaction
-                options = VariantOptions(
-                    generate_transcript=True,
-                    generate_lite=False,
-                    generate_summary=True,
-                    redact_categories=redaction_categories,
-                    output_dir=output_dir
-                )
+                    # Apply include/exclude filters (pass profile name for targeting)
+                    if not _matches_prompt_filters(config, include_rules, exclude_rules, profile_name):
+                        if args.verbose:
+                            print(f"  Skip (filtered): {canonical_path.name}")
+                        skipped += 1
+                        continue
 
-                result = generate_variants(canonical_path, options, logger)
-
-                # Write transcript (main output)
-                if result.transcript:
-                    out_path = output_dir / f"{canonical_path.stem}.md"
-                    out_path.write_text(result.transcript, encoding='utf-8')
+                    # Use output_name from frontmatter if specified, otherwise use stem
+                    output_name = config.get('output_name', canonical_path.stem)
+                    out_path = output_dir / f"Prompt - {output_name}.md"
+                    out_path.write_text(content, encoding='utf-8')
                     processed += 1
                     if args.verbose:
                         print(f"  -> {out_path}")
+
+                else:
+                    # Canonical files: full parsing with backmatter
+                    config, main_content, backmatter = parse_canonical_file(content)
+
+                    # Apply include/exclude filters
+                    if not _matches_filters(config, include_rules, exclude_rules):
+                        if args.verbose:
+                            print(f"  Skip (filtered): {canonical_path.name}")
+                        skipped += 1
+                        continue
+
+                    # Generate variants with redaction
+                    options = VariantOptions(
+                        generate_transcript=True,
+                        generate_lite=False,
+                        generate_summary=True,
+                        redact_categories=redaction_categories,
+                        output_dir=output_dir
+                    )
+
+                    result = generate_variants(canonical_path, options, logger)
+
+                    # Write transcript (main output)
+                    if result.transcript:
+                        out_path = output_dir / f"{canonical_path.stem}.md"
+                        out_path.write_text(result.transcript, encoding='utf-8')
+                        processed += 1
+                        if args.verbose:
+                            print(f"  -> {out_path}")
 
             except Exception as e:
                 print(f"  Error processing {canonical_path.name}: {e}")
@@ -427,6 +463,71 @@ def cmd_split(args):
                 traceback.print_exc()
 
     print(f"\nSummary: {split_files}/{total_files} files split into {chunks_created} chunks")
+
+
+def _parse_prompt_frontmatter(content: str) -> dict:
+    """
+    Parse simple YAML frontmatter from a prompt file.
+
+    Returns dict with frontmatter fields, or None if no frontmatter.
+    """
+    if not content.startswith('---'):
+        return None
+
+    # Find end of frontmatter
+    end_marker = content.find('\n---', 3)
+    if end_marker == -1:
+        return None
+
+    frontmatter_yaml = content[4:end_marker].strip()
+    try:
+        return yaml.safe_load(frontmatter_yaml) or {}
+    except Exception:
+        return {}
+
+
+def _matches_prompt_filters(config: dict, include_rules: dict, exclude_rules: dict, profile_name: str = None) -> bool:
+    """
+    Check if a prompt config (dict) matches the include/exclude filters.
+
+    Returns True if the prompt should be included in the export.
+
+    Args:
+        config: Parsed frontmatter dict from the prompt file
+        include_rules: Include rules from exports.yaml profile
+        exclude_rules: Exclude rules from exports.yaml profile
+        profile_name: Name of the export profile being run (e.g., 'bot', 'claude')
+    """
+    # Check profile targeting first (highest priority filter)
+    # If prompt has a profile field, it must match the current profile
+    prompt_profile = config.get('profile')
+    if prompt_profile:
+        if profile_name and prompt_profile != profile_name:
+            return False
+
+    # Check include.type
+    include_type = include_rules.get('type', [])
+    if include_type:
+        if isinstance(include_type, str):
+            include_type = [include_type]
+        file_type = config.get('type', '')
+        if file_type not in include_type:
+            return False
+
+    # Check include.scope
+    include_scope = include_rules.get('scope', [])
+    if include_scope:
+        if isinstance(include_scope, str):
+            include_scope = [include_scope]
+        file_scope = config.get('scope', '')
+        if isinstance(file_scope, str):
+            file_scope = [file_scope]
+        if not any(s in include_scope for s in file_scope):
+            # Also check if 'meta' is in include_scope (prompts are meta by default)
+            if 'meta' not in include_scope:
+                return False
+
+    return True
 
 
 def _matches_filters(config, include_rules: dict, exclude_rules: dict) -> bool:

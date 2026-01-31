@@ -15,7 +15,7 @@ Examples:
     parse-jsonl.py session.jsonl --search "cleanup-reminders.py"
 
 Options:
-    --corrections    Apply transcription corrections from config/corrections.yaml
+    --corrections    Apply transcription corrections from components/distill/config/corrections.yaml
     --corrections-file <path>  Use custom corrections file
 
 Output format:
@@ -40,10 +40,10 @@ from pathlib import Path
 def load_corrections(corrections_file=None):
     """Load transcription corrections from YAML file."""
     if corrections_file is None:
-        # Default location: config/corrections.yaml relative to repo root
+        # Default location: components/distill/config/corrections.yaml relative to repo root
         script_dir = Path(__file__).parent
         repo_root = script_dir.parent.parent
-        corrections_file = repo_root / "config" / "corrections.yaml"
+        corrections_file = repo_root / "components" / "distill" / "config" / "corrections.yaml"
     else:
         corrections_file = Path(corrections_file)
 

@@ -59,11 +59,24 @@ rotate_log "$LOG_FILE"
 
 log "=== Pushing Content to Bot ==="
 
+# Read remote_path from exports.yaml for bot profile
+REMOTE_PATH=$(python3 -c "
+import yaml
+with open('$ROOT_DIR/exports.yaml') as f:
+    config = yaml.safe_load(f)
+    path = config.get('exports', {}).get('bot', {}).get('remote_path', 'memory')
+    print(path if path else 'memory')
+" 2>/dev/null || echo "memory")
+if [[ -z "$REMOTE_PATH" ]]; then
+    REMOTE_PATH="memory"
+fi
+log "Remote path: $REMOTE_PATH"
+
 # Check if exports directory exists
 if [[ ! -d "$EXPORTS_DIR/bot" ]]; then
     log "No export found at $EXPORTS_DIR/bot"
-    log "Run export generation first (content from reference/ with filters from exports.yaml)"
-    echo "No export found. Generate exports first."
+    log "Run /export first to generate filtered exports from reference/"
+    echo "No export found. Run /export first."
     exit 1
 fi
 
@@ -89,13 +102,13 @@ else
 fi
 
 # Sync to bot
-log "Syncing to $SSH_HOST:$REMOTE_WORKSPACE/memory/"
+log "Syncing to $SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
 
 if [[ "$DRY_RUN" == "true" ]]; then
     log "[DRY RUN] Would sync $FILE_COUNT files"
-    rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/memory/"
+    rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
 else
-    rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/memory/"
+    rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
     log "Synced $FILE_COUNT files"
 
     # Trigger reindex

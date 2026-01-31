@@ -6,19 +6,26 @@ exports:
   bot:
     description: "Content synced to bot memory"
     output_dir: exports/bot
-    remote_path: memory               # Relative to workspace
+    remote_path: memory
     include:
       scope: [meta, reference, transcripts]
+      type: [prompt]
     exclude:
       sensitivity: [sensitive, restricted]
     redaction: [names, health]
 
-  rag:
-    description: "Content for external RAG systems"
-    output_dir: exports/rag
+  claude:
+    description: "Prompts for Claude Projects / Claude Code"
+    output_dir: exports/claude
     include:
-      scope: [reference, transcripts]
-    format: chunked                   # Split for embedding
+      type: [prompt]
+
+  tests:
+    description: "Local testing profile"
+    output_dir: exports/tests
+    include:
+      type: [prompt]
+      scope: [meta, reference, transcripts]
 
 defaults:
   redaction: []

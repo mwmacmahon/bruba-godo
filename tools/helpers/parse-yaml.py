@@ -80,7 +80,7 @@ def parse_yaml_simple(content):
                 value = value[1:-1]
 
             # Handle inline lists [a, b, c]
-            if value.startswith('[') and value.endswith(']'):
+            if isinstance(value, str) and value.startswith('[') and value.endswith(']'):
                 items = value[1:-1].split(',')
                 value = [item.strip().strip('"\'') for item in items if item.strip()]
 
@@ -92,12 +92,18 @@ def parse_yaml_simple(content):
                 current_list = current_dict[key]
                 list_indent = indent
                 stack.append((current_dict, indent))
-            elif value.startswith('-'):
+            elif isinstance(value, str) and value.startswith('-'):
                 # Inline list indicator
                 current_dict[key] = []
                 current_key = key
                 current_list = current_dict[key]
                 list_indent = indent
+            elif isinstance(value, list):
+                # Already parsed as inline list
+                current_dict[key] = value
+                current_key = key
+                current_list = None
+                list_indent = -1
             else:
                 current_dict[key] = value
                 current_key = key
