@@ -21,7 +21,7 @@ Common patterns:
 Bot Skills:
   Daemon:    /status, /launch, /stop, /restart
   Files:     /mirror, /pull, /push, /sync
-  Config:    /config, /update, /component
+  Config:    /config, /update, /component, /prompts
   Code:      /code
   Convo:     /convo
   Setup:     (run tools/setup-agent.sh)
@@ -154,33 +154,50 @@ Common paths (on bot machine):
 | `/sync` | Assemble prompts + push (with conflict detection) |
 | `/config` | Configure heartbeat, exec allowlist |
 | `/component` | Manage optional components (signal, voice, distill, etc.) |
+| `/prompts` | Manage prompt assembly, resolve conflicts, explain config |
 | `/update` | Update clawdbot version |
 | `/code` | Review and migrate staged code |
 | `/convo` | Load active conversation |
 
 ## Prompt Assembly Pipeline
 
-Prompts come from multiple sources, assembled in order:
+Prompts are assembled from **config-driven section order**. The `agents_sections` list in `config.yaml` defines exactly what sections appear and in what order.
 
-```
-templates/prompts/AGENTS.md           (base template)
-  + components/signal/prompts/AGENTS.snippet.md
-  + components/voice/prompts/AGENTS.snippet.md
-  + user/prompts/AGENTS.snippet.md    (personal additions)
-  = assembled/prompts/AGENTS.md       (final output)
+**Section types:**
+- `name` → component (`components/{name}/prompts/AGENTS.snippet.md`)
+- `name` → template section (`templates/prompts/sections/{name}.md`)
+- `bot:name` → bot-managed section (from mirror's `<!-- BOT-MANAGED: name -->`)
+
+**Example config:**
+```yaml
+agents_sections:
+  - header              # template section
+  - http-api            # component
+  - first-run           # template section
+  - session             # component
+  - bot:exec-approvals  # bot-managed (preserved from remote)
+  - safety              # template section
+  ...
 ```
 
-Run assembly with:
+**Run assembly:**
 ```bash
 ./tools/assemble-prompts.sh
+./tools/assemble-prompts.sh --verbose  # show details
 ```
 
-Component snippets are wrapped with markers:
+**Section markers in output:**
 ```markdown
 <!-- COMPONENT: voice -->
-...component additions...
+...component content...
 <!-- /COMPONENT: voice -->
+
+<!-- BOT-MANAGED: exec-approvals -->
+...bot's content (preserved)...
+<!-- /BOT-MANAGED: exec-approvals -->
 ```
+
+See `templates/prompts/README.md` for full documentation, or use `/prompts` for help.
 
 ## State Files
 

@@ -19,10 +19,12 @@ Running an AI agent with tool access is powerful but risky. bruba-godo provides 
 
 - **Daemon control**: Start, stop, restart the bot daemon
 - **File sync**: Mirror bot files, pull sessions, push content to memory
+- **Prompt assembly**: Config-driven prompt building with conflict detection
 - **Configuration**: Manage heartbeat, exec allowlist, clawdbot updates
 - **Code review**: Review and migrate staged code from bot workspace
 - **Templates**: Starter files for provisioning new agents
 - **Components**: Optional add-ons (Signal, voice, reminders)
+- **Test suite**: Automated tests for verifying prompt assembly
 
 ## Prerequisites
 
@@ -93,8 +95,8 @@ Open in Claude Code and use the skills:
 ```
 Bot Skills:
   Daemon:    /status, /launch, /stop, /restart
-  Files:     /mirror, /pull, /push
-  Config:    /config, /update
+  Files:     /mirror, /pull, /push, /sync
+  Config:    /config, /update, /component, /prompts
   Code:      /code
   Convo:     /convo
   Setup:     (run tools/setup-agent.sh)
@@ -105,39 +107,39 @@ Bot Skills:
 ```
 bruba-godo/
 ├── config.yaml.example      # Connection settings template
-├── bundles.yaml             # Bundle definitions
-├── config/                  # Configuration files
-│   └── corrections.yaml     # Transcription corrections
+├── exports.yaml             # Export definitions
 ├── docs/                    # Documentation
 │   ├── full-setup-guide.md  # Comprehensive setup
 │   ├── operations-guide.md  # Day-to-day operations
-│   ├── security-model.md    # Security reference
-│   ├── setup-remote-machine.md
-│   ├── setup-operator-ssh.md
-│   └── intake-pipeline.md
+│   └── security-model.md    # Security reference
 ├── tools/
 │   ├── bot                  # SSH wrapper
 │   ├── lib.sh               # Shared functions
 │   ├── mirror.sh            # Mirror bot files
 │   ├── pull-sessions.sh     # Pull closed sessions
 │   ├── push.sh              # Push content to bot
+│   ├── assemble-prompts.sh  # Build prompts from config
+│   ├── detect-conflicts.sh  # Find new bot sections / edits
 │   ├── provision-bot.sh     # Full bot provisioning
-│   ├── setup-agent.sh       # Agent template setup
-│   ├── snapshot.sh          # Config/memory backup
 │   └── helpers/             # Python utilities
 ├── components/              # Optional add-ons
 │   ├── signal/              # Signal messenger
-│   ├── voice/               # Voice I/O (planned)
-│   ├── reminders/           # Scheduled reminders (planned)
-│   └── web-search/          # Web search (planned)
+│   ├── voice/               # Voice I/O
+│   ├── session/             # Session workflow
+│   ├── memory/              # Memory management
+│   ├── heartbeats/          # Proactive behavior
+│   ├── distill/             # Conversation → knowledge
+│   └── ...                  # More components
 ├── .claude/commands/        # Skill definitions
-├── templates/               # Bot starter files
-│   ├── prompts/             # IDENTITY, SOUL, USER, AGENTS, etc.
-│   ├── config/              # clawdbot.json, exec-approvals templates
-│   └── tools/               # Sample scripts
-├── intake/                  # Raw files (gitignored)
-├── reference/               # Processed files (gitignored)
-├── bundles/                 # Generated output (gitignored)
+├── templates/
+│   ├── prompts/
+│   │   ├── sections/        # Template sections (header, safety, etc.)
+│   │   └── README.md        # Prompt assembly documentation
+│   └── config/              # clawdbot.json templates
+├── tests/                   # Test suite
+│   ├── test-prompt-assembly.sh  # Automated tests
+│   └── prompt-assembly-tests.md # Test protocols
+├── assembled/               # Assembled prompts (gitignored)
 ├── mirror/                  # Local file backup (gitignored)
 ├── sessions/                # Pulled sessions (gitignored)
 └── logs/                    # Script logs (gitignored)

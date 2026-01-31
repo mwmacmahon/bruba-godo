@@ -1,16 +1,15 @@
 #!/bin/bash
-# Assemble final prompts from templates, components, and user snippets
+# Assemble prompts from config-driven section order
 #
 # Usage:
-#   ./tools/assemble-prompts.sh              # Assemble all prompts
+#   ./tools/assemble-prompts.sh              # Assemble AGENTS.md
 #   ./tools/assemble-prompts.sh --verbose    # Show detailed output
 #   ./tools/assemble-prompts.sh --dry-run    # Show what would be assembled
 #
-# Assembly order for each prompt (e.g., AGENTS.md):
-#   1. templates/prompts/AGENTS.md           (base template)
-#   2. + components/*/prompts/AGENTS.snippet.md  (all enabled components)
-#   3. + user/prompts/AGENTS.snippet.md      (user customizations)
-#   = assembled/prompts/AGENTS.md            (final output)
+# Assembly reads agents_sections from config.yaml and resolves each entry:
+#   1. bot:name  → bot-managed section from mirror (<!-- BOT-MANAGED: name -->)
+#   2. name      → component snippet (components/{name}/prompts/AGENTS.snippet.md)
+#   3. name      → template section (templates/prompts/sections/{name}.md)
 #
 # Logs: logs/assemble.log
 
@@ -23,7 +22,7 @@ source "$(dirname "$0")/lib.sh"
 if ! parse_common_args "$@"; then
     echo "Usage: $0 [--dry-run] [--verbose]"
     echo ""
-    echo "Assemble final prompts from templates, components, and user snippets."
+    echo "Assemble AGENTS.md from config-driven section order."
     echo ""
     echo "Options:"
     echo "  --dry-run, -n   Show what would be assembled without doing it"
@@ -48,80 +47,226 @@ if [[ "$DRY_RUN" != "true" ]]; then
     mkdir -p "$PROMPTS_OUTPUT"
 fi
 
-# Core prompt files to assemble
-PROMPT_FILES="AGENTS.md TOOLS.md MEMORY.md IDENTITY.md SOUL.md USER.md HEARTBEAT.md BOOTSTRAP.md"
-
-ASSEMBLED=0
+# Counters
+SECTIONS_ADDED=0
 COMPONENTS_ADDED=0
+TEMPLATE_SECTIONS_ADDED=0
+BOT_SECTIONS_ADDED=0
+SECTIONS_SKIPPED=0
+SECTIONS_MISSING=0
 
-for prompt in $PROMPT_FILES; do
-    base_file="$ROOT_DIR/templates/prompts/$prompt"
-    output_file="$PROMPTS_OUTPUT/$prompt"
-    snippet_name="${prompt%.md}.snippet.md"
+# Parse agents_sections from config.yaml
+get_agents_sections() {
+    local config_file="$ROOT_DIR/config.yaml"
+    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
 
-    # Skip if base template doesn't exist
-    if [[ ! -f "$base_file" ]]; then
-        log "  Skip: $prompt (no base template)"
-        continue
+    if [[ ! -f "$config_file" ]]; then
+        echo "ERROR: config.yaml not found" >&2
+        return 1
     fi
 
-    log ""
-    log "Assembling: $prompt"
-
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "  Would use base: templates/prompts/$prompt"
-    else
-        # Start with base template
-        cp "$base_file" "$output_file"
-        log "  + Base: templates/prompts/$prompt"
+    # Use Python helper to get JSON array
+    if [[ -f "$helper" ]]; then
+        local json
+        json=$("$helper" "$config_file" agents_sections 2>/dev/null) || true
+        if [[ -n "$json" && "$json" != "null" && "$json" != "[]" ]]; then
+            echo "$json" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$'
+            return
+        fi
     fi
 
-    # Add component snippets
-    for component_dir in "$ROOT_DIR"/components/*/; do
-        component_name=$(basename "$component_dir")
-        snippet_file="$component_dir/prompts/$snippet_name"
-
-        if [[ -f "$snippet_file" ]]; then
-            if [[ "$DRY_RUN" == "true" ]]; then
-                log "  Would add: components/$component_name/prompts/$snippet_name"
-            else
-                # Append snippet with separator
-                echo "" >> "$output_file"
-                echo "<!-- COMPONENT: $component_name -->" >> "$output_file"
-                cat "$snippet_file" >> "$output_file"
-                echo "<!-- /COMPONENT: $component_name -->" >> "$output_file"
-                log "  + Component: $component_name"
+    # Fallback: grep-based parsing
+    local in_sections=false
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^agents_sections: ]]; then
+            in_sections=true
+            continue
+        fi
+        if [[ "$in_sections" == true ]]; then
+            if [[ "$line" =~ ^[a-z] && ! "$line" =~ ^[[:space:]] ]]; then
+                break
             fi
-            COMPONENTS_ADDED=$((COMPONENTS_ADDED + 1))
+            if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+([a-zA-Z0-9_:-]+) ]]; then
+                echo "${BASH_REMATCH[1]}"
+            fi
         fi
-    done
+    done < "$config_file"
+}
 
-    # Add user snippet if exists
-    user_snippet="$ROOT_DIR/user/prompts/$snippet_name"
-    if [[ -f "$user_snippet" ]]; then
-        if [[ "$DRY_RUN" == "true" ]]; then
-            log "  Would add: user/prompts/$snippet_name"
+# Extract a specific BOT-MANAGED section from mirror
+# Usage: get_bot_section "name" "mirror_file"
+get_bot_section() {
+    local name="$1"
+    local mirror_file="$2"
+
+    [[ ! -f "$mirror_file" ]] && return 1
+
+    local in_section=false
+    local content=""
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" =~ ^\<!--\ BOT-MANAGED:\ ${name}\ --\>$ ]]; then
+            in_section=true
+            content="$line"$'\n'
+        elif [[ "$in_section" == true ]]; then
+            content+="$line"$'\n'
+            if [[ "$line" =~ ^\<!--\ /BOT-MANAGED:\ ${name}\ --\>$ ]]; then
+                printf '%s' "$content"
+                return 0
+            fi
+        fi
+    done < "$mirror_file"
+
+    return 1
+}
+
+# Resolve a section entry to its content
+# Usage: resolve_section "entry" >> output_file
+resolve_section() {
+    local entry="$1"
+    local mirror_file="$MIRROR_DIR/prompts/AGENTS.md"
+
+    # Check if bot-managed (bot:name)
+    if [[ "$entry" =~ ^bot:(.+)$ ]]; then
+        local bot_name="${BASH_REMATCH[1]}"
+        local content
+        if content=$(get_bot_section "$bot_name" "$mirror_file"); then
+            printf '%s' "$content"
+            return 0
         else
-            echo "" >> "$output_file"
-            echo "<!-- USER CUSTOMIZATION -->" >> "$output_file"
-            cat "$user_snippet" >> "$output_file"
-            echo "<!-- /USER CUSTOMIZATION -->" >> "$output_file"
-            log "  + User: user/prompts/$snippet_name"
+            return 1  # Bot section not found in mirror
         fi
     fi
 
-    ASSEMBLED=$((ASSEMBLED + 1))
+    # Check if component exists
+    local component_file="$ROOT_DIR/components/$entry/prompts/AGENTS.snippet.md"
+    if [[ -f "$component_file" ]]; then
+        echo "<!-- COMPONENT: $entry -->"
+        cat "$component_file"
+        echo "<!-- /COMPONENT: $entry -->"
+        return 0
+    fi
+
+    # Check if template section exists
+    local section_file="$ROOT_DIR/templates/prompts/sections/$entry.md"
+    if [[ -f "$section_file" ]]; then
+        echo "<!-- SECTION: $entry -->"
+        cat "$section_file"
+        echo "<!-- /SECTION: $entry -->"
+        return 0
+    fi
+
+    return 1  # Not found
+}
+
+# Get section type for logging
+get_section_type() {
+    local entry="$1"
+
+    if [[ "$entry" =~ ^bot: ]]; then
+        echo "bot"
+    elif [[ -f "$ROOT_DIR/components/$entry/prompts/AGENTS.snippet.md" ]]; then
+        echo "component"
+    elif [[ -f "$ROOT_DIR/templates/prompts/sections/$entry.md" ]]; then
+        echo "section"
+    else
+        echo "missing"
+    fi
+}
+
+# Main assembly
+log ""
+log "Assembling: AGENTS.md"
+
+output_file="$PROMPTS_OUTPUT/AGENTS.md"
+
+# Build list of sections
+SECTIONS=()
+while IFS= read -r section; do
+    [[ -n "$section" ]] && SECTIONS+=("$section")
+done < <(get_agents_sections)
+
+if [[ ${#SECTIONS[@]} -eq 0 ]]; then
+    log "ERROR: No sections found in config.yaml agents_sections"
+    echo "ERROR: No sections found in config.yaml agents_sections" >&2
+    exit 1
+fi
+
+log "Found ${#SECTIONS[@]} sections in config"
+
+# Process each section
+if [[ "$DRY_RUN" != "true" ]]; then
+    > "$output_file"  # Clear output file
+fi
+
+for entry in "${SECTIONS[@]}"; do
+    section_type=$(get_section_type "$entry")
+
+    case "$section_type" in
+        bot)
+            bot_name="${entry#bot:}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log "  Would add bot section: $bot_name"
+            else
+                if content=$(resolve_section "$entry"); then
+                    printf '%s\n' "$content" >> "$output_file"
+                    log "  + Bot: $bot_name"
+                    BOT_SECTIONS_ADDED=$((BOT_SECTIONS_ADDED + 1))
+                else
+                    log "  ! Missing bot section: $bot_name (not in mirror)"
+                    SECTIONS_MISSING=$((SECTIONS_MISSING + 1))
+                fi
+            fi
+            ;;
+        component)
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log "  Would add component: $entry"
+            else
+                resolve_section "$entry" >> "$output_file"
+                echo "" >> "$output_file"
+                log "  + Component: $entry"
+                COMPONENTS_ADDED=$((COMPONENTS_ADDED + 1))
+            fi
+            ;;
+        section)
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log "  Would add section: $entry"
+            else
+                resolve_section "$entry" >> "$output_file"
+                echo "" >> "$output_file"
+                log "  + Section: $entry"
+                TEMPLATE_SECTIONS_ADDED=$((TEMPLATE_SECTIONS_ADDED + 1))
+            fi
+            ;;
+        missing)
+            log "  ! Missing: $entry (not found as component or section)"
+            SECTIONS_MISSING=$((SECTIONS_MISSING + 1))
+            ;;
+    esac
+
+    SECTIONS_ADDED=$((SECTIONS_ADDED + 1))
 done
 
+# Summary
 log ""
 log "=== Summary ==="
 if [[ "$DRY_RUN" == "true" ]]; then
-    log "Would assemble: $ASSEMBLED prompts"
-    log "Component snippets found: $COMPONENTS_ADDED"
+    log "Would assemble: ${#SECTIONS[@]} sections"
 else
-    log "Assembled: $ASSEMBLED prompts"
-    log "Component snippets added: $COMPONENTS_ADDED"
-    log "Output: $PROMPTS_OUTPUT/"
+    log "Assembled: AGENTS.md"
+    log "  Components: $COMPONENTS_ADDED"
+    log "  Template sections: $TEMPLATE_SECTIONS_ADDED"
+    log "  Bot-managed: $BOT_SECTIONS_ADDED"
+    if [[ $SECTIONS_MISSING -gt 0 ]]; then
+        log "  Missing: $SECTIONS_MISSING"
+    fi
+    log "Output: $output_file"
 fi
 
-echo "Assembled: $ASSEMBLED prompts ($COMPONENTS_ADDED component snippets)"
+TOTAL=$((COMPONENTS_ADDED + TEMPLATE_SECTIONS_ADDED + BOT_SECTIONS_ADDED))
+echo "Assembled: AGENTS.md ($TOTAL sections: $COMPONENTS_ADDED components, $TEMPLATE_SECTIONS_ADDED template, $BOT_SECTIONS_ADDED bot)"
+
+if [[ $SECTIONS_MISSING -gt 0 ]]; then
+    echo "WARNING: $SECTIONS_MISSING sections missing"
+    exit 1
+fi

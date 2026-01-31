@@ -1,28 +1,91 @@
-## Knowledge Pipeline
+## PKM Knowledge Resources
 
-Your conversations are processed into searchable knowledge through the distill pipeline.
+You have PKM content indexed in your memory from <REDACTED-NAME>'s knowledge management system.
 
-### How It Works
+**What's available:**
+- **Prompts** — Task-specific instructions (export, transcription, sanitization, etc.)
+- **Reference docs** — System architecture, conventions, decision history
+- **Summaries** — Past conversation summaries with context
+- **Document Inventory** — Categorized list of all docs with descriptions
+- **Transcript Inventory** — Past conversations grouped by date/topic
 
-1. **Sessions are pulled** from the bot to operator machine
-2. **Distill processes** raw JSONL into clean transcripts
-3. **Variants are generated** (canonical, redacted, summary)
-4. **Filtered content** is pushed back to your memory
+### Key Inventories
 
-This means your past conversations become searchable reference material. You can find patterns, recall decisions, and build on previous discussions.
+Your `memory/` folder contains inventories that serve as indexes to all available content:
 
-### Memory Search
+| Inventory | What It Lists |
+|-----------|---------------|
+| `Document Inventory.md` | Master list — all docs synced to your memory |
+| `Transcript Inventory.md` | Past conversations by date/topic |
+| `Meta - Document Inventory.md` | PKM system documentation |
+| `Home - Document Inventory.md` | Home and family docs |
+| `Work - Document Inventory.md` | Professional/work docs |
 
-When looking for past context:
-- Search `memory/` for recent daily notes
-- Search for specific topics in processed transcripts
-- Reference `MEMORY.md` for curated long-term knowledge
+**Use inventories to find relevant docs** before searching broadly. They contain descriptions of each file to help you pick the right one.
 
-### Contributing to Knowledge
+### Key Prompts
 
-When a conversation contains valuable information:
-1. **Daily notes** — Capture it in `memory/YYYY-MM-DD.md`
-2. **Long-term** — Add significant learnings to `MEMORY.md`
-3. **Let distill work** — Conversations are automatically processed
+These prompts provide consistent workflows. Load them when you hit their trigger conditions:
 
-Focus on capturing decisions, insights, and context that future-you will need.
+| Prompt | When to Load | Trigger Words |
+|--------|--------------|---------------|
+| `Prompt - Export.md` | Session wrap-up | "export", "done", "wrap up" |
+| `Prompt - Transcription.md` | Voice processing | "transcribe", "dictate" |
+| `Prompt - Daily Triage.md` | Morning routine | "triage" |
+| `Prompt - Reminders Integration.md` | Task management | (helpful for any reminder work) |
+
+**Scope-specific prompts:**
+- `Prompt - Home.md` — For home/family conversations
+- `Prompt - Work.md` — For professional conversations
+
+When entering a scope-specific conversation, loading the relevant prompt provides consistent conventions.
+
+### What's Synced (and What's Not)
+
+Your `memory/` folder contains **filtered** PKM content:
+- **Included:** meta, home, and work scope docs
+- **Excluded:** personal scope (intentionally private)
+- **Redacted:** Some terms (names, health, financial info)
+
+If you search for something and don't find it, it may be intentionally excluded. Ask <REDACTED-NAME> if you need something that seems to be missing.
+
+### When to Search Memory
+
+- User mentions "export", "done", "wrap up" → search for export prompt
+- User mentions "transcript", "cleanup", "dictation" → search for transcription guidance
+- User asks "how does X work" about PKM → search reference docs
+- User asks about past decisions or context → search summaries
+- User asks "what docs do we have about X" → search inventories
+
+**Default behavior:** When uncertain whether PKM content is relevant, search first rather than guessing.
+
+### Token-Conscious Loading
+
+Before loading large files into context, check their size first:
+
+```bash
+# Check file size in tokens (rough: chars/4)
+wc -c ~/clawd/memory/some-file.md | awk '{print int($1/4) " tokens"}'
+
+# Check directory size
+du -sh ~/clawd/memory/
+
+# List files with sizes
+ls -la ~/clawd/memory/
+
+# Preview first/last lines without loading full file
+head -20 ~/clawd/memory/some-file.md
+tail -20 ~/clawd/memory/some-file.md
+
+# Find files containing a keyword (without loading them)
+grep -l "keyword" ~/clawd/memory/*.md
+
+# Read a file (use sparingly - loads full content)
+cat ~/clawd/memory/some-file.md
+```
+
+**Reporting requirement:** When loading any file >2000 tokens, report to the user:
+- What file you're loading and why
+- Approximate tokens being added
+
+This helps <REDACTED-NAME> track context burn and adjust if needed. For smaller files, load freely without reporting.
