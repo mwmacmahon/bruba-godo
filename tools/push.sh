@@ -80,6 +80,10 @@ if [[ ! -d "$EXPORTS_DIR/bot" ]]; then
     exit 1
 fi
 
+# Generate inventory files (Transcript Inventory.md, Document Inventory.md)
+log "Generating inventories..."
+"$ROOT_DIR/tools/generate-inventory.sh" | while read -r line; do log "$line"; done
+
 # Count files to sync
 FILE_COUNT=$(find "$EXPORTS_DIR/bot" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
 log "Files to sync: $FILE_COUNT"
@@ -123,17 +127,18 @@ if [[ -d "$EXPORTS_DIR/bot/core-prompts" ]]; then
     fi
 fi
 
-# 2. Sync all other subdirectories to memory/
+# 2. Sync all content subdirectories FLAT to memory/
+# Files have prefixes (Transcript -, Doc -, etc.) so they go flat, not in subdirs
 for subdir in prompts transcripts refdocs docs artifacts cc_logs summaries; do
     if [[ -d "$EXPORTS_DIR/bot/$subdir" ]]; then
         SUBDIR_COUNT=$(find "$EXPORTS_DIR/bot/$subdir" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
         if [[ "$SUBDIR_COUNT" -gt 0 ]]; then
-            log "Syncing $subdir/ to $SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/$subdir/ ($SUBDIR_COUNT files)"
+            log "Syncing $subdir/ flat to $SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/ ($SUBDIR_COUNT files)"
             if [[ "$DRY_RUN" == "true" ]]; then
                 log "[DRY RUN] Would sync $SUBDIR_COUNT $subdir files"
-                rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/$subdir/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/$subdir/"
+                rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/$subdir/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
             else
-                rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/$subdir/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/$subdir/"
+                rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/$subdir/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
                 log "  Synced $SUBDIR_COUNT $subdir files"
             fi
             TOTAL_SYNCED=$((TOTAL_SYNCED + SUBDIR_COUNT))

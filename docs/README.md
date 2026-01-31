@@ -2,6 +2,7 @@
 type: doc
 scope: reference
 title: "Documentation Index"
+description: "Index of bruba-godo documentation with navigation"
 ---
 
 # Documentation Index

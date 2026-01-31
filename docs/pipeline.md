@@ -2,6 +2,7 @@
 type: doc
 scope: reference
 title: "Prompts and Distillation Pipeline"
+description: "Content processing pipeline: intake to export"
 ---
 
 # Prompts and Distillation Pipeline

@@ -2,6 +2,7 @@
 type: doc
 scope: reference
 title: "Quick Start: Setting Up a New Bot Machine"
+description: "Fast-track guide for new bot machine setup"
 ---
 
 # Quick Start: Setting Up a New Bot Machine

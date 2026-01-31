@@ -29,6 +29,7 @@ Trigger words: "export", "done", "wrap up", "finished", end of session.
 ```yaml
 === EXPORT CONFIG ===
 title: "Descriptive Title"
+description: "One-line summary for inventory display"
 slug: YYYY-MM-DD-topic-slug
 date: YYYY-MM-DD
 source: bruba | claude-projects | claude-code | voice-memo
@@ -58,6 +59,7 @@ sensitivity:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `title` | Yes | Descriptive title for the conversation |
+| `description` | Yes | One-line summary for inventory display |
 | `slug` | Yes | `YYYY-MM-DD-topic-slug` format |
 | `date` | Yes | Conversation date (YYYY-MM-DD) |
 | `source` | Yes | Where this came from (see Source Detection) |
@@ -172,6 +174,7 @@ After the CONFIG block, add backmatter:
 ```yaml
 === EXPORT CONFIG ===
 title: "Setting Up Export Pipeline"
+description: "Created CONFIG block spec and integrated with intake workflow"
 slug: 2026-01-31-export-pipeline-setup
 date: 2026-01-31
 source: claude-projects

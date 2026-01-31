@@ -2,6 +2,7 @@
 type: doc
 scope: reference
 title: "Full Setup Guide"
+description: "Complete Clawdbot setup from prerequisites to hardening"
 ---
 
 # Full Setup Guide

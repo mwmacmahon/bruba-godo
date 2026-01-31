@@ -2,6 +2,7 @@
 type: doc
 scope: reference
 title: "Intake Pipeline"
+description: "Session flow from raw JSONL to bot memory"
 ---
 
 # Intake Pipeline

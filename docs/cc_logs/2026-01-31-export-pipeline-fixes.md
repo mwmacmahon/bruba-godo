@@ -2,6 +2,7 @@
 type: claude_code_log
 scope: reference
 title: "Export Pipeline Fixes - 2026-01-31"
+description: "Made docs and refdocs exportable with type routing"
 ---
 
 # Export Pipeline Fixes - 2026-01-31

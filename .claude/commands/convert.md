@@ -68,6 +68,7 @@ Present findings in a clear table format:
 
 📋 SUMMARY
    Title: "Proposed Title Here"
+   Description: "One-line summary for inventory"
    Date: 2026-01-28
    Source: bruba
    Tags: [tag1, tag2, tag3]
@@ -148,6 +149,7 @@ Based on analysis + user decisions, generate the CONFIG block:
 ```yaml
 === EXPORT CONFIG ===
 title: "Final Title"
+description: "One-line summary for inventory display"
 slug: YYYY-MM-DD-topic-slug
 date: YYYY-MM-DD
 source: bruba

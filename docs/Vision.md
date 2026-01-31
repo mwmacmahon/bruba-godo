@@ -2,6 +2,7 @@
 type: doc
 scope: reference
 title: "Vision: Bot-Agnostic Operator Design"
+description: "Architectural vision for multi-bot operator workspace"
 ---
 
 # Vision: Bot-Agnostic Operator Design

@@ -2,6 +2,7 @@
 type: doc
 scope: reference
 title: "Security Model"
+description: "Threat model, permissions, and security practices"
 ---
 
 # Security Model

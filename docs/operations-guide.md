@@ -2,6 +2,7 @@
 type: doc
 scope: reference
 title: "Operations Guide"
+description: "Day-to-day bot operations and maintenance tasks"
 ---
 
 # Operations Guide

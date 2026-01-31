@@ -2,6 +2,7 @@
 type: doc
 scope: reference
 title: "Setting Up Operator SSH Access"
+description: "Configure SSH from operator to bot machine"
 ---
 
 # Setting Up Operator SSH Access

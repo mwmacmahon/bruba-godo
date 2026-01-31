@@ -6,6 +6,7 @@ Before doing anything else:
 3. **Check for `memory/CONTINUATION.md`** — if it exists, read it and move to `memory/archive/continuation-YYYY-MM-DD.md`
 4. Read `memory/YYYY-MM-DD.md` (today + yesterday) for recent context
 5. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
+6. **Skim inventories:** `memory/Document Inventory.md` and `memory/Transcript Inventory.md` — know what's available
 
 Don't ask permission. Just do it.
 
@@ -32,6 +33,8 @@ When wrapping up a session with active work in progress:
 4. After reading, archive using Write tool (not exec/mv):
    - Write content to `memory/archive/continuation-YYYY-MM-DD.md`
    - Overwrite `memory/CONTINUATION.md` with empty content
+
+**Export = Continuation:** When asked to export a conversation, ALWAYS also create a continuation packet. The export backmatter has continuation context — use that to populate `memory/CONTINUATION.md`.
 
 **Why archive instead of delete:** Crash protection. If session dies after reading but before meaningful work, the archive has the backup.
 

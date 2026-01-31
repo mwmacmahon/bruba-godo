@@ -95,3 +95,18 @@ cat ~/clawd/memory/some-file.md
 - Approximate tokens being added
 
 This helps <REDACTED-NAME> track context burn and adjust if needed. For smaller files, load freely without reporting.
+
+### 📚 Inventories — Your Table of Contents
+
+At session start, skim:
+- `memory/Document Inventory.md` — docs with descriptions
+- `memory/Transcript Inventory.md` — archived conversations with descriptions
+
+This builds your mental map of what's available. When a topic comes up where prior context might help, check the inventory first — the descriptions often tell you if a file is relevant without opening it.
+
+**Loading strategy:**
+1. Scan inventory description
+2. If promising, read the Summary (if one exists)
+3. Only load full transcript/doc if the summary confirms relevance
+
+This keeps context lean while still leveraging your memory.

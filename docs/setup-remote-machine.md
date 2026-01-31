@@ -2,6 +2,7 @@
 type: doc
 scope: reference
 title: "Setting Up the Remote Machine"
+description: "Prepare macOS/Linux machine for Clawdbot"
 ---
 
 # Setting Up the Remote Machine
