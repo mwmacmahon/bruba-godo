@@ -1,16 +1,57 @@
 # /sync - Full Pipeline Sync
 
-Runs full sync: prompts + content pipeline. No menu, just runs everything.
+Runs full sync: prompts + content pipeline.
 
 ## Instructions
 
 ### 1. Prompt Sync
 
-Run `/prompt-sync` (mirror → conflict detection → assemble → push).
+#### Step 1: Mirror
+```bash
+./tools/mirror.sh
+```
+
+#### Step 2: Detect Conflicts (CRITICAL)
+```bash
+./tools/detect-conflicts.sh
+```
+
+**⚠️ IF CONFLICTS ARE DETECTED: STOP IMMEDIATELY.**
+
+Do NOT proceed to assembly or push. Show the user the conflict summary and ask how to resolve each one:
+
+**For new BOT-MANAGED sections:**
+- Ask: "Bot added section 'X'. Keep it?"
+- If yes: Add `bot:X` to exports.yaml agents_sections
+- If no: Warn that it will be removed on push
+
+**For new COMPONENT sections:**
+- Ask: "Bot added component 'X'. Keep it?"
+- If yes as component: Create `components/X/prompts/AGENTS.snippet.md` with content from mirror, add `X` to agents_sections
+- If yes as bot-managed: Add `bot:X` to agents_sections
+- If no: Warn that it will be removed on push
+
+**For edited components:**
+- Show diff with `./tools/detect-conflicts.sh --diff NAME`
+- Ask: "Bot modified 'X'. Keep bot's version?"
+- If yes: Copy changes to component source
+- If no: Warn that bot's changes will be overwritten
+
+Only after ALL conflicts are resolved, continue.
+
+#### Step 3: Assemble (only if no conflicts)
+```bash
+./tools/assemble-prompts.sh --verbose
+```
+
+#### Step 4: Push
+```bash
+./tools/push.sh --verbose
+```
+
+---
 
 ### 2. Content Pipeline
-
-When running content sync, follow these steps in order:
 
 #### Step 1: Pull new sessions
 
@@ -24,7 +65,7 @@ Report: new sessions pulled, converted to intake/
 
 **2a. Identify trivial files for deletion**
 
-Scan for tiny conversations (≤4 messages OR <800 chars) that are likely heartbeat/test sessions:
+Scan for tiny conversations (≤4 messages OR <800 chars):
 
 ```bash
 for f in intake/*.md; do
@@ -36,67 +77,29 @@ for f in intake/*.md; do
 done
 ```
 
-If trivial files found, present them:
-```
-=== Trivial Conversations (likely deletable) ===
-
- #  Msgs  Size   File                    Preview
- 1     1    63   57ce03ef...             [Bot greeting only]
- 2     2   120   db7cd26d...             "test" / "Pong"
- 3     2   180   f33f045c...             [heartbeat check]
-
-Options:
-  [D] Delete all trivial files (intake + sessions/)
-  [R] Review each one individually
-  [S] Skip triage, keep all
-```
+If trivial files found, ask user:
+- [D] Delete all trivial files
+- [R] Review individually
+- [S] Skip, keep all
 
 **2b. Handle files needing CONFIG**
 
-Check for files without CONFIG:
 ```bash
 grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
 ```
 
-If files need CONFIG, show full list with date column:
-
-```bash
-for f in intake/*.md; do
-    msgs=$(grep -c "^=== MESSAGE" "$f" 2>/dev/null || echo 0)
-    size=$(wc -c < "$f" | tr -d ' ')
-    name=$(basename "$f" .md | cut -c1-12)
-    # Extract date from file (look for timestamp in header)
-    date=$(grep -m1 "^Date:" "$f" 2>/dev/null | cut -d' ' -f2 || echo "unknown")
-    printf "%s  %s  %3d msgs  %6d\n" "$name" "$date" "$msgs" "$size"
-done
-```
-
-Present as:
-```
-=== Files Needing CONFIG (25 files) ===
-
- #  Session       Date        Msgs   Size
- 1  867bb508...   2026-01-28     5   1.3K
- 2  9bd86045...   2026-01-29    63  29.7K
- 3  a05bd263...   2026-01-29    34  10.1K
-...
-
-Options:
-  [A] Auto-CONFIG subset (specify files or search criteria)
-  [C] Convert document-by-document (clears context between each)
-  [S] Skip (leave unconverted, continue pipeline)
-```
-
-**Note:** Unconverted files stay in intake/ until next sync or manual `/convert`.
+If files need CONFIG, ask user:
+- [A] Auto-CONFIG subset
+- [C] Convert one-by-one
+- [S] Skip (leave unconverted)
 
 #### Step 3: Canonicalize ready files
 
 ```bash
-# Check what's ready
 grep -l "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
 ```
 
-If files are ready:
+If files ready:
 ```bash
 python -m components.distill.lib.cli canonicalize intake/<file>.md \
     -o reference/transcripts/ \
@@ -116,6 +119,8 @@ python -m components.distill.lib.cli export --profile bot --verbose
 ./tools/push.sh --verbose
 ```
 
+---
+
 ### 3. Summary
 
 Show brief summary of what was synced.
@@ -124,8 +129,7 @@ Show brief summary of what was synced.
 
 - `/prompt-sync` - Prompt assembly only (detailed conflict resolution)
 - `/pull` - Pull sessions only
-- `/convert` - Convert single file (AI-assisted CONFIG)
+- `/convert` - Convert single file
 - `/intake` - Batch canonicalize
 - `/export` - Generate exports
 - `/push` - Push to bot memory
-- `/status` - Quick bot status check

@@ -44,7 +44,7 @@ For each entry in `agents_sections`, the assembler checks:
 ## Config Structure
 
 ```yaml
-# config.yaml
+# exports.yaml (under bot profile)
 agents_sections:
   - header                # Template section (title + intro)
   - http-api              # Component (Message Triggers, HTTP API)
@@ -55,7 +55,7 @@ agents_sections:
   - distill               # Component (PKM resources)
   - safety                # Template section
   - bot:exec-approvals    # Bot-managed (preserved from remote)
-  - bot:packets           # Bot-managed (preserved from remote)
+  - cc-packets            # Component (Claude Code packet exchange)
   - external-internal     # Template section
   - workspace             # Component
   - group-chats           # Component
@@ -90,6 +90,7 @@ bruba-godo/
 │   ├── http-api/prompts/AGENTS.snippet.md
 │   ├── distill/prompts/AGENTS.snippet.md
 │   ├── continuity/prompts/AGENTS.snippet.md
+│   ├── cc-packets/prompts/AGENTS.snippet.md
 │   └── signal/prompts/AGENTS.snippet.md
 ├── mirror/prompts/AGENTS.md                 # Remote state (has BOT-MANAGED sections)
 ├── exports/bot/core-prompts/AGENTS.md       # Assembled output
@@ -122,16 +123,27 @@ bruba-godo/
 ```
 
 Detects:
-- **New bot sections:** BOT-MANAGED blocks in mirror not in config
+- **New BOT-MANAGED sections:** Bot added `<!-- BOT-MANAGED: X -->` not in config
+- **New COMPONENT sections:** Bot added `<!-- COMPONENT: X -->` not in config
 - **Bot edits:** Component content differs from mirror
 
-### When Bot Adds a Section
+### When Bot Adds a BOT-MANAGED Section
 
 1. Bot wraps new content with `<!-- BOT-MANAGED: name -->` on remote
 2. You run `/mirror` to pull changes
 3. `detect-conflicts.sh` reports: "New bot section: name"
 4. You decide:
    - **Keep:** Add `bot:name` to config at correct position
+   - **Discard:** Section removed on next push
+
+### When Bot Adds a COMPONENT Section
+
+1. Bot wraps new content with `<!-- COMPONENT: name -->` on remote
+2. You run `/mirror` to pull changes
+3. `detect-conflicts.sh` reports: "New component section: name"
+4. You decide:
+   - **Keep as component:** Create `components/name/prompts/AGENTS.snippet.md`, add `name` to config
+   - **Keep as bot-managed:** Add `bot:name` to config (bot owns content)
    - **Discard:** Section removed on next push
 
 ### When Bot Edits a Component

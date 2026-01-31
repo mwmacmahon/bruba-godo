@@ -94,6 +94,31 @@ get_mirror_bot_sections() {
     grep -oE '<!-- BOT-MANAGED: [^>]+ -->' "$MIRROR_FILE" 2>/dev/null | sed 's/<!-- BOT-MANAGED: //' | sed 's/ -->//' || true
 }
 
+# Get COMPONENT sections from mirror
+get_mirror_component_sections() {
+    grep -oE '<!-- COMPONENT: [^>]+ -->' "$MIRROR_FILE" 2>/dev/null | \
+        sed 's/<!-- COMPONENT: //' | sed 's/ -->//' || true
+}
+
+# Get all sections from config (components + templates + bot:)
+get_config_all_sections() {
+    local sections_started=false
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^[[:space:]]*agents_sections: ]]; then
+            sections_started=true
+            continue
+        fi
+        if [[ "$sections_started" == true ]]; then
+            if [[ "$line" =~ ^[[:space:]]*[a-z_]+: ]] && [[ ! "$line" =~ ^[[:space:]]*- ]]; then
+                break
+            fi
+            if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+([a-z0-9_:-]+) ]]; then
+                echo "${BASH_REMATCH[1]}" | sed 's/^bot://'
+            fi
+        fi
+    done < "$EXPORTS_FILE"
+}
+
 # Get section content from mirror by name
 get_mirror_section_content() {
     local name="$1"
@@ -191,6 +216,7 @@ echo ""
 
 CONFLICTS=0
 NEW_BOT_SECTIONS=()
+NEW_COMPONENT_SECTIONS=()
 EDITED_COMPONENTS=()
 
 # Check for missing mirror
@@ -206,6 +232,17 @@ MIRROR_BOT_SECTIONS=$(get_mirror_bot_sections)
 for section in $MIRROR_BOT_SECTIONS; do
     if ! echo "$CONFIG_BOT_SECTIONS" | grep -q "^${section}$"; then
         NEW_BOT_SECTIONS+=("$section")
+        CONFLICTS=$((CONFLICTS + 1))
+    fi
+done
+
+# 1b. Find new COMPONENT sections (in mirror but not in config)
+CONFIG_ALL_SECTIONS=$(get_config_all_sections)
+MIRROR_COMPONENT_SECTIONS=$(get_mirror_component_sections)
+
+for section in $MIRROR_COMPONENT_SECTIONS; do
+    if ! echo "$CONFIG_ALL_SECTIONS" | grep -q "^${section}$"; then
+        NEW_COMPONENT_SECTIONS+=("$section")
         CONFLICTS=$((CONFLICTS + 1))
     fi
 done
@@ -308,6 +345,23 @@ if [[ ${#NEW_BOT_SECTIONS[@]} -gt 0 ]]; then
         fi
         echo ""
         echo "  To keep: Add 'bot:$section' to exports.yaml agents_sections after '$position'"
+        echo "  To discard: Section will be removed on next push"
+    done
+fi
+
+# Report new component sections (bot added COMPONENT markers not in config)
+if [[ ${#NEW_COMPONENT_SECTIONS[@]} -gt 0 ]]; then
+    echo ""
+    echo "NEW COMPONENT SECTIONS (bot added, not in config):"
+    for section in "${NEW_COMPONENT_SECTIONS[@]}"; do
+        position=$(find_section_position "$section")
+        echo ""
+        echo "  Component: $section"
+        echo "  Position: after '$position'"
+        echo ""
+        echo "  To keep as component: Create components/$section/prompts/AGENTS.snippet.md"
+        echo "                        Add '$section' to exports.yaml agents_sections"
+        echo "  To keep as bot-managed: Add 'bot:$section' to exports.yaml agents_sections"
         echo "  To discard: Section will be removed on next push"
     done
 fi

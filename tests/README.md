@@ -32,6 +32,8 @@ python3 tests/run_tests.py -v && \
 tests/
 ├── run_tests.py                    # Test runner (works without pytest)
 ├── test_variants.py                # Variant generation tests (24 tests)
+├── test_export.py                  # Export pipeline tests (18 tests)
+├── test_detect_conflicts.sh        # Conflict detection tests (18 tests)
 ├── test-export-prompts.sh          # Profile targeting tests (38 tests)
 ├── test-prompt-assembly.sh         # Prompt assembly tests (13 tests)
 ├── test-e2e-pipeline.sh            # E2E content pipeline tests (10 tests)
@@ -55,8 +57,9 @@ tests/
 | Module | Tests | Description |
 |--------|-------|-------------|
 | `test_variants.py` | 24 | Variant generation from canonical files |
+| `test_export.py` | 18 | Export pipeline routing and frontmatter preservation |
 
-**Total Python tests: 24**
+**Total Python tests: 42**
 
 #### What's Tested in `test_variants.py`
 
@@ -67,15 +70,32 @@ tests/
 - **Fuzzy anchor matching** - Case-insensitive, normalized text matching
 - **Variant generation** - transcript, transcript-lite, summary
 
+#### What's Tested in `test_export.py`
+
+- **Type/scope parsing** - Frontmatter type and scope extraction
+- **Export routing** - Type-based routing (doc→docs/, refdoc→refdocs/, etc.)
+- **Routing priority** - Frontmatter type takes precedence over path
+- **Frontmatter preservation** - Type/scope preserved in variant output
+- **Footer handling** - "End of Transcript" only for transcript types
+
+#### What's Tested in `test_detect_conflicts.sh`
+
+- **No conflicts** - Clean state when mirror matches config
+- **New BOT-MANAGED sections** - Detects bot-added BOT-MANAGED blocks
+- **New COMPONENT sections** - Detects bot-added COMPONENT blocks (regression test)
+- **Edited components** - Detects when bot modifies component content
+- **Multiple conflicts** - Handles multiple simultaneous conflicts
+
 ### Shell Tests
 
 | Script | Tests | Description |
 |--------|-------|-------------|
+| `test_detect_conflicts.sh` | 18 | Conflict detection for sync workflow |
 | `test-export-prompts.sh` | 38 | Profile targeting, prompt export, silent mode content |
 | `test-prompt-assembly.sh` | 13 | Prompt assembly from templates + components |
 | `test-e2e-pipeline.sh` | 10 | Full content pipeline: intake → reference → exports |
 
-**Total tests: 85** (24 Python + 61 Shell)
+**Total tests: 121** (42 Python + 79 Shell)
 
 #### What's Tested in `test-export-prompts.sh`
 
