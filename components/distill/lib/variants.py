@@ -541,7 +541,20 @@ def _build_transcript_output(
     lines.append(f'title: "{config.title}"')
     lines.append(f'slug: {config.slug}')
     lines.append(f'date: {config.date}')
-    lines.append(f'type: {"transcript-lite" if is_lite else "transcript"}')
+
+    # Preserve original type from frontmatter, or default based on is_lite
+    if config.type:
+        file_type = config.type
+        if is_lite and file_type == 'transcript':
+            file_type = 'transcript-lite'
+        lines.append(f'type: {file_type}')
+    else:
+        lines.append(f'type: {"transcript-lite" if is_lite else "transcript"}')
+
+    # Preserve scope if present
+    if config.scope:
+        lines.append(f'scope: {config.scope}')
+
     if config.description:
         lines.append(f'description: "{config.description}"')
     if config.tags:
@@ -550,10 +563,13 @@ def _build_transcript_output(
     lines.append('---')
     lines.append('')
     lines.append(content)
-    lines.append('')
-    lines.append('---')
-    lines.append('')
-    lines.append('## End of Transcript')
+
+    # Only add "End of Transcript" footer for actual transcripts
+    if not config.type or config.type in ('transcript', 'transcript-lite'):
+        lines.append('')
+        lines.append('---')
+        lines.append('')
+        lines.append('## End of Transcript')
     lines.append('')
 
     return '\n'.join(lines)

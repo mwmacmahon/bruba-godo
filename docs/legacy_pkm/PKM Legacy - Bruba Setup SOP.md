@@ -1,7 +1,9 @@
 ---
+type: doc
+scope: reference
+title: "Bruba Setup SOP"
 version: 5.17.0
 updated: 2026-01-28
-type: sop
 tags: [bruba, clawdbot, setup, pkm-integration]
 description: "Bruba setup and PKM integration procedure"
 ---

@@ -1,3 +1,9 @@
+---
+type: doc
+scope: reference
+title: "Prompts and Distillation Pipeline"
+---
+
 # Prompts and Distillation Pipeline
 
 Comprehensive documentation for the bruba-godo content processing pipeline.
@@ -68,7 +74,7 @@ exports:
     remote_path: memory
     include:
       scope: [meta, reference, transcripts]
-      type: [prompt]
+      type: [prompt, doc, refdoc]
     exclude:
       sensitivity: [sensitive, restricted]
     redaction: [names, health]
@@ -96,7 +102,8 @@ exports:
     description: "Prompts for Claude Projects / Claude Code"
     output_dir: exports/claude
     include:
-      type: [prompt]
+      type: [prompt, doc, refdoc]
+      scope: [meta, reference, transcripts]
 
   tests:
     description: "Local testing profile"
@@ -182,15 +189,34 @@ defaults:
 /convert <file>
 ```
 
-AI-assisted analysis of intake file to add frontmatter:
+AI-assisted analysis of intake file to add frontmatter + backmatter CONFIG block.
 
+**Frontmatter controls export routing:**
+
+| type | Output directory | Prefix |
+|------|-----------------|--------|
+| `doc` | `exports/bot/docs/` | `Doc - ` |
+| `refdoc` | `exports/bot/refdocs/` | `Refdoc - ` |
+| `transcript` | `exports/bot/transcripts/` | `Transcript - ` |
+| `prompt` | `exports/bot/prompts/` | `Prompt - ` |
+
+Example frontmatter for a doc:
 ```yaml
 ---
-type: conversation
-scope: meta
+type: doc
+scope: reference
+title: "My Document"
+---
+```
+
+Example frontmatter for a transcript:
+```yaml
+---
+title: "Pipeline Work Session"
+slug: 2026-01-31-pipeline-work
 date: 2026-01-31
-participants: [gus, bruba]
-topics: [export-pipeline, testing]
+source: claude
+tags: [export-pipeline, testing]
 ---
 ```
 
@@ -406,9 +432,18 @@ Check resolution order:
 ### Export Not Including Files
 
 Check frontmatter matches profile filters:
-- `type` must match `include.type`
-- `scope` must match `include.scope`
+- `type` must match `include.type` (e.g., `doc`, `refdoc`, `prompt`)
+- `scope` must match `include.scope` (e.g., `reference`, `meta`, `transcripts`)
 - `sensitivity` must not match `exclude.sensitivity`
+
+### Export Going to Wrong Directory
+
+The `type` field in frontmatter controls output routing:
+- `type: doc` → `docs/` with `Doc - ` prefix
+- `type: refdoc` → `refdocs/` with `Refdoc - ` prefix
+- `type: transcript` → `transcripts/` with `Transcript - ` prefix
+
+If files go to wrong directory, check frontmatter has correct `type` field.
 
 ### Push Not Syncing
 

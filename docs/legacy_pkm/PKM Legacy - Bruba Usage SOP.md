@@ -1,7 +1,9 @@
 ---
+type: doc
+scope: reference
+title: "Bruba Usage SOP"
 version: 1.4.0
 updated: 2026-01-29
-type: sop
 tags: [bruba, clawdbot, operations, reference]
 description: "Day-to-day Bruba operations reference"
 ---

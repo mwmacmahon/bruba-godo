@@ -1,7 +1,9 @@
 ---
+type: doc
+scope: reference
+title: "Siri/Shortcuts Integration Journey"
 version: 1.0.0
 updated: 2026-01-29 00:15
-type: refdoc
 project: planning
 tags: [bruba, siri, shortcuts, http-api, integration]
 ---

@@ -1,3 +1,9 @@
+---
+type: doc
+scope: reference
+title: "Operations Guide"
+---
+
 # Operations Guide
 
 Day-to-day operations reference for managing your bot. For initial setup, see [Full Setup Guide](full-setup-guide.md).

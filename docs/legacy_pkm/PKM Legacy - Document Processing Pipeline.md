@@ -1,7 +1,9 @@
 ---
+type: doc
+scope: reference
+title: "Document Processing Pipeline"
 version: 2.0.0
 updated: 2026-01-26
-type: reference
 tags: [meta, reference, pkm-system, convo-processor]
 description: "Complete pipeline reference for PKM document processing from intake to bundle output"
 ---

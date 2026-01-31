@@ -1,3 +1,9 @@
+---
+type: doc
+scope: reference
+title: "Full Setup Guide"
+---
+
 # Full Setup Guide
 
 Complete guide for setting up a personal AI assistant bot with Clawdbot. This guide covers everything from prerequisites to security hardening.

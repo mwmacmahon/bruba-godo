@@ -1,7 +1,9 @@
 ---
+type: doc
+scope: reference
+title: "Bruba Vision and Roadmap"
 version: 2.0.1
 updated: 2026-01-28
-type: vision
 project: bruba
 tags: [bruba, clawdbot, vision, planning, roadmap]
 description: "Bruba PKM-integrated personal assistant vision and roadmap"

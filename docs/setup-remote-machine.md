@@ -1,3 +1,9 @@
+---
+type: doc
+scope: reference
+title: "Setting Up the Remote Machine"
+---
+
 # Setting Up the Remote Machine
 
 This guide covers preparing a macOS or Linux machine to run Clawdbot.

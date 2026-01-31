@@ -1,7 +1,9 @@
 ---
+type: doc
+scope: reference
+title: "Bruba Voice Integration"
 version: 1.4.1
 updated: 2026-01-28
-type: refdoc
 project: planning
 tags: [bruba, voice, integration]
 description: "Voice interaction for Bruba: local STT/TTS setup, model benchmarks, and future Signal call exploration"

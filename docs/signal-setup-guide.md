@@ -1,7 +1,9 @@
 ---
+type: doc
+scope: reference
+title: "Signal Channel Setup Guide"
 version: 1.0.0
 updated: 2026-01-30
-type: guide
 project: shared
 tags: [moltbot, signal, setup, voice]
 description: "Standalone guide for Signal channel setup with voice handling"

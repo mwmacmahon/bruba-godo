@@ -1,7 +1,9 @@
 ---
+type: doc
+scope: reference
+title: "Bruba Security Overview"
 version: 1.3.1
 updated: 2026-01-29
-type: reference
 project: bruba
 tags: [bruba, security, clawdbot, reference]
 description: "Bruba security model, threat analysis, and operational guidelines"

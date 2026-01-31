@@ -709,6 +709,8 @@ def parse_v2_config_block(block: str) -> CanonicalConfig:
         date = str(date)
     source = parsed.get('source', 'claude-projects')
     tags = parse_inline_list(parsed.get('tags', []))
+    file_type = parsed.get('type', '')
+    scope = parsed.get('scope', '')
     description = parsed.get('description', '')
 
     # Parse sections_remove
@@ -800,6 +802,8 @@ def parse_v2_config_block(block: str) -> CanonicalConfig:
         date=date,
         source=source,
         tags=tags,
+        type=file_type,
+        scope=scope,
         description=description,
         sections_remove=sections_remove,
         sections_lite_remove=sections_lite_remove,

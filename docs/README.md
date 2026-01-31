@@ -1,3 +1,9 @@
+---
+type: doc
+scope: reference
+title: "Documentation Index"
+---
+
 # Documentation Index
 
 ## Start Here

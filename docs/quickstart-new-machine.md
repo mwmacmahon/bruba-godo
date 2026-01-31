@@ -1,3 +1,9 @@
+---
+type: doc
+scope: reference
+title: "Quick Start: Setting Up a New Bot Machine"
+---
+
 # Quick Start: Setting Up a New Bot Machine
 
 Step-by-step guide for getting a new bot running quickly.

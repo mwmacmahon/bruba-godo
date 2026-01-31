@@ -1,3 +1,9 @@
+---
+type: doc
+scope: reference
+title: "Vision: Bot-Agnostic Operator Design"
+---
+
 # Vision: Bot-Agnostic Operator Design
 
 **Version:** 2.0.0

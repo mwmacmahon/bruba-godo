@@ -292,11 +292,16 @@ def cmd_export(args):
             sys.exit(1)
         exports = {args.profile: exports[args.profile]}
 
-    # Find canonical files in reference/
+    # Find canonical files in reference/ AND docs/
     input_dir = Path(args.input) if args.input else Path('reference')
     canonical_files = []
     if input_dir.exists():
         canonical_files = list(input_dir.rglob("*.md"))
+
+    # Also scan docs/ directory for documentation files
+    docs_dir = Path('docs')
+    if docs_dir.exists() and not args.input:  # Only auto-scan docs if using default input
+        canonical_files.extend(docs_dir.rglob("*.md"))
 
     # Also scan component prompts
     prompt_files = []
@@ -404,6 +409,16 @@ def cmd_export(args):
                         processed += 1
                         if args.verbose:
                             print(f"  -> {out_path}")
+
+                    # Write summary if generated
+                    if result.summary:
+                        summary_dir = output_dir / "summaries"
+                        summary_dir.mkdir(parents=True, exist_ok=True)
+                        summary_name = f"Summary - {canonical_path.stem}.md"
+                        summary_path = summary_dir / summary_name
+                        summary_path.write_text(result.summary, encoding='utf-8')
+                        if args.verbose:
+                            print(f"  -> {summary_path}")
 
             except Exception as e:
                 print(f"  Error processing {canonical_path.name}: {e}")
@@ -605,31 +620,32 @@ def _get_content_subdirectory_and_prefix(canonical_path: Path, config) -> tuple:
     - ('refdocs', 'Refdoc - ') for reference documents
     - ('docs', 'Doc - ') for documentation
     - ('artifacts', 'Artifact - ') for artifacts
+
+    Priority: frontmatter type > source path > default
     """
-    # Check source path first
+    # Check type from frontmatter FIRST (highest priority)
+    if hasattr(config, 'type') and config.type:
+        file_type = config.type
+        if file_type == 'doc':
+            return ('docs', 'Doc - ')
+        if file_type == 'refdoc':
+            return ('refdocs', 'Refdoc - ')
+        if file_type == 'transcript':
+            return ('transcripts', 'Transcript - ')
+        if file_type == 'artifact':
+            return ('artifacts', 'Artifact - ')
+
+    # Then check source path as fallback
     path_str = str(canonical_path)
     if 'transcripts' in path_str:
         return ('transcripts', 'Transcript - ')
     if 'refdocs' in path_str:
         return ('refdocs', 'Refdoc - ')
+    if '/docs/' in path_str or path_str.startswith('docs/'):
+        return ('docs', 'Doc - ')
 
-    # Check scope/tags from config
-    scopes = set(config.tags) if config.tags else set()
-    if 'transcripts' in scopes:
-        return ('transcripts', 'Transcript - ')
-    if 'refdocs' in scopes or 'reference' in scopes:
-        return ('refdocs', 'Refdoc - ')
-
-    # Check for type in frontmatter if available
-    if hasattr(config, 'type'):
-        file_type = getattr(config, 'type', '')
-        if file_type == 'doc':
-            return ('docs', 'Doc - ')
-        if file_type == 'artifact':
-            return ('artifacts', 'Artifact - ')
-
-    # Default to transcripts for conversation-like content
-    return ('transcripts', 'Transcript - ')
+    # Default to artifacts for unclassified content
+    return ('artifacts', 'Artifact - ')
 
 
 def _matches_filters(config, include_rules: dict, exclude_rules: dict) -> bool:

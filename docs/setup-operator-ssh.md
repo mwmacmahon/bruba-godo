@@ -1,3 +1,9 @@
+---
+type: doc
+scope: reference
+title: "Setting Up Operator SSH Access"
+---
+
 # Setting Up Operator SSH Access
 
 This guide covers configuring your local machine (the operator) to connect to the bot machine via SSH.

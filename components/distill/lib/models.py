@@ -246,6 +246,8 @@ class CanonicalConfig:
     date: str  # YYYY-MM-DD
     source: str = "claude"  # claude | bruba | manual
     tags: List[str] = field(default_factory=list)
+    type: str = ""  # doc | refdoc | transcript | prompt
+    scope: str = ""  # reference | meta | transcripts
     description: str = ""  # One-line summary for inventory display
 
     # === SECTION HANDLING ===

@@ -9,7 +9,7 @@ exports:
     remote_path: memory
     include:
       scope: [meta, reference, transcripts]
-      type: [prompt]
+      type: [prompt, doc, refdoc]
     exclude:
       sensitivity: [sensitive, restricted]
     redaction: [names, health]
@@ -40,8 +40,8 @@ exports:
     description: "Prompts for Claude Projects / Claude Code"
     output_dir: exports/claude
     include:
-      type: [prompt]
-      scope: [meta]
+      type: [prompt, doc, refdoc]
+      scope: [meta, reference, transcripts]
 
   tests:
     description: "Local testing profile"

@@ -1,3 +1,9 @@
+---
+type: doc
+scope: reference
+title: "Intake Pipeline"
+---
+
 # Intake Pipeline
 
 How conversation sessions flow from raw JSONL to bot memory.

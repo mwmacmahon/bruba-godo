@@ -1,3 +1,9 @@
+---
+type: doc
+scope: reference
+title: "Security Model"
+---
+
 # Security Model
 
 Security reference for bot instances running Clawdbot. Covers threat model, permission boundaries, known gaps, and operational security practices.
