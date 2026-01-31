@@ -136,7 +136,7 @@ For each file WITH a CONFIG block (or each part file):
 python -m components.distill.lib.cli canonicalize intake/<file>.md \
     -o reference/transcripts/ \
     -c components/distill/config/corrections.yaml \
-    --verbose
+    --move intake/processed
 ```
 
 The CLI will:
@@ -145,18 +145,7 @@ The CLI will:
 - Strip Signal/Telegram wrappers
 - Content stays intact (sections_remove applied later at /export)
 - Use the slug from CONFIG as the output filename
-
-### 5. Move Processed Files
-
-After successful canonicalization, move original (or part files) to processed/:
-
-```bash
-mv intake/<file>.md intake/processed/
-# Or for split files:
-mv intake/<file>-part-*.md intake/processed/
-```
-
-This preserves the original with its CONFIG block for reference.
+- Move source file to `intake/processed/` after successful canonicalization
 
 ### 6. Report Results
 

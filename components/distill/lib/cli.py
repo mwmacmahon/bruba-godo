@@ -96,6 +96,10 @@ def cmd_canonicalize(args):
     if output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)
 
+    move_dir = Path(args.move) if args.move else None
+    if move_dir:
+        move_dir.mkdir(parents=True, exist_ok=True)
+
     for file_path in args.files:
         path = Path(file_path)
         if not path.exists():
@@ -120,6 +124,13 @@ def cmd_canonicalize(args):
                 out_path = output_dir / out_name
                 out_path.write_text(canonical_content, encoding='utf-8')
                 print(f"  -> {out_path}")
+
+                # Move source file if --move specified
+                if move_dir:
+                    import shutil
+                    dest_path = move_dir / path.name
+                    shutil.move(str(path), str(dest_path))
+                    print(f"  moved to {dest_path}")
             else:
                 print(canonical_content)
 
@@ -280,12 +291,12 @@ def cmd_export(args):
         exports = {args.profile: exports[args.profile]}
 
     # Find canonical files
-    input_dir = Path(args.input) if args.input else Path('reference/transcripts')
+    input_dir = Path(args.input) if args.input else Path('reference')
     if not input_dir.exists():
         print(f"Error: Input directory {input_dir} not found")
         sys.exit(1)
 
-    canonical_files = list(input_dir.glob("*.md"))
+    canonical_files = list(input_dir.rglob("*.md"))
     if not canonical_files:
         print(f"No canonical files found in {input_dir}")
         sys.exit(0)
@@ -510,6 +521,10 @@ def main():
     canonicalize_parser.add_argument(
         '--corrections', '-c',
         help='Path to corrections.yaml file'
+    )
+    canonicalize_parser.add_argument(
+        '--move', '-m',
+        help='Move source files to this directory after successful canonicalization (e.g., intake/processed)'
     )
     canonicalize_parser.set_defaults(func=cmd_canonicalize)
 

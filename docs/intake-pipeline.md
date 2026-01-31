@@ -93,7 +93,8 @@ Use `/intake` to batch process files WITH CONFIG blocks.
 ```bash
 python -m components.distill.lib.cli canonicalize intake/*.md \
     -o reference/transcripts/ \
-    -c components/distill/config/corrections.yaml
+    -c components/distill/config/corrections.yaml \
+    --move intake/processed
 ```
 
 This:
@@ -101,7 +102,7 @@ This:
 2. Applies transcription corrections from `corrections.yaml`
 3. Strips Signal/Telegram wrappers (`[Signal Michael id:...]`)
 4. **Content stays intact** — sections_remove, sensitivity are just in frontmatter
-5. Moves processed files to `intake/processed/`
+5. Moves processed files to `intake/processed/` (via `--move` flag)
 
 **Output in reference/transcripts/:**
 ```yaml
@@ -178,13 +179,16 @@ This rsyncs `exports/bot/` to the bot's memory directory.
 # Parse JSONL to delimited markdown (automatic with /pull)
 python -m components.distill.lib.cli parse-jsonl sessions/*.jsonl -o intake/
 
-# Canonicalize with CONFIG
-python -m components.distill.lib.cli canonicalize intake/*.md -o reference/transcripts/
+# Canonicalize with CONFIG (--move auto-moves source to processed/)
+python -m components.distill.lib.cli canonicalize intake/*.md \
+    -o reference/transcripts/ \
+    -c components/distill/config/corrections.yaml \
+    --move intake/processed
 
 # Generate variants with redaction
 python -m components.distill.lib.cli variants reference/transcripts/ --redact health,names
 
-# Export per profile
+# Export per profile (scans all of reference/ recursively)
 python -m components.distill.lib.cli export --profile bot
 
 # Debug: show parsed CONFIG
@@ -199,9 +203,12 @@ python -m components.distill.lib.cli parse intake/file.md
 | `sessions/.pulled` | Tracking file for pulled IDs |
 | `intake/*.md` | Delimited markdown (awaiting CONFIG) |
 | `intake/processed/` | Originals after canonicalization |
-| `reference/transcripts/` | Canonical files with frontmatter |
+| `reference/transcripts/` | Canonical conversation files |
+| `reference/refdocs/` | Reference documents (PKM docs, guides, etc.) |
 | `exports/bot/` | Filtered + redacted for bot |
 | `exports/rag/` | Filtered for RAG systems |
+
+**Note:** The `/export` command scans all of `reference/` recursively, so files in both `transcripts/` and `refdocs/` are included (filtered by frontmatter tags).
 
 ---
 
@@ -237,6 +244,46 @@ Define what gets redacted per export profile:
 - `financial` — Financial details
 
 Mark sensitive content in the CONFIG block, and it gets redacted automatically during export.
+
+---
+
+## Reference Documents (refdocs)
+
+Besides conversation transcripts, you can sync reference documents to bot memory.
+
+### Adding Reference Docs
+
+Place markdown files in `reference/refdocs/`:
+
+```bash
+cp ~/docs/my-guide.md reference/refdocs/
+```
+
+### Frontmatter Requirements
+
+Files must have YAML frontmatter to be included in exports:
+
+```yaml
+---
+title: My Guide
+date: 2026-01-28
+scope: [reference]
+---
+
+# My Guide
+...
+```
+
+The `scope` tag determines which export profiles include the file (per `exports.yaml`).
+
+### How It Works
+
+1. `/export` scans all of `reference/` recursively (`rglob("*.md")`)
+2. Files without frontmatter are skipped with an error
+3. Files matching the profile's `include`/`exclude` rules are exported
+4. `/push` syncs exports to bot memory
+
+This lets you manage both conversation transcripts (`reference/transcripts/`) and static reference docs (`reference/refdocs/`) in one pipeline.
 
 ---
 
