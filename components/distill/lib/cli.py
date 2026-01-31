@@ -8,6 +8,7 @@ Usage:
     python -m components.distill.lib.cli variants <directory>
     python -m components.distill.lib.cli export [--profile PROFILE]
     python -m components.distill.lib.cli split <files>... [-o OUTPUT] [--max-chars N]
+    python -m components.distill.lib.cli auto-config <files>... [--apply]
     python -m components.distill.lib.cli parse <file>
     python -m components.distill.lib.cli --help
 
@@ -17,6 +18,7 @@ Commands:
     variants      Generate variants (transcript, summary) from canonical files
     export        Generate filtered exports per exports.yaml profiles
     split         Split large files along message boundaries
+    auto-config   Generate minimal CONFIG block for files without one
     parse         Debug: show parsed CONFIG block from a file
 """
 
@@ -416,6 +418,61 @@ def cmd_export(args):
     print("\nExport complete.")
 
 
+def cmd_auto_config(args):
+    """Generate minimal CONFIG block for files without one."""
+    from .parsing import (
+        extract_config_block, detect_source, extract_date_from_content,
+        generate_slug, extract_title_hint
+    )
+
+    for file_path in args.files:
+        path = Path(file_path)
+        if not path.exists():
+            print(f"  Warning: {file_path} not found, skipping")
+            continue
+
+        content = path.read_text(encoding='utf-8')
+
+        # Check if file already has CONFIG
+        try:
+            existing_config = extract_config_block(content)
+            if existing_config:
+                print(f"  {path.name}: already has CONFIG, skipping")
+                continue
+        except Exception:
+            pass  # No config block, proceed
+
+        # Detect source and extract metadata
+        source = detect_source(content)
+        date = extract_date_from_content(content, path.name)
+        title = extract_title_hint(content) or "Untitled"
+        slug = generate_slug(title, date)
+
+        # Build CONFIG block
+        config_block = f'''title: "{title}"
+slug: {slug}
+date: {date}
+source: {source}
+tags: []
+
+sections_remove: []
+'''
+
+        if args.apply:
+            # Append CONFIG to file
+            with open(path, 'a', encoding='utf-8') as f:
+                f.write(f"\n\n=== EXPORT CONFIG ===\n{config_block}=== END CONFIG ===\n")
+            print(f"  {path.name}: CONFIG added (source: {source})")
+        else:
+            # Dry-run: show preview
+            print(f"=== {path.name} ===")
+            print(f"source: {source}")
+            print(f"title: {title}")
+            print(f"slug: {slug}")
+            print(f"date: {date}")
+            print()
+
+
 def cmd_split(args):
     """Split large files along message boundaries."""
     from .splitting import should_split, split_by_message_boundaries, split_file
@@ -755,6 +812,23 @@ def main():
         help='Minimum messages per chunk (default: 5)'
     )
     split_parser.set_defaults(func=cmd_split)
+
+    # auto-config command
+    auto_config_parser = subparsers.add_parser(
+        'auto-config',
+        help='Generate minimal CONFIG block for files without one'
+    )
+    auto_config_parser.add_argument(
+        'files',
+        nargs='+',
+        help='Markdown files to add CONFIG to'
+    )
+    auto_config_parser.add_argument(
+        '--apply',
+        action='store_true',
+        help='Write CONFIG to files (default: dry-run preview)'
+    )
+    auto_config_parser.set_defaults(func=cmd_auto_config)
 
     args = parser.parse_args()
 

@@ -91,7 +91,55 @@ grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
 Report:
 - X files in intake/
 - Y ready for canonicalization (have CONFIG)
-- Z need /convert first (no CONFIG)
+- Z need CONFIG (no CONFIG block)
+
+### 1.5 Handle Files Without CONFIG
+
+For files WITHOUT CONFIG blocks, show auto-detection results:
+
+```bash
+python -m components.distill.lib.cli auto-config intake/<files-without-config>
+```
+
+This detects source type and extracts metadata. Present findings:
+
+```
+=== Files Without CONFIG ===
+
+#  Filename               Source           Title (auto)
+1  abc12345.md            bruba            "Discussion about..."
+2  bookmarklet.md         claude-projects  "API Design Session"
+3  voice-memo-01.md       voice-memo       "Project update notes"
+
+Options:
+  [A] Apply auto-CONFIG to all and continue to canonicalize
+  [S] Select which to auto-CONFIG (others need /convert)
+  [C] Route all to /convert for full AI-assisted CONFIG
+  [Q] Skip files without CONFIG for now
+```
+
+**Source detection patterns:**
+- `bruba` — Has `[Signal ... id:...]` or `[Telegram ... id:...]` markers
+- `voice-memo` — Contains `[Transcript]` or `[attached audio file`
+- `claude-projects` — Default (no Bruba or voice markers)
+
+If user selects **[A]** or **[S]**:
+
+```bash
+python -m components.distill.lib.cli auto-config intake/<file>.md --apply
+```
+
+Auto-generated CONFIG uses:
+- **title**: First ~60 chars of first user message, or "Untitled"
+- **slug**: `{YYYY-MM-DD}-{sanitized-title}`
+- **date**: From Signal timestamp, filename pattern, or today
+- **source**: Auto-detected
+- **tags**: `[]` (empty)
+- **sections_remove**: `[]` (empty)
+
+**Note:** Auto-CONFIG is minimal. For conversations needing summaries, section removal, or transcription fixes, route to `/convert` instead.
+
+After applying auto-CONFIG, continue to step 2 (canonicalize).
 
 ### 2. Create Directories
 

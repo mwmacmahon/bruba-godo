@@ -11,10 +11,15 @@ Contents:
     - extract_config_block(): Extract the YAML-ish config block
     - parse_yaml_like_block(): Parse YAML-ish config into dict
     - parse_config_block(): Convert config dict to ExportConfig
+    - detect_source(): Auto-detect conversation source from content patterns
+    - extract_date_from_content(): Extract date from timestamps or filename
+    - generate_slug(): Generate URL-safe slug from title and date
+    - extract_title_hint(): Extract title hint from first user message
 """
 
 import re
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 try:
@@ -900,3 +905,157 @@ def extract_backmatter(content: str) -> Backmatter:
             break
 
     return result
+
+
+# =============================================================================
+# Source Detection and Auto-CONFIG Generation
+# =============================================================================
+
+def detect_source(content: str) -> str:
+    """
+    Detect conversation source from content patterns.
+
+    Returns:
+        'bruba' | 'claude-projects' | 'voice-memo'
+    """
+    # Check for Bruba markers (Signal/Telegram metadata prefixes)
+    if BRUBA_METADATA_PREFIX_PATTERN.search(content):
+        return 'bruba'
+
+    # Check for voice memo indicators
+    if '[Transcript]' in content or '[attached audio file' in content:
+        return 'voice-memo'
+
+    # Default to claude-projects
+    return 'claude-projects'
+
+
+# Pattern for Signal timestamps: 2026-01-31 10:00 EST
+SIGNAL_TIMESTAMP_PATTERN = re.compile(
+    r'(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}\s*(?:EST|EDT|CST|CDT|MST|MDT|PST|PDT|UTC)?'
+)
+
+# Pattern for date in filename: YYYY-MM-DD prefix or UUID
+FILENAME_DATE_PATTERN = re.compile(r'^(\d{4}-\d{2}-\d{2})')
+
+
+def extract_date_from_content(content: str, filename: str) -> str:
+    """
+    Extract date from content timestamps, filename, or return today's date.
+
+    Checks in order:
+    1. Signal timestamp pattern in content
+    2. YYYY-MM-DD prefix in filename
+    3. Falls back to today's date
+
+    Args:
+        content: The file content to search
+        filename: The filename (without path)
+
+    Returns:
+        Date string in YYYY-MM-DD format
+    """
+    # Try Signal timestamp pattern in content
+    match = SIGNAL_TIMESTAMP_PATTERN.search(content)
+    if match:
+        return match.group(1)
+
+    # Try filename pattern (YYYY-MM-DD prefix)
+    match = FILENAME_DATE_PATTERN.match(filename)
+    if match:
+        return match.group(1)
+
+    # Fall back to today's date
+    return datetime.now().strftime('%Y-%m-%d')
+
+
+def generate_slug(title: str, date: str) -> str:
+    """
+    Generate a URL-safe slug from title and date.
+
+    Format: YYYY-MM-DD-slugified-title
+
+    Args:
+        title: The conversation title
+        date: Date in YYYY-MM-DD format
+
+    Returns:
+        Slug string like "2026-01-31-my-conversation-title"
+    """
+    # Slugify the title
+    slug_title = title.lower()
+
+    # Replace common separators with hyphens
+    slug_title = re.sub(r'[\s_/\\]+', '-', slug_title)
+
+    # Remove non-alphanumeric characters (except hyphens)
+    slug_title = re.sub(r'[^a-z0-9-]', '', slug_title)
+
+    # Collapse multiple hyphens
+    slug_title = re.sub(r'-+', '-', slug_title)
+
+    # Trim hyphens from ends
+    slug_title = slug_title.strip('-')
+
+    # Truncate to reasonable length (keep ~50 chars for title portion)
+    if len(slug_title) > 50:
+        slug_title = slug_title[:50].rsplit('-', 1)[0]
+
+    return f"{date}-{slug_title}" if slug_title else date
+
+
+def extract_title_hint(content: str) -> Optional[str]:
+    """
+    Extract a title hint from the first substantial user message.
+
+    Looks for the first USER message and extracts the first ~60 characters
+    of meaningful content. Handles Bruba/Signal artifacts and voice transcripts.
+
+    Args:
+        content: The file content
+
+    Returns:
+        Title string (up to 60 chars) or None if no suitable content found
+    """
+    # Parse messages
+    messages = parse_messages(content)
+
+    # Find first USER message with substantial content
+    for msg in messages:
+        if msg.role != 'USER':
+            continue
+
+        # Clean the content - apply Bruba artifact cleanup first
+        text = clean_bruba_artifacts(msg.content.strip())
+
+        # Handle voice transcripts: strip "[Transcript] " prefix
+        if text.startswith('[Transcript]'):
+            text = text[len('[Transcript]'):].strip()
+
+        # Skip messages that are just artifacts or very short
+        if len(text) < 10:
+            continue
+
+        # Skip messages that look like remaining metadata or commands
+        if text.startswith('[') or text.startswith('==='):
+            continue
+
+        # Get first line or first 60 chars
+        first_line = text.split('\n')[0].strip()
+
+        # Remove common conversational prefixes
+        first_line = re.sub(r'^(Hey|Hi|Hello|OK|Okay|So|Well|Um|Uh),?\s*', '', first_line, flags=re.IGNORECASE)
+
+        # Truncate to 60 chars at word boundary
+        if len(first_line) > 60:
+            first_line = first_line[:60].rsplit(' ', 1)[0]
+            if not first_line.endswith(('.', '!', '?')):
+                first_line = first_line.rstrip('.,!?;:') + '...'
+
+        # Skip if too short after processing
+        if len(first_line) < 5:
+            continue
+
+        return first_line
+
+    return None

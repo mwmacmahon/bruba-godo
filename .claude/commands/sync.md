@@ -100,28 +100,68 @@ When running content sync, follow these steps in order:
 
 Report: new sessions pulled, converted to intake/
 
-#### Step 2: Convert files needing CONFIG
+#### Step 2: Triage & Convert
+
+**2a. Identify trivial files for deletion**
+
+Scan for tiny conversations (≤4 messages OR <800 chars) that are likely heartbeat/test sessions:
+
+```bash
+for f in intake/*.md; do
+    msgs=$(grep -c "^=== MESSAGE" "$f" 2>/dev/null || echo 0)
+    chars=$(wc -c < "$f" | tr -d ' ')
+    if [ "$msgs" -le 4 ] || [ "$chars" -lt 800 ]; then
+        echo "$f|$msgs|$chars"
+    fi
+done
+```
+
+If trivial files found, present them:
+```
+=== Trivial Conversations (likely deletable) ===
+
+ #  Msgs  Size   File                    Preview
+ 1     1    63   57ce03ef...             [Bot greeting only]
+ 2     2   120   db7cd26d...             "test" / "Pong"
+ 3     2   180   f33f045c...             [heartbeat check]
+
+Options:
+  [D] Delete all trivial files (intake + sessions/)
+  [R] Review each one individually
+  [S] Skip triage, keep all
+```
+
+**2b. Handle files needing CONFIG**
 
 Check for files without CONFIG:
 ```bash
 grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
 ```
 
-If files need CONFIG:
+If files need CONFIG, show in batches (10 at a time) with auto-config preview:
+
+```bash
+python -m components.distill.lib.cli auto-config intake/<files> 2>/dev/null
 ```
-Files needing CONFIG:
-  1. intake/abc12345.md (45 messages, 12KB)
-  2. intake/def67890.md (23 messages, 8KB)
+
+Present as:
+```
+=== Files Needing CONFIG (batch 1/3) ===
+
+ #  Date        Source   Title (auto-detected)
+ 1  2026-01-27  bruba    "can you check my reminders for today"
+ 2  2026-01-27  bruba    "quick question about the API"
+...
+10  2026-01-28  bruba    "did you read the packet?"
 
 Options:
-  1. Convert all interactively (recommended)
-  2. Skip conversion, continue with ready files
-  3. Stop here
+  [A] Auto-CONFIG this batch (minimal CONFIG, continue)
+  [C] Convert interactively (/convert for each)
+  [N] Next batch (skip this batch for now)
+  [Q] Continue to intake (unconverted files stay in intake/)
 ```
 
-If user chooses to convert:
-- Run `/convert` for each file interactively
-- User reviews and approves each CONFIG
+Unconverted files are fine — they'll just sit in intake/ until the next sync or manual `/convert`.
 
 #### Step 3: Canonicalize ready files
 
@@ -211,20 +251,26 @@ Pushed to bot.
   Pulled: 1 new session → intake/ghi11111.md
   Skipped: 24 already pulled
 
-[2/5] Converting files...
-  Files needing CONFIG: 3
-    1. intake/abc12345.md
-    2. intake/def67890.md
-    3. intake/ghi11111.md
+[2/5] Triage & Convert...
 
-  Options:
-    1. Convert all interactively
-    2. Skip conversion, continue with ready files
-    3. Stop here
+  === Trivial Conversations ===
+  Found 2 trivial files (≤4 msgs or <800 chars):
+    1. abc11111.md (1 msg, 63 chars) - [bot greeting only]
+    2. def22222.md (2 msgs, 120 chars) - "test" / "Pong"
 
-  User: 1
+  Delete trivial files? [D/r/s]: d
+  Deleted 2 trivial files (intake + sessions/)
 
-  [runs /convert for each, user approves]
+  === Files Needing CONFIG (batch 1/1) ===
+  3 files need CONFIG:
+    1. 2026-01-30  bruba  "can you help with the API?"
+    2. 2026-01-30  bruba  "quick question about auth"
+    3. 2026-01-30  bruba  "project planning discussion"
+
+  Options: [A]uto-CONFIG / [C]onvert / [Q]uit to intake
+  User: a
+
+  Applied auto-CONFIG to 3 files
 
 [3/5] Canonicalizing...
   3 files ready
