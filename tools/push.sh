@@ -124,7 +124,7 @@ if [[ -d "$EXPORTS_DIR/bot/core-prompts" ]]; then
 fi
 
 # 2. Sync all other subdirectories to memory/
-for subdir in prompts transcripts refdocs docs artifacts; do
+for subdir in prompts transcripts refdocs docs artifacts cc_logs summaries; do
     if [[ -d "$EXPORTS_DIR/bot/$subdir" ]]; then
         SUBDIR_COUNT=$(find "$EXPORTS_DIR/bot/$subdir" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
         if [[ "$SUBDIR_COUNT" -gt 0 ]]; then

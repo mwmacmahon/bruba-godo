@@ -1,5 +1,5 @@
 ---
-type: doc
+type: claude_code_log
 scope: reference
 title: "Export Pipeline Fixes - 2026-01-31"
 ---

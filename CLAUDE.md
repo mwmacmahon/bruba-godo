@@ -77,7 +77,8 @@ bruba-godo/
 │   │   ├── prompts/         # Prompt - *.md → ~/clawd/memory/prompts/
 │   │   ├── transcripts/     # Transcript - *.md → ~/clawd/memory/transcripts/
 │   │   ├── refdocs/         # Refdoc - *.md → ~/clawd/memory/refdocs/
-│   │   └── docs/            # Doc - *.md → ~/clawd/memory/docs/
+│   │   ├── docs/            # Doc - *.md → ~/clawd/memory/docs/
+│   │   └── cc_logs/         # Claude Code Log - *.md → ~/clawd/memory/cc_logs/
 │   └── claude/              # Content for Claude Projects/Code
 └── logs/                    # Script logs (gitignored)
 ```
@@ -280,3 +281,38 @@ Export profiles in `exports.yaml` control filtering and redaction per destinatio
 ## Git Policy
 
 Mirror, sessions, logs, intake, reference, exports, and user are gitignored. Only commit tool/skill/component changes after review.
+
+## Output Conventions
+
+### Work Logs (Large Plans Only)
+
+For **large plan executions** (multi-step implementations, major refactors), write a work log to `docs/cc_logs/`. Do NOT create logs for routine tasks, quick fixes, or simple changes.
+
+**Filename format:** `YYYY-MM-DD-<descriptive-slug>.md`
+
+**Required frontmatter:**
+```yaml
+---
+type: claude_code_log
+scope: reference
+title: "<Descriptive Title>"
+---
+```
+
+This frontmatter ensures logs get exported to Bruba's memory as "Claude Code Log - <title>.md".
+
+### Incoming Packets from Bruba
+
+When the user asks to check for a Bruba packet, look here:
+
+`workspace/output/packets/YYYY-MM-DD-<packet-name>.md`
+
+This is on the **bot's filesystem** (`/Users/bruba/clawd/workspace/output/packets/`), so use `./tools/bot cat` to read it.
+
+Packets include:
+- Clear goal
+- Context/background
+- Specific deliverables
+- Verification steps
+
+After completing the packet's plan, offer to archive it to `workspace/output/packets/archive/`.

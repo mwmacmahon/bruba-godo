@@ -87,7 +87,7 @@ sections_remove:
 sensitivity:
   terms:
     names: [Michael]
-=== END CONFIG ===
+[END CONFIG]
 ```
 
 ### Step 3: Intake (Canonicalize)
@@ -123,7 +123,7 @@ tags: [auth, backend, voice]
 [Clean conversation content with sections removed per CONFIG]
 
 ---
-<!-- === BACKMATTER === -->
+[BACKMATTER SECTION]
 
 ## Summary
 ...

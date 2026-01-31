@@ -9,7 +9,7 @@ exports:
     remote_path: memory
     include:
       scope: [meta, reference, transcripts]
-      type: [prompt, doc, refdoc]
+      type: [prompt, doc, refdoc, claude_code_log]
     exclude:
       sensitivity: [sensitive, restricted]
     redaction: [names, health]

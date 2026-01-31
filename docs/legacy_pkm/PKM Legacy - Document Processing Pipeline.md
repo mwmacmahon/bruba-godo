@@ -103,12 +103,12 @@ Assistant response
 === EXPORT CONFIG ===
 title: "..."
 ...
-=== END CONFIG ===
+[END CONFIG]
 ```
 
 - Delimited format with `=== MESSAGE N | ROLE ===` markers
 - CONFIG block between `=== EXPORT CONFIG ===` markers
-- Backmatter after `<!-- === BACKMATTER === -->`
+- Backmatter after `[BACKMATTER MARKER]`
 - CONFIG can be at end (Claude Projects) or beginning (Bruba) — auto-detected
 
 **Bruba/Clawdbot JSONL:**
@@ -214,7 +214,7 @@ sensitivity:
 
 ---
 
-<!-- === BACKMATTER === -->
+[BACKMATTER SECTION]
 
 ## Summary
 ...
@@ -328,7 +328,7 @@ sensitivity:
       tags: [health, personal]
       description: "description for replacement text"
 ```
-=== END CONFIG ===
+[END CONFIG]
 ```
 
 ### Field Reference
@@ -371,7 +371,7 @@ Summary and continuation context go in **backmatter** (after main content), not 
 
 ---
 
-<!-- === BACKMATTER === -->
+[BACKMATTER SECTION]
 
 ## Summary
 
@@ -601,7 +601,7 @@ sensitivity:
   terms:
     health: Zoloft
     names: Dr. Chen
-=== END CONFIG ===
+[END CONFIG]
 
 Hey, so I talked to Dr. Chen today about my Zoloft dosage...
 ```

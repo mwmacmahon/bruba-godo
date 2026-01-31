@@ -634,6 +634,8 @@ def _get_content_subdirectory_and_prefix(canonical_path: Path, config) -> tuple:
             return ('transcripts', 'Transcript - ')
         if file_type == 'artifact':
             return ('artifacts', 'Artifact - ')
+        if file_type == 'claude_code_log':
+            return ('cc_logs', 'Claude Code Log - ')
 
     # Then check source path as fallback
     path_str = str(canonical_path)
