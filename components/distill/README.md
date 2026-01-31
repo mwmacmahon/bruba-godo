@@ -102,24 +102,26 @@ exports:
       type: [prompt]
 ```
 
-### Prompt Profile Targeting
+### Prompts
 
-Prompts can target specific export profiles using the `profile` field in frontmatter:
+Prompts use frontmatter for metadata:
 
 ```yaml
 ---
 type: prompt
-profile: bot      # Only exported to bot profile
+scope: meta
+title: "Export Prompt"
 output_name: "Export"  # Output as "Prompt - Export.md"
 ---
 ```
 
 | Field | Description |
 |-------|-------------|
-| `profile` | Target profile (bot, claude, etc.). If set, prompt only goes to that profile |
+| `type` | Must be `prompt` for prompt files |
+| `scope` | Typically `meta` for prompts |
 | `output_name` | Custom output filename. "Export" → "Prompt - Export.md" |
 
-This allows different prompt variants for different contexts (e.g., Export.md for bot vs Export-Claude.md for Claude Code).
+Prompts go to `exports/{profile}/prompts/` subdirectory (e.g., `exports/bot/prompts/Prompt - Export.md`).
 
 ### corrections.yaml (voice transcription fixes)
 
@@ -176,9 +178,15 @@ reference/transcripts/*.md    (canonical with YAML frontmatter, full content)
     ↓ /export (NOT AI)
     │   - Applies sections_remove (actually removes)
     │   - Applies redaction per exports.yaml profile
-exports/bot/*.md              (filtered + redacted for bot)
+    │   - Outputs to subdirectories by content type
+exports/bot/
+    ├── core-prompts/         # AGENTS.md → ~/clawd/
+    ├── prompts/              # Prompt - *.md → ~/clawd/memory/prompts/
+    ├── transcripts/          # Transcript - *.md → ~/clawd/memory/transcripts/
+    ├── refdocs/              # Refdoc - *.md → ~/clawd/memory/refdocs/
+    └── docs/                 # Doc - *.md → ~/clawd/memory/docs/
     ↓ /push
-bot memory
+bot memory (routed to appropriate directories)
 ```
 
 ## CONFIG Block Format (v2)

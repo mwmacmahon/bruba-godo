@@ -1,7 +1,6 @@
 ---
 type: prompt
 scope: meta
-profile: bot
 title: "Export Prompt"
 output_name: "Export"
 ---
@@ -19,7 +18,9 @@ Trigger words: "export", "done", "wrap up", "finished", end of session.
 1. **CONFIG block** — metadata for processing (filtering, redaction, section removal)
 2. **Backmatter** — summary, decisions, outputs, continuation context
 
-Output these at the end of your response. The user will copy the conversation (including your output) into the intake pipeline.
+**If you have file write access (Claude Code):** Write the complete exported conversation directly to `intake/YYYY-MM-DD-slug.md`, then report the file path. The user can then run `/intake` to canonicalize.
+
+**Otherwise:** Output the CONFIG and backmatter at the end of your response. The user will copy the conversation (including your output) into the intake pipeline.
 
 ---
 
@@ -218,13 +219,34 @@ Parser now handles V2 format. Next step is updating the export profiles in expor
 
 ---
 
+## Transcript Second-Pass
+
+If this conversation includes voice transcripts, review the transcript handling:
+
+1. **Check for flagged fixes** — Any uncertain corrections that need confirmation?
+2. **Scan for missed errors** — Common mistakes that slipped through (see `Prompt - Transcription.md` for Known Common Mistakes)
+3. **Add to CONFIG** — Include `transcription_fixes_applied` with all corrections made
+
+This ensures transcripts are clean before they enter the canonical archive.
+
+---
+
 ## Output Instructions
 
 When the user asks for export:
 
 1. Analyze the conversation for sections to remove and sensitive content
-2. Generate the CONFIG block with appropriate fields
-3. Generate the backmatter summary
-4. Output both at the end of your response
+2. If voice transcripts present, do second-pass review (see above)
+3. Generate the CONFIG block with appropriate fields
+4. Generate the backmatter summary
 
-The user will copy the full conversation (including your output) into a file for processing.
+**With file access (Claude Code):**
+5. Write complete file to `intake/YYYY-MM-DD-slug.md`:
+   - CONFIG block at the top
+   - Full conversation content
+   - Backmatter at the end
+6. Report the file path to the user
+
+**Without file access:**
+5. Output CONFIG and backmatter at the end of your response
+6. User copies the full conversation into a file for processing

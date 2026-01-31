@@ -141,7 +141,6 @@ bruba-godo/
 ├── tests/                   # Test suite
 │   ├── test-prompt-assembly.sh  # Automated tests
 │   └── prompt-assembly-tests.md # Test protocols
-├── assembled/               # Assembled prompts (gitignored)
 ├── mirror/                  # Local file backup (gitignored)
 ├── sessions/                # Pulled sessions (gitignored)
 ├── intake/                  # Raw conversations awaiting CONFIG (gitignored)
@@ -149,6 +148,12 @@ bruba-godo/
 │   ├── transcripts/         # Canonical conversation files (gitignored)
 │   └── refdocs/             # Reference documents for bot memory (gitignored)
 ├── exports/                 # Filtered exports for sync (gitignored)
+│   ├── bot/
+│   │   ├── core-prompts/    # Assembled AGENTS.md → ~/clawd/
+│   │   ├── prompts/         # Prompt - *.md → ~/clawd/memory/prompts/
+│   │   ├── transcripts/     # Transcript - *.md → ~/clawd/memory/transcripts/
+│   │   └── ...              # Other content subdirectories
+│   └── claude/              # Content for Claude Projects/Code
 └── logs/                    # Script logs (gitignored)
 ```
 

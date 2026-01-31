@@ -49,10 +49,11 @@ else
     fail "Export.md not found"
 fi
 
-if [[ -f "components/distill/prompts/Export-Claude.md" ]]; then
-    pass "Export-Claude.md exists"
+# Export-Claude.md was merged into Export.md
+if [[ ! -f "components/distill/prompts/Export-Claude.md" ]]; then
+    pass "Export-Claude.md correctly merged (file removed)"
 else
-    fail "Export-Claude.md not found"
+    fail "Export-Claude.md should have been merged into Export.md"
 fi
 
 if [[ -f "components/distill/prompts/Transcription.md" ]]; then
@@ -127,10 +128,11 @@ else
     fail "Prompt - Export.md not created"
 fi
 
-if [[ -f "$TEMP_EXPORTS/Prompt - Export-Claude.md" ]]; then
-    pass "Export-Claude.md renamed to 'Prompt - Export-Claude.md'"
+# Export-Claude.md no longer exists (merged into Export.md)
+if [[ ! -f "$TEMP_EXPORTS/Prompt - Export-Claude.md" ]]; then
+    pass "Export-Claude.md correctly merged (not copied separately)"
 else
-    fail "Prompt - Export-Claude.md not created"
+    fail "Export-Claude.md should have been merged into Export.md"
 fi
 
 if [[ -f "$TEMP_EXPORTS/Prompt - Transcription.md" ]]; then
@@ -186,31 +188,31 @@ else
     fail "Export CLI failed to run bot profile"
 fi
 
-# Bot profile should get Export.md and Transcription.md (profile: bot)
-if [[ -f "exports/bot/Prompt - Export.md" ]]; then
-    pass "Export.md exported to bot profile"
+# Bot profile should get Export.md and Transcription.md in prompts/ subdirectory
+if [[ -f "exports/bot/prompts/Prompt - Export.md" ]]; then
+    pass "Export.md exported to bot profile (prompts/)"
 else
-    fail "Export.md not exported to bot profile"
+    fail "Export.md not exported to bot profile prompts/"
 fi
 
-if [[ -f "exports/bot/Prompt - Transcription.md" ]]; then
-    pass "Transcription.md exported to bot profile"
+if [[ -f "exports/bot/prompts/Prompt - Transcription.md" ]]; then
+    pass "Transcription.md exported to bot profile (prompts/)"
 else
-    fail "Transcription.md not exported to bot profile"
-fi
-
-# Bot profile should NOT get Export-Claude.md (profile: claude)
-if [[ ! -f "exports/bot/Prompt - Export-Claude.md" ]]; then
-    pass "Export-Claude.md correctly excluded from bot profile"
-else
-    fail "Export-Claude.md should not be in bot profile"
+    fail "Transcription.md not exported to bot profile prompts/"
 fi
 
 # Check frontmatter preserved
-if head -1 "exports/bot/Prompt - Export.md" | grep -q "^---"; then
+if head -1 "exports/bot/prompts/Prompt - Export.md" | grep -q "^---"; then
     pass "Frontmatter preserved in exported prompt"
 else
     fail "Frontmatter missing from exported prompt"
+fi
+
+# Check Export.md has file access conditional (merged content)
+if grep -q "file write access" "exports/bot/prompts/Prompt - Export.md"; then
+    pass "Export.md has Claude Code conditional (merged)"
+else
+    fail "Export.md missing Claude Code conditional"
 fi
 
 # Test 6: Claude profile targeting
@@ -225,25 +227,147 @@ else
     fail "Export CLI failed to run claude profile"
 fi
 
-# Claude profile should get Export-Claude.md as "Prompt - Export.md"
-if [[ -f "exports/claude/Prompt - Export.md" ]]; then
-    pass "Export-Claude.md exported to claude profile as Prompt - Export.md"
+# Claude profile gets the unified Export.md in prompts/ subdirectory
+if [[ -f "exports/claude/prompts/Prompt - Export.md" ]]; then
+    pass "Export.md exported to claude profile (prompts/)"
 else
-    fail "Export-Claude.md not exported to claude profile"
+    fail "Export.md not exported to claude profile prompts/"
 fi
 
-# Claude profile should NOT get bot-targeted prompts
-if [[ ! -f "exports/claude/Prompt - Transcription.md" ]]; then
-    pass "Transcription.md correctly excluded from claude profile"
+# Claude profile should also get Transcription.md now (unified prompts)
+if [[ -f "exports/claude/prompts/Prompt - Transcription.md" ]]; then
+    pass "Transcription.md exported to claude profile (prompts/)"
 else
-    fail "Transcription.md should not be in claude profile"
+    fail "Transcription.md not exported to claude profile prompts/"
 fi
 
-# Verify the Export.md in claude/ is the Claude-specific version
-if grep -q "Claude Code" "exports/claude/Prompt - Export.md"; then
-    pass "Claude profile has Claude-specific Export prompt"
+# Verify the Export.md has the unified content with file access conditional
+if grep -q "file write access" "exports/claude/prompts/Prompt - Export.md"; then
+    pass "Claude profile has unified Export prompt with file access conditional"
 else
-    fail "Claude profile should have Claude Code variant of Export"
+    fail "Claude profile Export.md missing file access conditional"
+fi
+
+echo ""
+
+# Test 7: Stage 2 - Silent Transcript Mode Content
+echo "--- Test 7: Silent Transcript Mode Content ---"
+
+# Check Transcription.md has Bruba Silent Mode section
+if grep -q "## Bruba Silent Mode" "components/distill/prompts/Transcription.md"; then
+    pass "Transcription.md has Bruba Silent Mode section"
+else
+    fail "Transcription.md missing Bruba Silent Mode section"
+fi
+
+# Check exported Transcription.md has silent mode section
+if grep -q "## Bruba Silent Mode" "exports/bot/prompts/Prompt - Transcription.md"; then
+    pass "Exported Transcription.md has Bruba Silent Mode section"
+else
+    fail "Exported Transcription.md missing Bruba Silent Mode section"
+fi
+
+# Check silent mode has key instructions (updated for expanded version)
+SILENT_MODE_CONTENT=$(grep -A 50 "## Bruba Silent Mode" "exports/bot/prompts/Prompt - Transcription.md" 2>/dev/null || true)
+
+if echo "$SILENT_MODE_CONTENT" | grep -q "Decision Tree"; then
+    pass "Silent mode has Decision Tree section"
+else
+    fail "Silent mode missing Decision Tree section"
+fi
+
+if echo "$SILENT_MODE_CONTENT" | grep -q "What to Track Internally"; then
+    pass "Silent mode has internal tracking guidance"
+else
+    fail "Silent mode missing internal tracking guidance"
+fi
+
+if echo "$SILENT_MODE_CONTENT" | grep -q "What to Print"; then
+    pass "Silent mode has 'What to Print' section"
+else
+    fail "Silent mode missing 'What to Print' section"
+fi
+
+if echo "$SILENT_MODE_CONTENT" | grep -q "Example Workflow"; then
+    pass "Silent mode has Example Workflow"
+else
+    fail "Silent mode missing Example Workflow"
+fi
+
+echo ""
+
+# Test 8: Voice Snippet Silent Mode Flow (simplified 6-step)
+echo "--- Test 8: Voice Snippet Silent Mode Flow ---"
+
+VOICE_SNIPPET="components/voice/prompts/AGENTS.snippet.md"
+
+if [[ -f "$VOICE_SNIPPET" ]]; then
+    pass "Voice AGENTS.snippet.md exists"
+else
+    fail "Voice AGENTS.snippet.md not found"
+fi
+
+# Check voice snippet has simplified 6-step flow
+if grep -q "Transcribe:" "$VOICE_SNIPPET"; then
+    pass "Voice snippet has 'Transcribe' step"
+else
+    fail "Voice snippet missing 'Transcribe' step"
+fi
+
+if grep -q "Apply fixes silently" "$VOICE_SNIPPET"; then
+    pass "Voice snippet has 'Apply fixes silently' step"
+else
+    fail "Voice snippet missing 'Apply fixes silently' step"
+fi
+
+if grep -q "Surface uncertainties" "$VOICE_SNIPPET"; then
+    pass "Voice snippet has 'Surface uncertainties' step"
+else
+    fail "Voice snippet missing 'Surface uncertainties' step"
+fi
+
+if grep -q "Respond" "$VOICE_SNIPPET"; then
+    pass "Voice snippet has 'Respond' step"
+else
+    fail "Voice snippet missing 'Respond' step"
+fi
+
+if grep -q "Voice reply:" "$VOICE_SNIPPET"; then
+    pass "Voice snippet has 'Voice reply' step"
+else
+    fail "Voice snippet missing 'Voice reply' step"
+fi
+
+if grep -q "Text version" "$VOICE_SNIPPET"; then
+    pass "Voice snippet has 'Text version' step"
+else
+    fail "Voice snippet missing 'Text version' step"
+fi
+
+echo ""
+
+# Test 9: AGENTS.snippet Export Pipeline Note
+echo "--- Test 9: AGENTS.snippet Export Pipeline Note ---"
+
+DISTILL_SNIPPET="components/distill/prompts/AGENTS.snippet.md"
+
+if grep -q "export pipeline" "$DISTILL_SNIPPET"; then
+    pass "Distill snippet mentions export pipeline"
+else
+    fail "Distill snippet missing export pipeline reference"
+fi
+
+if grep -q "components/distill/prompts/" "$DISTILL_SNIPPET"; then
+    pass "Distill snippet references source location"
+else
+    fail "Distill snippet missing source location reference"
+fi
+
+# Updated: exports now go to exports/bot/prompts/ (with subdirectory)
+if grep -q "exports/bot/" "$DISTILL_SNIPPET"; then
+    pass "Distill snippet references export output location"
+else
+    fail "Distill snippet missing export output reference"
 fi
 
 echo ""

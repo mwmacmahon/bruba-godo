@@ -5,8 +5,9 @@
 #   ./tools/assemble-prompts.sh              # Assemble AGENTS.md
 #   ./tools/assemble-prompts.sh --verbose    # Show detailed output
 #   ./tools/assemble-prompts.sh --dry-run    # Show what would be assembled
+#   ./tools/assemble-prompts.sh --force      # Skip conflict check
 #
-# Assembly reads agents_sections from config.yaml and resolves each entry:
+# Assembly reads agents_sections from exports.yaml (bot profile) and resolves each entry:
 #   1. bot:name  → bot-managed section from mirror (<!-- BOT-MANAGED: name -->)
 #   2. name      → component snippet (components/{name}/prompts/AGENTS.snippet.md)
 #   3. name      → template section (templates/prompts/sections/{name}.md)
@@ -19,8 +20,17 @@ set -e
 source "$(dirname "$0")/lib.sh"
 
 # Parse arguments
+FORCE=false
+for arg in "$@"; do
+    case $arg in
+        --force|-f)
+            FORCE=true
+            ;;
+    esac
+done
+
 if ! parse_common_args "$@"; then
-    echo "Usage: $0 [--dry-run] [--verbose]"
+    echo "Usage: $0 [--dry-run] [--verbose] [--force]"
     echo ""
     echo "Assemble AGENTS.md from config-driven section order."
     echo ""
@@ -28,6 +38,7 @@ if ! parse_common_args "$@"; then
     echo "  --dry-run, -n   Show what would be assembled without doing it"
     echo "  --verbose, -v   Show detailed output"
     echo "  --quiet, -q     Summary output only (default)"
+    echo "  --force, -f     Skip conflict check (overwrites bot changes)"
     exit 0
 fi
 
@@ -39,10 +50,31 @@ LOG_FILE="$LOG_DIR/assemble.log"
 mkdir -p "$LOG_DIR"
 rotate_log "$LOG_FILE"
 
+# Check for conflicts (unless --force or --dry-run)
+if [[ "$FORCE" != "true" && "$DRY_RUN" != "true" ]]; then
+    SCRIPT_DIR="$(dirname "$0")"
+    if [[ -f "$MIRROR_DIR/prompts/AGENTS.md" ]]; then
+        if ! "$SCRIPT_DIR/detect-conflicts.sh" --quiet >/dev/null 2>&1; then
+            echo ""
+            echo "⚠️  CONFLICTS DETECTED - Assembly blocked"
+            echo ""
+            echo "Bot has made changes that would be overwritten."
+            echo "Run './tools/detect-conflicts.sh' to see details."
+            echo ""
+            echo "Options:"
+            echo "  1. Resolve conflicts (see /prompt-sync skill)"
+            echo "  2. Use --force to overwrite bot changes"
+            echo ""
+            exit 1
+        fi
+    fi
+fi
+
 log "=== Assembling Prompts ==="
 
 # Create output directory
-PROMPTS_OUTPUT="$ASSEMBLED_DIR/prompts"
+# Output goes to exports/bot/core-prompts/ which syncs to ~/clawd/ (not memory/)
+PROMPTS_OUTPUT="$EXPORTS_DIR/bot/core-prompts"
 if [[ "$DRY_RUN" != "true" ]]; then
     mkdir -p "$PROMPTS_OUTPUT"
 fi
@@ -55,42 +87,56 @@ BOT_SECTIONS_ADDED=0
 SECTIONS_SKIPPED=0
 SECTIONS_MISSING=0
 
-# Parse agents_sections from config.yaml
+# Parse agents_sections from exports.yaml (under bot profile)
 get_agents_sections() {
-    local config_file="$ROOT_DIR/config.yaml"
+    local exports_file="$ROOT_DIR/exports.yaml"
     local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
 
-    if [[ ! -f "$config_file" ]]; then
-        echo "ERROR: config.yaml not found" >&2
+    if [[ ! -f "$exports_file" ]]; then
+        echo "ERROR: exports.yaml not found" >&2
         return 1
     fi
 
-    # Use Python helper to get JSON array
+    # Use Python helper to get JSON array from exports.bot.agents_sections
     if [[ -f "$helper" ]]; then
         local json
-        json=$("$helper" "$config_file" agents_sections 2>/dev/null) || true
+        json=$("$helper" "$exports_file" exports.bot.agents_sections 2>/dev/null) || true
         if [[ -n "$json" && "$json" != "null" && "$json" != "[]" ]]; then
             echo "$json" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$'
             return
         fi
     fi
 
-    # Fallback: grep-based parsing
+    # Fallback: grep-based parsing (look for agents_sections under bot profile)
+    local in_bot=false
     local in_sections=false
     while IFS= read -r line; do
-        if [[ "$line" =~ ^agents_sections: ]]; then
-            in_sections=true
+        if [[ "$line" =~ ^[[:space:]]*bot: ]]; then
+            in_bot=true
             continue
         fi
-        if [[ "$in_sections" == true ]]; then
-            if [[ "$line" =~ ^[a-z] && ! "$line" =~ ^[[:space:]] ]]; then
-                break
+        if [[ "$in_bot" == true ]]; then
+            # Exit bot section if we hit another top-level profile
+            if [[ "$line" =~ ^[[:space:]]{2}[a-z]+: && ! "$line" =~ ^[[:space:]]{4} ]]; then
+                if [[ ! "$line" =~ agents_sections ]]; then
+                    break
+                fi
             fi
-            if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+([a-zA-Z0-9_:-]+) ]]; then
-                echo "${BASH_REMATCH[1]}"
+            if [[ "$line" =~ agents_sections: ]]; then
+                in_sections=true
+                continue
+            fi
+            if [[ "$in_sections" == true ]]; then
+                # Exit if we hit a non-list line at same or lower indent
+                if [[ "$line" =~ ^[[:space:]]{4}[a-z] && ! "$line" =~ ^[[:space:]]*- ]]; then
+                    break
+                fi
+                if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+([a-zA-Z0-9_:-]+) ]]; then
+                    echo "${BASH_REMATCH[1]}"
+                fi
             fi
         fi
-    done < "$config_file"
+    done < "$exports_file"
 }
 
 # Extract a specific BOT-MANAGED section from mirror
@@ -187,8 +233,8 @@ while IFS= read -r section; do
 done < <(get_agents_sections)
 
 if [[ ${#SECTIONS[@]} -eq 0 ]]; then
-    log "ERROR: No sections found in config.yaml agents_sections"
-    echo "ERROR: No sections found in config.yaml agents_sections" >&2
+    log "ERROR: No sections found in exports.yaml agents_sections"
+    echo "ERROR: No sections found in exports.yaml (exports.bot.agents_sections)" >&2
     exit 1
 fi
 

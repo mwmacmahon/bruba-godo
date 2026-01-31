@@ -13,12 +13,35 @@ exports:
     exclude:
       sensitivity: [sensitive, restricted]
     redaction: [names, health]
+    # Section order for AGENTS.md assembly
+    # - name → component (components/{name}/prompts/AGENTS.snippet.md)
+    # - name → template section (templates/prompts/sections/{name}.md)
+    # - bot:name → bot-managed section (preserved from mirror)
+    agents_sections:
+      - header
+      - http-api
+      - first-run
+      - session
+      - continuity
+      - memory
+      - distill
+      - safety
+      - bot:exec-approvals
+      - external-internal
+      - workspace
+      - group-chats
+      - tools
+      - voice
+      - heartbeats
+      - signal
+      - make-it-yours
 
   claude:
     description: "Prompts for Claude Projects / Claude Code"
     output_dir: exports/claude
     include:
       type: [prompt]
+      scope: [meta]
 
   tests:
     description: "Local testing profile"

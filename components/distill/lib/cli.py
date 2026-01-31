@@ -358,7 +358,10 @@ def cmd_export(args):
 
                     # Use output_name from frontmatter if specified, otherwise use stem
                     output_name = config.get('output_name', canonical_path.stem)
-                    out_path = output_dir / f"Prompt - {output_name}.md"
+                    # Prompts go to prompts/ subdirectory
+                    prompts_dir = output_dir / "prompts"
+                    prompts_dir.mkdir(parents=True, exist_ok=True)
+                    out_path = prompts_dir / f"Prompt - {output_name}.md"
                     out_path.write_text(content, encoding='utf-8')
                     processed += 1
                     if args.verbose:
@@ -375,20 +378,26 @@ def cmd_export(args):
                         skipped += 1
                         continue
 
+                    # Determine output subdirectory and prefix based on content type
+                    subdir, prefix = _get_content_subdirectory_and_prefix(canonical_path, config)
+                    content_output_dir = output_dir / subdir
+                    content_output_dir.mkdir(parents=True, exist_ok=True)
+
                     # Generate variants with redaction
                     options = VariantOptions(
                         generate_transcript=True,
                         generate_lite=False,
                         generate_summary=True,
                         redact_categories=redaction_categories,
-                        output_dir=output_dir
+                        output_dir=content_output_dir
                     )
 
                     result = generate_variants(canonical_path, options, logger)
 
-                    # Write transcript (main output)
+                    # Write transcript (main output) with prefix
                     if result.transcript:
-                        out_path = output_dir / f"{canonical_path.stem}.md"
+                        out_name = f"{prefix}{canonical_path.stem}.md" if prefix else f"{canonical_path.stem}.md"
+                        out_path = content_output_dir / out_name
                         out_path.write_text(result.transcript, encoding='utf-8')
                         processed += 1
                         if args.verbose:
@@ -528,6 +537,42 @@ def _matches_prompt_filters(config: dict, include_rules: dict, exclude_rules: di
                 return False
 
     return True
+
+
+def _get_content_subdirectory_and_prefix(canonical_path: Path, config) -> tuple:
+    """
+    Determine output subdirectory and filename prefix based on content type.
+
+    Returns (subdirectory, prefix) tuple:
+    - ('transcripts', 'Transcript - ') for conversation transcripts
+    - ('refdocs', 'Refdoc - ') for reference documents
+    - ('docs', 'Doc - ') for documentation
+    - ('artifacts', 'Artifact - ') for artifacts
+    """
+    # Check source path first
+    path_str = str(canonical_path)
+    if 'transcripts' in path_str:
+        return ('transcripts', 'Transcript - ')
+    if 'refdocs' in path_str:
+        return ('refdocs', 'Refdoc - ')
+
+    # Check scope/tags from config
+    scopes = set(config.tags) if config.tags else set()
+    if 'transcripts' in scopes:
+        return ('transcripts', 'Transcript - ')
+    if 'refdocs' in scopes or 'reference' in scopes:
+        return ('refdocs', 'Refdoc - ')
+
+    # Check for type in frontmatter if available
+    if hasattr(config, 'type'):
+        file_type = getattr(config, 'type', '')
+        if file_type == 'doc':
+            return ('docs', 'Doc - ')
+        if file_type == 'artifact':
+            return ('artifacts', 'Artifact - ')
+
+    # Default to transcripts for conversation-like content
+    return ('transcripts', 'Transcript - ')
 
 
 def _matches_filters(config, include_rules: dict, exclude_rules: dict) -> bool:

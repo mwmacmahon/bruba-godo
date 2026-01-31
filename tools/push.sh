@@ -101,26 +101,69 @@ else
     RSYNC_OPTS="$RSYNC_OPTS --quiet"
 fi
 
-# Sync to bot
-log "Syncing to $SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
+# Sync subdirectories to appropriate remote targets
+# core-prompts/ → ~/clawd/ (workspace root, for AGENTS.md etc.)
+# Everything else → ~/clawd/memory/
 
-if [[ "$DRY_RUN" == "true" ]]; then
-    log "[DRY RUN] Would sync $FILE_COUNT files"
-    rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
-else
-    rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
-    log "Synced $FILE_COUNT files"
+TOTAL_SYNCED=0
 
-    # Trigger reindex
-    if [[ "$NO_INDEX" != "true" ]]; then
-        log "Triggering memory reindex..."
-        if bot_cmd "clawdbot memory index" 2>/dev/null; then
-            log "Memory indexed"
+# 1. Sync core-prompts to workspace root
+if [[ -d "$EXPORTS_DIR/bot/core-prompts" ]]; then
+    CORE_COUNT=$(find "$EXPORTS_DIR/bot/core-prompts" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$CORE_COUNT" -gt 0 ]]; then
+        log "Syncing core-prompts/ to $SSH_HOST:$REMOTE_WORKSPACE/ ($CORE_COUNT files)"
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log "[DRY RUN] Would sync $CORE_COUNT core prompt files"
+            rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/core-prompts/" "$SSH_HOST:$REMOTE_WORKSPACE/"
         else
-            log "Warning: Memory index failed (may need manual reindex)"
+            rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/core-prompts/" "$SSH_HOST:$REMOTE_WORKSPACE/"
+            log "  Synced $CORE_COUNT core prompt files"
         fi
+        TOTAL_SYNCED=$((TOTAL_SYNCED + CORE_COUNT))
+    fi
+fi
+
+# 2. Sync all other subdirectories to memory/
+for subdir in prompts transcripts refdocs docs artifacts; do
+    if [[ -d "$EXPORTS_DIR/bot/$subdir" ]]; then
+        SUBDIR_COUNT=$(find "$EXPORTS_DIR/bot/$subdir" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+        if [[ "$SUBDIR_COUNT" -gt 0 ]]; then
+            log "Syncing $subdir/ to $SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/$subdir/ ($SUBDIR_COUNT files)"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log "[DRY RUN] Would sync $SUBDIR_COUNT $subdir files"
+                rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/$subdir/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/$subdir/"
+            else
+                rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/$subdir/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/$subdir/"
+                log "  Synced $SUBDIR_COUNT $subdir files"
+            fi
+            TOTAL_SYNCED=$((TOTAL_SYNCED + SUBDIR_COUNT))
+        fi
+    fi
+done
+
+# 3. Sync any remaining files at root level (legacy compatibility)
+ROOT_FILES=$(find "$EXPORTS_DIR/bot" -maxdepth 1 -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$ROOT_FILES" -gt 0 ]]; then
+    log "Syncing root-level files to $SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/ ($ROOT_FILES files)"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "[DRY RUN] Would sync $ROOT_FILES root files"
+        rsync $RSYNC_OPTS --include='*.md' --exclude='*/' "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
+    else
+        rsync $RSYNC_OPTS --include='*.md' --exclude='*/' "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
+        log "  Synced $ROOT_FILES root files"
+    fi
+    TOTAL_SYNCED=$((TOTAL_SYNCED + ROOT_FILES))
+fi
+
+# Trigger reindex if not dry run
+if [[ "$DRY_RUN" != "true" && "$NO_INDEX" != "true" ]]; then
+    log "Triggering memory reindex..."
+    if bot_cmd "clawdbot memory index" 2>/dev/null; then
+        log "Memory indexed"
+    else
+        log "Warning: Memory index failed (may need manual reindex)"
     fi
 fi
 
 log "=== Push Complete ==="
-echo "Push: $FILE_COUNT files"
+echo "Push: $TOTAL_SYNCED files synced"

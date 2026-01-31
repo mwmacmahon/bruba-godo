@@ -5,10 +5,10 @@ Help manage the prompt assembly system: resolve conflicts, explain configuration
 ## Context
 
 Read these files to understand current state:
-- `config.yaml` — section order in `agents_sections`
+- `exports.yaml` — section order in `exports.bot.agents_sections`
 - `templates/prompts/README.md` — full system documentation
 - `mirror/prompts/AGENTS.md` — current remote state (has BOT-MANAGED sections)
-- `assembled/prompts/AGENTS.md` — last assembled output
+- `exports/bot/core-prompts/AGENTS.md` — last assembled output
 
 ## Commands
 
@@ -25,7 +25,7 @@ If user asks "how does this work" or seems confused:
 
 ### Show Current Config
 ```bash
-grep -A 50 "^agents_sections:" config.yaml | head -30
+grep -A 50 "agents_sections:" exports.yaml | head -30
 ```
 
 ### Show Section Order Comparison
@@ -33,13 +33,13 @@ Compare mirror (remote) vs assembled:
 ```bash
 echo "=== REMOTE ===" && grep "^## " mirror/prompts/AGENTS.md
 echo ""
-echo "=== ASSEMBLED ===" && grep "^## " assembled/prompts/AGENTS.md
+echo "=== ASSEMBLED ===" && grep "^## " exports/bot/core-prompts/AGENTS.md
 ```
 
 ### Reorder Sections
 If user wants to move a section:
-1. Show current `agents_sections` from config
-2. Edit `config.yaml` to move the entry
+1. Show current `agents_sections` from exports.yaml
+2. Edit `exports.yaml` to move the entry (under `exports.bot.agents_sections`)
 3. Run `./tools/assemble-prompts.sh`
 4. Show the new order
 
@@ -109,17 +109,17 @@ Check:
 3. Run `/mirror` to refresh from remote
 
 ### Wrong Section Order
-Edit `agents_sections` in config and move entries to desired positions.
+Edit `agents_sections` in exports.yaml and move entries to desired positions.
 
 ## Quick Reference
 
 | Task | Action |
 |------|--------|
-| See config | `grep -A 30 "agents_sections:" config.yaml` |
+| See config | `grep -A 30 "agents_sections:" exports.yaml` |
 | Assemble | `./tools/assemble-prompts.sh` |
 | Verbose assemble | `./tools/assemble-prompts.sh --verbose` |
 | Dry run | `./tools/assemble-prompts.sh --dry-run` |
-| Compare sections | `grep "^## " mirror/prompts/AGENTS.md assembled/prompts/AGENTS.md` |
+| Compare sections | `grep "^## " mirror/prompts/AGENTS.md exports/bot/core-prompts/AGENTS.md` |
 | Find bot sections | `grep "BOT-MANAGED" mirror/prompts/AGENTS.md` |
 | Mirror remote | `./tools/mirror.sh` |
 

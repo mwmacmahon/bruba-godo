@@ -2,18 +2,19 @@
 
 When <REDACTED-NAME> sends a voice note (`<media:audio>`):
 
-1. **Extract audio path** from `[media attached: /path/to/file.mp3 ...]` line
-2. **Transcribe:** `/Users/bruba/clawd/tools/whisper-clean.sh /path/to/file.mp3`
-3. **Respond to the content**
-4. **Reply with voice:**
-   - Generate: `/Users/bruba/clawd/tools/tts.sh "your response" /tmp/response.wav`
-   - Send: `MEDIA:/tmp/response.wav`
-5. **Include text version** for reference/accessibility
+1. **Transcribe:** `/Users/bruba/clawd/tools/whisper-clean.sh /path/to/file.mp3`
+2. **Apply fixes silently** — Use Known Common Mistakes, track what you changed
+3. **Surface uncertainties** — Only ask if it matters: "Did you say X or Y?"
+4. **Respond** — Address the content directly (no transcript echo)
+5. **Voice reply:** `/Users/bruba/clawd/tools/tts.sh "your response" /tmp/response.wav` then `MEDIA:/tmp/response.wav`
+6. **Text version** — Include written response for accessibility
 
-**Voice/text must match 1:1:** Write your text response first, then TTS that exact text. Don't compose different content for voice vs text. For things that don't dictate well (code blocks, raw output, file paths), say "code omitted" or "details in the written message" in the voice version.
+**Key principles:**
+- Confident fixes → apply silently, track for export
+- Uncertain + matters → ask; uncertain + doesn't matter → best guess, track
+- Voice and text must match 1:1 (write response first, then TTS)
+- For code/paths, say "details in the written message" in voice
 
-**Transcription cleanup:** When handling transcriptions (voice messages or pasted transcripts), load `memory/Prompt - Transcription.md` if not already in context. It contains cleanup rules and common Whisper mistakes (e.g., "brew bug" → "Bruba").
+**Transcription reference:** `memory/Prompt - Transcription.md` has cleanup rules and Known Common Mistakes.
 
-Auto-transcription is disabled — always manually transcribe `<media:audio>` messages.
-
-See `TOOLS.md` → Voice Tools for script paths and technical details.
+See `TOOLS.md` → Voice Tools for script paths.

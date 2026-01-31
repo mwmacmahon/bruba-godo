@@ -462,3 +462,118 @@ Export pipeline is now fully operational:
 4. `config.yaml` enables bot connection ✅
 5. Push syncs to bot memory ✅
 6. Memory indexed on bot ✅
+
+---
+
+## Session 5: Stage 2 - Prompt Updates for Silent Transcript Mode (2026-01-31)
+
+Implemented silent transcript mode for Bruba voice messages per `memory/packet-stage2-prompt-updates.md`.
+
+### Changes Made
+
+1. **Updated `components/voice/prompts/AGENTS.snippet.md`**
+   - Rewrote 5-step voice flow to 7-step silent mode flow
+   - Step 2: "Transcribe internally" - don't echo to chat
+   - New Step 3: Track fixes internally for CONFIG block
+   - New Step 4: Clarify only if needed
+   - Step 6: Voice reply is response only, never transcript
+   - Step 7: Text version is of response, not transcript
+
+2. **Updated `components/distill/prompts/Transcription.md`**
+   - Added "Bruba Silent Mode" section after Output Format
+   - 5 rules for silent transcript handling in Bruba
+   - Notes that Claude Projects/Code still print visible transcripts
+
+3. **Updated `components/distill/prompts/AGENTS.snippet.md`**
+   - Added note after Key Prompts table clarifying export pipeline source of truth
+   - Points to `components/distill/prompts/` as source, `exports/bot/` as output
+
+### Verification
+
+```bash
+python3 -m components.distill.lib.cli --verbose export --profile bot
+# -> exports/bot/Prompt - Transcription.md (includes Silent Mode section)
+# -> exports/bot/Prompt - Export.md
+```
+
+Checked for stale PKM paths - none found.
+
+### Detailed Log
+
+Full details in `pkm-and-voice-prompts-overhaul.md` (project root).
+
+### Stage 2 Status
+
+- Voice snippet updated ✅
+- Transcription.md updated ✅
+- AGENTS.snippet.md updated ✅
+- Stale reference check ✅
+- Export tested ✅
+- Needs: Push to bot + manual voice testing
+
+---
+
+## Session 6: Config Consolidation & E2E Tests (2026-01-31)
+
+### Problem
+
+`agents_sections` was added to `config.yaml` during Stage 2 testing, but it logically belongs in `exports.yaml` under the bot profile (it defines how bot exports are assembled).
+
+### Config Consolidation
+
+**Moved `agents_sections`** from config.yaml to exports.yaml:
+
+```yaml
+# exports.yaml
+exports:
+  bot:
+    description: "Content synced to bot memory"
+    output_dir: exports/bot
+    remote_path: memory
+    include: ...
+    agents_sections:     # <-- Now lives here
+      - header
+      - http-api
+      - ...
+```
+
+**config.yaml** now only has connection settings (SSH, paths).
+
+### Scripts Updated
+
+- `tools/assemble-prompts.sh` - reads from exports.yaml
+- `tools/detect-conflicts.sh` - reads from exports.yaml
+- `.claude/commands/prompts.md` - updated references
+- `.claude/commands/prompt-sync.md` - updated references
+- `tests/test-prompt-assembly.sh` - updated Test 3
+
+### E2E Pipeline Test Added
+
+Created `tests/test-e2e-pipeline.sh` (10 tests):
+- Copies fixture to intake/
+- Runs canonicalize → reference/transcripts/
+- Runs export → exports/bot/
+- Verifies content at each stage
+
+Created `tests/fixtures/009-e2e-pipeline/input.md` as test fixture.
+
+### Documentation Created
+
+- `docs/pipeline.md` - Comprehensive pipeline documentation
+- Updated `tests/README.md` - Added new tests and fixtures
+- Updated `CLAUDE.md` - Corrected Prompt Assembly section
+
+### Test Results
+
+```
+Assembly tests:  13 passed, 1 skipped
+Export tests:    38 passed
+E2E tests:       10 passed
+Python tests:    24 passed
+─────────────────────────────
+Total:           85 passed, 1 skipped
+```
+
+### Full Details
+
+See `pkm-and-voice-prompts-overhaul.md` for detailed session logs.

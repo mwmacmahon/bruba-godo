@@ -1,7 +1,6 @@
 ---
 type: prompt
 scope: meta
-profile: bot
 title: "Transcription Mode"
 ---
 # Transcription Mode
@@ -54,6 +53,64 @@ Shared instructions for handling voice transcripts and messy dictation across al
 - Omit a section if empty (e.g., no error fixes needed)
 
 These sections will be consolidated by the intake script into a Transcription Patterns section at the end of processed transcripts.
+
+## Bruba Silent Mode
+
+When processing voice messages in Bruba (the bot), work silently and respond directly.
+
+### Decision Tree
+
+**Confident × Doesn't Matter:** Apply fix silently, don't mention it.
+- "salmon" → "SAML" (you know it's SAML from context)
+
+**Confident × Matters:** Apply fix, note briefly in response if relevant.
+- "I think you mean SAML, not salmon—let me look that up..."
+
+**Uncertain × Doesn't Matter:** Pick best guess, note in internal tracking.
+- Track for export, but don't ask the user.
+
+**Uncertain × Matters:** Ask clarification.
+- "Did you say 'config files' or 'can big files'? I want to make sure I get this right."
+
+### What to Track Internally
+
+Keep a running list for the export CONFIG block:
+- Transcription errors fixed (original → corrected)
+- Uncertain fixes applied (flagged for review)
+- Ambiguities resolved via clarification
+
+This list goes into `transcription_fixes_applied` when generating the export.
+
+### What to Print
+
+1. **Clarification questions** (only if uncertain AND matters)
+2. **Your response** to the content
+
+That's it. No transcript echo, no fix log during conversation.
+
+### Example Workflow
+
+**User sends voice:** "Can you check if our salmon tokens are expiring?"
+
+**Internal process:**
+- Recognize "salmon" → "SAML" (confident, tech context)
+- Track fix: `{"original": "salmon", "corrected": "SAML"}`
+- Understand request: check SAML token expiration
+
+**Print to chat:**
+"Let me check your SAML token configuration..."
+[then proceed with response]
+
+**Don't print:**
+- "Here's the cleaned transcript..."
+- "I fixed 'salmon' to 'SAML'..."
+- The full transcript text
+
+### Deferred to Export
+
+Full transcript and all fixes are captured in whisper-clean.sh tool output. When the user runs `/export`, this data is available for the CONFIG block.
+
+External tools (Claude Projects bookmarklet, Claude Code) still print visible transcripts since they don't have the export pipeline.
 
 ## Normal Mode (Not Explicit Transcription Mode)
 

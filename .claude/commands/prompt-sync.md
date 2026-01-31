@@ -34,17 +34,25 @@ Build final prompts from config-driven section order:
 ./tools/assemble-prompts.sh --verbose
 ```
 
+**Note:** Assembly will automatically block if conflicts are detected. Use `--force` to override (discards bot changes).
+
 ### 4. Push to Remote
 
-Sync assembled prompts to bot:
+Sync assembled prompts to bot using the push script (handles multi-destination routing):
 
 ```bash
-rsync -avz --delete assembled/prompts/ bruba:/Users/bruba/clawd/
+./tools/push.sh --verbose
 ```
+
+This syncs:
+- `exports/bot/core-prompts/` → `~/clawd/` (AGENTS.md)
+- `exports/bot/prompts/` → `~/clawd/memory/prompts/`
+- `exports/bot/transcripts/` → `~/clawd/memory/transcripts/`
+- Other subdirs → `~/clawd/memory/{subdir}/`
 
 Or for specific files:
 ```bash
-scp assembled/prompts/AGENTS.md bruba:/Users/bruba/clawd/AGENTS.md
+scp exports/bot/core-prompts/AGENTS.md bruba:/Users/bruba/clawd/AGENTS.md
 ```
 
 ## Conflict Resolution
@@ -62,7 +70,7 @@ When mirror has `<!-- BOT-MANAGED: X -->` not in config:
 
 3. **If yes:**
    - Determine position (look at surrounding sections in mirror)
-   - Edit `config.yaml` to add `bot:X` at correct position
+   - Edit `exports.yaml` to add `bot:X` to `agents_sections` at correct position
    - Example: If section appears after `safety`, add after `- safety` line
 
 4. **If no:**
@@ -102,15 +110,18 @@ Options:
 If you're confident there are no conflicts:
 
 ```bash
-./tools/mirror.sh && ./tools/assemble-prompts.sh && rsync -avz assembled/prompts/ bruba:/Users/bruba/clawd/
+./tools/mirror.sh && ./tools/assemble-prompts.sh && ./tools/push.sh
 ```
 
 ## Config-Driven Assembly
 
-Sections are defined in `config.yaml`:
+Sections are defined in `exports.yaml` under the bot profile:
 
 ```yaml
-agents_sections:
+# exports.yaml
+exports:
+  bot:
+    agents_sections:
   - header              # template section
   - http-api            # component
   - bot:exec-approvals  # bot-managed (preserved)

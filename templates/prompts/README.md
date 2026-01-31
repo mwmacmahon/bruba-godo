@@ -92,7 +92,7 @@ bruba-godo/
 │   ├── continuity/prompts/AGENTS.snippet.md
 │   └── signal/prompts/AGENTS.snippet.md
 ├── mirror/prompts/AGENTS.md                 # Remote state (has BOT-MANAGED sections)
-├── assembled/prompts/AGENTS.md              # Output
+├── exports/bot/core-prompts/AGENTS.md       # Assembled output
 └── tools/
     ├── assemble-prompts.sh                  # Build assembled from config
     └── detect-conflicts.sh                  # Find new bot sections / edits
@@ -101,15 +101,17 @@ bruba-godo/
 ## Assembly Process
 
 ```bash
-./tools/assemble-prompts.sh [--verbose] [--dry-run]
+./tools/assemble-prompts.sh [--verbose] [--dry-run] [--force]
 ```
 
-1. Read `agents_sections` list from `config.yaml`
+**Important:** Assembly automatically blocks if conflicts are detected. Use `--force` to override (overwrites bot changes).
+
+1. Read `agents_sections` list from `exports.yaml` (under bot profile)
 2. For each entry in order:
    - `bot:name` → extract from mirror's `<!-- BOT-MANAGED: name -->` blocks
    - Otherwise → try component, then template section
 3. Wrap each section with markers
-4. Write to `assembled/prompts/AGENTS.md`
+4. Write to `exports/bot/core-prompts/AGENTS.md`
 
 ## Conflict Detection
 
@@ -220,6 +222,7 @@ If bot customized a component and you want to preserve it:
 | `./tools/assemble-prompts.sh` | Assemble AGENTS.md from config |
 | `./tools/assemble-prompts.sh --verbose` | Show detailed output |
 | `./tools/assemble-prompts.sh --dry-run` | Preview without writing |
+| `./tools/assemble-prompts.sh --force` | Skip conflict check (overwrites bot changes) |
 | `./tools/detect-conflicts.sh` | Check for new bot sections / edits |
 | `./tools/detect-conflicts.sh --show-section X` | Show bot section content |
 | `./tools/detect-conflicts.sh --diff X` | Diff component vs mirror |
@@ -278,6 +281,7 @@ Tests cover:
 - Basic assembly (section counts, order, bot sections)
 - Conflict detection (no false positives)
 - Bot section simulation (detection → config add → assembly)
+- Component edit detection (single and multiple components)
 - Full sync cycle (push → mirror → compare)
 
 See `tests/prompt-assembly-tests.md` for detailed test protocols.

@@ -34,7 +34,6 @@ load_config() {
     LOCAL_INTAKE=$(grep "^  intake:" "$config_file" | awk '{print $2}' | tr -d '"')
     LOCAL_REFERENCE=$(grep "^  reference:" "$config_file" | awk '{print $2}' | tr -d '"')
     LOCAL_EXPORTS=$(grep "^  exports:" "$config_file" | awk '{print $2}' | tr -d '"')
-    LOCAL_ASSEMBLED=$(grep "^  assembled:" "$config_file" | awk '{print $2}' | tr -d '"')
 
     # Make local paths absolute
     MIRROR_DIR="$ROOT_DIR/${LOCAL_MIRROR:-mirror}"
@@ -43,7 +42,6 @@ load_config() {
     INTAKE_DIR="$ROOT_DIR/${LOCAL_INTAKE:-intake}"
     REFERENCE_DIR="$ROOT_DIR/${LOCAL_REFERENCE:-reference}"
     EXPORTS_DIR="$ROOT_DIR/${LOCAL_EXPORTS:-exports}"
-    ASSEMBLED_DIR="$ROOT_DIR/${LOCAL_ASSEMBLED:-assembled}"
 
     # Derived remote paths
     REMOTE_SESSIONS="$REMOTE_CLAWDBOT/agents/$REMOTE_AGENT_ID/sessions"

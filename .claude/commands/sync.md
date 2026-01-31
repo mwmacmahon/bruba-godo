@@ -20,8 +20,8 @@ Run these checks in parallel:
 
 **Prompts status:**
 ```bash
-# Last prompt sync (check assembled/ timestamps)
-ls -la assembled/prompts/*.md 2>/dev/null | head -5
+# Last prompt sync (check exports/bot/core-prompts/ timestamps)
+ls -la exports/bot/core-prompts/*.md 2>/dev/null | head -5
 
 # Check for pending prompt changes
 ./tools/detect-conflicts.sh --quiet 2>/dev/null || echo "conflicts unknown"
@@ -41,8 +41,8 @@ grep -l "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null | wc -l
 # Canonical files
 ls reference/transcripts/*.md 2>/dev/null | wc -l
 
-# Export files ready
-ls exports/bot/*.md 2>/dev/null | wc -l
+# Export files ready (all subdirectories)
+find exports/bot -name "*.md" 2>/dev/null | wc -l
 ```
 
 ### 2. Show Status Dashboard

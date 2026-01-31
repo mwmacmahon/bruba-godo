@@ -61,8 +61,6 @@ bruba-godo/
 ├── user/                    # USER CUSTOMIZATIONS (gitignored)
 │   ├── prompts/             # Personal prompt additions
 │   └── exports.yaml         # Personal export profiles
-├── assembled/               # ASSEMBLED PROMPTS (gitignored)
-│   └── prompts/             # Final AGENTS.md, TOOLS.md, etc.
 ├── mirror/                  # BOT STATE (gitignored)
 │   └── prompts/             # Current bot prompts
 ├── sessions/                # RAW SESSIONS (gitignored)
@@ -74,8 +72,13 @@ bruba-godo/
 │   ├── transcripts/         # Canonicalized conversations
 │   └── refdocs/             # Reference documents (PKM docs, guides)
 ├── exports/                 # SYNC OUTPUTS (gitignored)
-│   ├── bot/                 # Content for bot memory
-│   └── rag/                 # Content for RAG systems
+│   ├── bot/                 # Content for bot
+│   │   ├── core-prompts/    # AGENTS.md → syncs to ~/clawd/
+│   │   ├── prompts/         # Prompt - *.md → ~/clawd/memory/prompts/
+│   │   ├── transcripts/     # Transcript - *.md → ~/clawd/memory/transcripts/
+│   │   ├── refdocs/         # Refdoc - *.md → ~/clawd/memory/refdocs/
+│   │   └── docs/            # Doc - *.md → ~/clawd/memory/docs/
+│   └── claude/              # Content for Claude Projects/Code
 └── logs/                    # Script logs (gitignored)
 ```
 
@@ -100,7 +103,6 @@ local:
   intake: intake
   reference: reference
   exports: exports
-  assembled: assembled
 ```
 
 Export definitions in `exports.yaml`:
@@ -170,23 +172,25 @@ Common paths (on bot machine):
 
 ## Prompt Assembly Pipeline
 
-Prompts are assembled from **config-driven section order**. The `agents_sections` list in `config.yaml` defines exactly what sections appear and in what order.
+Prompts are assembled from **config-driven section order**. The `agents_sections` list in `exports.yaml` (under the `bot` profile) defines exactly what sections appear and in what order.
 
 **Section types:**
 - `name` → component (`components/{name}/prompts/AGENTS.snippet.md`)
 - `name` → template section (`templates/prompts/sections/{name}.md`)
 - `bot:name` → bot-managed section (from mirror's `<!-- BOT-MANAGED: name -->`)
 
-**Example config:**
+**Example config (in exports.yaml):**
 ```yaml
-agents_sections:
-  - header              # template section
-  - http-api            # component
-  - first-run           # template section
-  - session             # component
-  - bot:exec-approvals  # bot-managed (preserved from remote)
-  - safety              # template section
-  ...
+exports:
+  bot:
+    agents_sections:
+      - header              # template section
+      - http-api            # component
+      - first-run           # template section
+      - session             # component
+      - bot:exec-approvals  # bot-managed (preserved from remote)
+      - safety              # template section
+      ...
 ```
 
 **Run assembly:**
@@ -265,7 +269,9 @@ Full pipeline for processing conversations to bot memory:
 - `intake/processed/` — Originals after canonicalization
 - `reference/transcripts/` — Canonical conversation files
 - `reference/refdocs/` — Reference documents (synced to bot memory)
-- `exports/bot/` — Filtered + redacted for bot
+- `exports/bot/core-prompts/` — AGENTS.md (syncs to ~/clawd/)
+- `exports/bot/prompts/` — Prompt files (syncs to ~/clawd/memory/prompts/)
+- `exports/bot/transcripts/` — Transcripts (syncs to ~/clawd/memory/transcripts/)
 
 **Note:** `/export` scans all of `reference/` recursively. Files need YAML frontmatter with `scope` tags to be included.
 
@@ -273,4 +279,4 @@ Export profiles in `exports.yaml` control filtering and redaction per destinatio
 
 ## Git Policy
 
-Mirror, sessions, logs, intake, reference, exports, assembled, and user are gitignored. Only commit tool/skill/component changes after review.
+Mirror, sessions, logs, intake, reference, exports, and user are gitignored. Only commit tool/skill/component changes after review.

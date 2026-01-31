@@ -16,7 +16,14 @@ python3 tests/run_tests.py test_variants
 
 # Run shell-based tests
 ./tests/test-export-prompts.sh
-./tests/test-prompt-assembly.sh
+./tests/test-prompt-assembly.sh --quick
+./tests/test-e2e-pipeline.sh
+
+# Full test suite
+python3 tests/run_tests.py -v && \
+  ./tests/test-export-prompts.sh && \
+  ./tests/test-prompt-assembly.sh --quick && \
+  ./tests/test-e2e-pipeline.sh
 ```
 
 ## Test Structure
@@ -25,8 +32,9 @@ python3 tests/run_tests.py test_variants
 tests/
 ├── run_tests.py                    # Test runner (works without pytest)
 ├── test_variants.py                # Variant generation tests (24 tests)
-├── test-export-prompts.sh          # Profile targeting tests
-├── test-prompt-assembly.sh         # Prompt assembly tests
+├── test-export-prompts.sh          # Profile targeting tests (38 tests)
+├── test-prompt-assembly.sh         # Prompt assembly tests (13 tests)
+├── test-e2e-pipeline.sh            # E2E content pipeline tests (10 tests)
 └── fixtures/                       # Test fixtures
     ├── FIXTURES.md                 # Fixture documentation
     ├── 001-ui-artifacts/
@@ -36,7 +44,8 @@ tests/
     ├── 005-full-export/
     ├── 006-v1-migration/
     ├── 007-paste-and-export/
-    └── 008-filter-test/
+    ├── 008-filter-test/
+    └── 009-e2e-pipeline/           # E2E pipeline test fixture
 ```
 
 ## Test Modules
@@ -62,22 +71,36 @@ tests/
 
 | Script | Tests | Description |
 |--------|-------|-------------|
-| `test-export-prompts.sh` | 24 | Profile targeting, prompt export, frontmatter |
-| `test-prompt-assembly.sh` | - | Prompt assembly from templates + components |
+| `test-export-prompts.sh` | 38 | Profile targeting, prompt export, silent mode content |
+| `test-prompt-assembly.sh` | 13 | Prompt assembly from templates + components |
+| `test-e2e-pipeline.sh` | 10 | Full content pipeline: intake → reference → exports |
+
+**Total tests: 85** (24 Python + 61 Shell)
 
 #### What's Tested in `test-export-prompts.sh`
 
-- **Prompt file existence** - Export.md, Export-Claude.md, Transcription.md
+- **Prompt file existence** - Export.md, Transcription.md (Export-Claude.md merged)
 - **exports.yaml profiles** - bot, claude, tests profiles defined
-- **Profile targeting** - bot gets Export.md, claude gets Export-Claude.md
+- **Unified prompts** - Single Export.md with conditional file access behavior
+- **Subdirectory structure** - Prompts go to exports/{profile}/prompts/
 - **Frontmatter preservation** - YAML frontmatter retained in exports
 - **AGENTS.snippet.md exclusion** - Snippet files not exported as prompts
+- **Silent transcript mode** - Voice snippet has 6-step flow, Transcription.md has decision tree
+- **Export pipeline notes** - Distill snippet references source/output locations
+
+#### What's Tested in `test-e2e-pipeline.sh`
+
+- **Fixture setup** - Copy test file to intake/
+- **Canonicalization** - CLI processes to reference/transcripts/
+- **File movement** - Original moved to intake/processed/
+- **Export generation** - CLI exports to exports/bot/transcripts/ with prefix
+- **Content preservation** - Frontmatter, messages, backmatter intact
 
 ## Fixtures
 
-Test fixtures in `tests/fixtures/` are based on realistic conversation exports.
+Test fixtures in `fixtures/` are based on realistic conversation exports.
 
-See `tests/fixtures/FIXTURES.md` for:
+See `fixtures/FIXTURES.md` for:
 - How to create new fixtures
 - Fixture patterns (voice transcripts, paste-and-export, etc.)
 - Sanitization guidelines
@@ -94,6 +117,7 @@ See `tests/fixtures/FIXTURES.md` for:
 | 006-v1-migration | Legacy v1 config format migration |
 | 007-paste-and-export | Pasted conversation with transcription_replacements |
 | 008-filter-test | Sensitivity and scope filtering |
+| 009-e2e-pipeline | E2E test: intake → reference → exports |
 
 ## Debug Mode
 
@@ -198,9 +222,11 @@ TOOL_ROOT / "components" / "distill" / "config" / "corrections.yaml"
 Before committing changes to the distill pipeline:
 
 ```bash
-# Run all tests
-python3 tests/run_tests.py -v
-./tests/test-export-prompts.sh
+# Run full test suite
+python3 tests/run_tests.py -v && \
+  ./tests/test-export-prompts.sh && \
+  ./tests/test-prompt-assembly.sh --quick && \
+  ./tests/test-e2e-pipeline.sh
 
 # Verify profile targeting
 python3 -m components.distill.lib.cli export --profile bot --verbose

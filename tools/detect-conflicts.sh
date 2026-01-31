@@ -82,11 +82,11 @@ done
 load_config
 
 MIRROR_FILE="$MIRROR_DIR/prompts/AGENTS.md"
-CONFIG_FILE="$ROOT_DIR/config.yaml"
+EXPORTS_FILE="$ROOT_DIR/exports.yaml"
 
-# Get bot sections from config
+# Get bot sections from exports.yaml (under bot profile agents_sections)
 get_config_bot_sections() {
-    grep -E "^\s*-\s+bot:" "$CONFIG_FILE" 2>/dev/null | sed 's/.*bot://' | sed 's/#.*//' | tr -d ' ' || true
+    grep -E "^\s*-\s+bot:" "$EXPORTS_FILE" 2>/dev/null | sed 's/.*bot://' | sed 's/#.*//' | tr -d ' ' || true
 }
 
 # Get bot sections from mirror
@@ -211,8 +211,75 @@ for section in $MIRROR_BOT_SECTIONS; do
 done
 
 # 2. Check if components were edited by bot
-# (This is harder - we'd need to compare component content to what's in mirror)
-# For now, we detect if mirror has content that doesn't match any known pattern
+# Extract each component from mirror and compare to source
+get_component_content_from_mirror() {
+    local name="$1"
+    local in_component=false
+    local content=""
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" =~ ^\<!--\ COMPONENT:\ ${name}\ --\>$ ]]; then
+            in_component=true
+            continue
+        elif [[ "$in_component" == true ]]; then
+            if [[ "$line" =~ ^\<!--\ /COMPONENT:\ ${name}\ --\>$ ]]; then
+                printf '%s' "$content"
+                return 0
+            fi
+            content+="$line"$'\n'
+        fi
+    done < "$MIRROR_FILE"
+
+    return 1
+}
+
+# Get list of components from exports.yaml agents_sections
+get_config_components() {
+    # Extract entries that don't have "bot:" prefix and aren't template sections
+    local sections_started=false
+    while IFS= read -r line; do
+        # Look for agents_sections under bot profile
+        if [[ "$line" =~ ^[[:space:]]*agents_sections: ]]; then
+            sections_started=true
+            continue
+        fi
+        if [[ "$sections_started" == true ]]; then
+            # Stop at next non-list item
+            if [[ "$line" =~ ^[[:space:]]*[a-z_]+: ]] && [[ ! "$line" =~ ^[[:space:]]*- ]]; then
+                break
+            fi
+            # Extract section name (skip bot: prefix and template sections)
+            if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+([a-z0-9_-]+)[[:space:]]*(#.*)?$ ]]; then
+                local name="${BASH_REMATCH[1]}"
+                # Check if it's a component (has prompts/AGENTS.snippet.md)
+                if [[ -f "$ROOT_DIR/components/$name/prompts/AGENTS.snippet.md" ]]; then
+                    echo "$name"
+                fi
+            fi
+        fi
+    done < "$EXPORTS_FILE"
+}
+
+# Compare each component
+for component in $(get_config_components); do
+    component_file="$ROOT_DIR/components/$component/prompts/AGENTS.snippet.md"
+
+    if [[ ! -f "$component_file" ]]; then
+        continue
+    fi
+
+    # Get content from mirror
+    mirror_content=$(get_component_content_from_mirror "$component" 2>/dev/null) || continue
+
+    # Get source content
+    source_content=$(cat "$component_file")
+
+    # Compare using diff (handles whitespace normalization)
+    if ! diff -q <(printf '%s\n' "$mirror_content") <(printf '%s\n' "$source_content") >/dev/null 2>&1; then
+        EDITED_COMPONENTS+=("$component")
+        CONFLICTS=$((CONFLICTS + 1))
+    fi
+done
 
 # Report conflicts
 if [[ $CONFLICTS -eq 0 ]]; then
@@ -240,8 +307,26 @@ if [[ ${#NEW_BOT_SECTIONS[@]} -gt 0 ]]; then
             fi
         fi
         echo ""
-        echo "  To keep: Add 'bot:$section' to config.yaml after '$position'"
+        echo "  To keep: Add 'bot:$section' to exports.yaml agents_sections after '$position'"
         echo "  To discard: Section will be removed on next push"
+    done
+fi
+
+# Report edited components
+if [[ ${#EDITED_COMPONENTS[@]} -gt 0 ]]; then
+    echo ""
+    echo "EDITED COMPONENTS (bot modified source component content):"
+    for component in "${EDITED_COMPONENTS[@]}"; do
+        echo ""
+        echo "  Component: $component"
+        echo "  Source: components/$component/prompts/AGENTS.snippet.md"
+        echo ""
+        echo "  Options:"
+        echo "    1. Keep bot's version: copy changes to source component"
+        echo "    2. Discard bot's changes: next push will overwrite"
+        echo "    3. Convert to bot-managed: rename to BOT-MANAGED section"
+        echo ""
+        echo "  Run: ./tools/detect-conflicts.sh --diff $component"
     done
 fi
 

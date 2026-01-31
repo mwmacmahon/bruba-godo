@@ -34,6 +34,12 @@ These prompts provide consistent workflows. Load them when you hit their trigger
 | `Prompt - Daily Triage.md` | Morning routine | "triage" |
 | `Prompt - Reminders Integration.md` | Task management | (helpful for any reminder work) |
 
+> **Note:** These prompts are synced via the export pipeline. Source of truth:
+> - Reusable prompts: `components/distill/prompts/`
+> - User content: `reference/`
+>
+> Bot memory receives the exported versions (`exports/bot/Prompt - *.md`).
+
 **Scope-specific prompts:**
 - `Prompt - Home.md` — For home/family conversations
 - `Prompt - Work.md` — For professional conversations

@@ -331,10 +331,10 @@ Testing documentation helps contributors understand:
 | `tests/run_tests.py` | Updated imports to `components.distill.lib.*` |
 | `tests/test_variants.py` | Updated imports, fixed lite variant tests |
 | `tests/test-export-prompts.sh` | Added profile targeting tests |
-| `docs/testing.md` | Created testing documentation |
+| `tests/README.md` | Created testing documentation (migrated from docs/testing.md) |
 | `claude-exports-overhaul.md` | Updated with completion log |
 
-### Test Results
+### Test Results (at time of completion)
 
 ```
 Python tests: 24 passed, 0 failed
@@ -342,14 +342,16 @@ Shell tests:  24 passed, 0 failed
 Total:        48 passed, 0 failed
 ```
 
+**Note:** Test counts have since increased. See `claude-exports-log.md` Session 6 for current totals (85 tests).
+
 ### Verification Commands
 
 ```bash
-# Python tests
-python3 tests/run_tests.py -v
-
-# Shell tests
-./tests/test-export-prompts.sh
+# Full test suite
+python3 tests/run_tests.py -v && \
+  ./tests/test-export-prompts.sh && \
+  ./tests/test-prompt-assembly.sh --quick && \
+  ./tests/test-e2e-pipeline.sh
 
 # Profile targeting
 python3 -m components.distill.lib.cli export --profile bot --verbose
