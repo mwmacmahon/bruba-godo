@@ -1,0 +1,204 @@
+# Voice transcription corrections for convo-processor
+#
+# These corrections are applied automatically during canonicalization.
+# They handle common voice transcription mishearings - primarily homophones
+# and run-together technical terms that speech recognition gets wrong.
+#
+# NUDGE FOR AI ANALYSIS (Path B):
+# When analyzing transcripts, look for similar patterns:
+#   - Homophones: "salmon" for "SAML", "lamb da" for "Lambda"
+#   - Run-together words: "easy to" for "EC2", "our dubby you" for "RDW"
+#   - Technical terms that sound like common words
+#   - Names and proper nouns the transcription wouldn't know
+#   - Acronyms spelled out phonetically: "a w s" for "AWS"
+#
+# Pattern/replacement format supported alongside original/corrected.
+
+corrections:
+  # === AWS / Cloud (voice mishearings) ===
+  - pattern: "lamb da"
+    replacement: "Lambda"
+  - pattern: "lambda"  # lowercase standardization
+    replacement: "Lambda"
+  - pattern: "salmon"  # homophone for SAML
+    replacement: "SAML"
+  - pattern: "sam el"
+    replacement: "SAML"
+  - pattern: "easy to"  # sounds like EC2
+    replacement: "EC2"
+  - pattern: "easy too"
+    replacement: "EC2"
+  - pattern: "e c two"
+    replacement: "EC2"
+  - pattern: "s three"
+    replacement: "S3"
+  - pattern: "s 3"
+    replacement: "S3"
+  - pattern: "aye am"  # IAM
+    replacement: "IAM"
+  - pattern: "i am role"
+    replacement: "IAM role"
+  - pattern: "dynamo db"
+    replacement: "DynamoDB"
+  - pattern: "red shift"
+    replacement: "Redshift"
+  - pattern: "cloud watch"
+    replacement: "CloudWatch"
+  - pattern: "cloud front"
+    replacement: "CloudFront"
+  - pattern: "cloud formation"
+    replacement: "CloudFormation"
+  - pattern: "e k s"
+    replacement: "EKS"
+  - pattern: "e c s"
+    replacement: "ECS"
+  - pattern: "fargate"
+    replacement: "Fargate"
+  - pattern: "cognito"
+    replacement: "Cognito"
+
+  # === AI/ML (capitalization + mishearings) ===
+  - pattern: "chat gpt"
+    replacement: "ChatGPT"
+  - pattern: "chat g p t"
+    replacement: "ChatGPT"
+  - pattern: "g p t"
+    replacement: "GPT"
+  - pattern: "gee p t"
+    replacement: "GPT"
+  - pattern: "open ai"
+    replacement: "OpenAI"
+  - pattern: "open a i"
+    replacement: "OpenAI"
+  - pattern: "anthropic"
+    replacement: "Anthropic"
+  - pattern: "clod"  # mishearing for Claude
+    replacement: "Claude"
+  - pattern: "clawed"  # common mishearing
+    replacement: "Claude"
+  - pattern: " claude "  # lowercase with spaces (safe boundary)
+    replacement: " Claude "
+  - pattern: "cloud ai"  # mishearing for Claude
+    replacement: "Claude"
+  - pattern: "lama"  # LLaMA model
+    replacement: "LLaMA"
+  - pattern: "llama model"
+    replacement: "LLaMA model"
+  - pattern: "hugging face"
+    replacement: "Hugging Face"
+  - pattern: "tensor flow"
+    replacement: "TensorFlow"
+  - pattern: "pie torch"  # PyTorch
+    replacement: "PyTorch"
+  - pattern: "pi torch"
+    replacement: "PyTorch"
+  - pattern: "transformers"
+    replacement: "Transformers"
+  - pattern: "rag system"
+    replacement: "RAG system"
+  - pattern: "rag"
+    replacement: "RAG"
+
+  # === Development tools ===
+  - pattern: "git hub"
+    replacement: "GitHub"
+  - pattern: "get hub"  # mishearing
+    replacement: "GitHub"
+  - pattern: "git lab"
+    replacement: "GitLab"
+  - pattern: "vs code"
+    replacement: "VS Code"
+  - pattern: "visual studio code"
+    replacement: "VS Code"
+  - pattern: "docker"
+    replacement: "Docker"
+  - pattern: "kubernetes"
+    replacement: "Kubernetes"
+  - pattern: "cooper netties"  # Kubernetes mishearing
+    replacement: "Kubernetes"
+  - pattern: "k 8 s"
+    replacement: "K8s"
+  - pattern: "k8s"
+    replacement: "K8s"
+  - pattern: "terra form"
+    replacement: "Terraform"
+  - pattern: "ansible"
+    replacement: "Ansible"
+  - pattern: "jenkins"
+    replacement: "Jenkins"
+
+  # === Programming languages/frameworks ===
+  - pattern: "java script"
+    replacement: "JavaScript"
+  - pattern: "type script"
+    replacement: "TypeScript"
+  - pattern: "python"
+    replacement: "Python"
+  - pattern: "rust lang"
+    replacement: "Rust"
+  - pattern: "go lang"
+    replacement: "Go"
+  - pattern: "react js"
+    replacement: "React"
+  - pattern: "react native"
+    replacement: "React Native"
+  - pattern: "node js"
+    replacement: "Node.js"
+  - pattern: "node.js"
+    replacement: "Node.js"
+  - pattern: "next js"
+    replacement: "Next.js"
+  - pattern: "next.js"
+    replacement: "Next.js"
+
+  # === Auth / Security ===
+  - pattern: "o auth"
+    replacement: "OAuth"
+  - pattern: "oh auth"
+    replacement: "OAuth"
+  - pattern: "o i d c"
+    replacement: "OIDC"
+  - pattern: "jay w t"  # JWT
+    replacement: "JWT"
+  - pattern: "j w t"
+    replacement: "JWT"
+  - pattern: "jason web token"
+    replacement: "JSON Web Token"
+
+  # === Data / APIs ===
+  - pattern: "jason"  # JSON
+    replacement: "JSON"
+  - pattern: "j son"
+    replacement: "JSON"
+  - pattern: "rest api"
+    replacement: "REST API"
+  - pattern: "graph q l"
+    replacement: "GraphQL"
+  - pattern: "graph ql"
+    replacement: "GraphQL"
+  - pattern: "sequel"  # SQL
+    replacement: "SQL"
+  - pattern: "s q l"
+    replacement: "SQL"
+  - pattern: "no sequel"
+    replacement: "NoSQL"
+  - pattern: "post gres"
+    replacement: "PostgreSQL"
+  - pattern: "postgres"
+    replacement: "PostgreSQL"
+  - pattern: "my sequel"
+    replacement: "MySQL"
+  - pattern: "mongo db"
+    replacement: "MongoDB"
+  - pattern: "redis"
+    replacement: "Redis"
+  - pattern: "elastic search"
+    replacement: "Elasticsearch"
+
+  # === Common misspellings (non-voice) ===
+  - original: "knowledeg"
+    corrected: "knowledge"
+  - original: "repostiory"
+    corrected: "repository"
+  - original: "impelmentation"
+    corrected: "implementation"

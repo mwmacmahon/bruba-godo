@@ -94,6 +94,8 @@ Or via command line:
 
 ## Related Skills
 
+- `/sync` - Full pipeline sync (prompts + content)
 - `/pull` - Pull sessions from bot
+- `/export` - Generate filtered exports (prerequisite)
 - `/mirror` - Mirror bot files locally
 - `/status` - Show bot sync status

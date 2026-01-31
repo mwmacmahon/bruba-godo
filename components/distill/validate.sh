@@ -46,12 +46,12 @@ FIXES=()
 
 check_pass() {
     echo -e "  ${GREEN}✓${NC} $1"
-    ((PASS++))
+    PASS=$((PASS + 1))
 }
 
 check_fail() {
     echo -e "  ${RED}✗${NC} $1"
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
     if [[ -n "$2" ]]; then
         FIXES+=("$2")
     fi
@@ -59,7 +59,7 @@ check_fail() {
 
 check_warn() {
     echo -e "  ${YELLOW}!${NC} $1"
-    ((WARN++))
+    WARN=$((WARN + 1))
 }
 
 echo "=== Distill Component Validation ==="

@@ -1,120 +1,207 @@
 # Intake Pipeline
 
-How conversation sessions flow from raw JSONL to processed reference documents.
+How conversation sessions flow from raw JSONL to bot memory.
 
 ## Overview
 
 ```
-JSONL Session → Pull → Markdown → Process → Reference Doc
-     ↓            ↓        ↓          ↓           ↓
-  (on bot)    /pull    parse-jsonl  (manual)   (local)
+/pull                    Pull JSONL, convert to intake/*.md
+  ↓
+/convert <file>          AI-assisted: add CONFIG block + summary
+  ↓
+/intake                  Canonicalize → reference/transcripts/
+  ↓
+/export                  Filter + redact → exports/bot/
+  ↓
+/push                    Sync to bot memory
 ```
 
-## The Pipeline
+## The Full Pipeline
 
-### Step 1: Sessions Accumulate
+### Step 1: Pull Sessions
 
-As you interact with the bot, conversations are recorded in JSONL files:
-
-```
-~/.clawdbot/agents/<agent-id>/sessions/
-├── session-2026-01-29-abc123.jsonl    # Active session
-├── session-2026-01-28-def456.jsonl    # Closed
-└── session-2026-01-27-ghi789.jsonl    # Closed
-```
-
-Sessions are **closed** when you say `/reset` or start a new session.
-
-### Step 2: Pull Sessions
-
-Use `/pull` skill or `./tools/pull-sessions.sh` to download closed sessions:
+Use `/pull` to download closed sessions from the bot:
 
 ```bash
 ./tools/pull-sessions.sh --verbose
 ```
 
-This copies closed JSONL files to `sessions/` locally and tracks what's been pulled in `sessions/.pulled`.
+This:
+1. Copies closed JSONL files to `sessions/` (archived)
+2. Converts each to delimited markdown in `intake/`
+3. Tracks pulled session IDs in `sessions/.pulled`
 
-### Step 3: Convert to Markdown
+**Output format in intake/:**
+```markdown
+=== MESSAGE 1 | ASSISTANT ===
+Hey! What's on your mind?
 
-Convert a JSONL session to readable markdown:
+=== MESSAGE 2 | USER ===
+[Transcript] Let's work on the new feature...
 
-```bash
-python tools/helpers/parse-jsonl.py sessions/session-2026-01-28.jsonl > intake/2026-01-28-topic.md
+=== MESSAGE 3 | ASSISTANT ===
+Sure, I can help with that.
 ```
 
-This produces a clean transcript with:
-- Human/Assistant message separation
-- Timestamps
-- Tool calls summarized
+### Step 2: Convert (Add CONFIG)
 
-**With transcription corrections** (for voice messages):
+Use `/convert <file>` for AI-assisted CONFIG block generation.
 
-```bash
-python tools/helpers/parse-jsonl.py sessions/session.jsonl --corrections > intake/topic.md
+**`/convert` does TWO things:**
+
+1. **REMOVES noise from the file:**
+   - Heartbeat interrupts (exec denials + `HEARTBEAT_OK`)
+   - System error messages
+   - These are deleted before canonicalize runs
+
+2. **MARKS content in CONFIG block (applied later at export):**
+   - **Metadata:** title, slug, date, source, tags
+   - **Sections to remove:** debugging tangents, off-topic content
+   - **Sensitivity markers:** names, health info, personal details
+   - **Code blocks:** walls of text, artifacts with keep/summarize/remove actions
+   - **Summary backmatter:** what was discussed, decisions made
+
+**CRITICAL:** Only noise is removed from the file. Everything else stays — CONFIG just marks it for processing at `/export` time.
+
+**CONFIG block format:**
+```yaml
+=== EXPORT CONFIG ===
+title: "Implementing User Authentication"
+slug: 2026-01-28-user-auth
+date: 2026-01-28
+source: bruba
+tags: [auth, backend, voice]
+description: "Built JWT auth system"
+
+sections_remove:
+  - start: "Let me check the error logs"
+    end: "Okay the logs show it's a path issue"
+    description: "Debugging session"
+
+sensitivity:
+  terms:
+    names: [Michael]
+=== END CONFIG ===
 ```
 
-See [Transcription Corrections](#transcription-corrections) below.
+### Step 3: Intake (Canonicalize)
 
-### Step 4: Process for Reference
+Use `/intake` to batch process files WITH CONFIG blocks.
 
-Review the markdown and extract valuable content:
+**`/intake` is NOT AI-powered.** It does deterministic processing:
 
-- Key decisions or insights
-- Reference information worth keeping
-- Code snippets or configurations
+```bash
+python -m components.distill.lib.cli canonicalize intake/*.md \
+    -o reference/transcripts/ \
+    -c components/distill/config/corrections.yaml
+```
 
-Move processed content to `reference/` for syncing back to the bot.
+This:
+1. Parses the CONFIG block → YAML frontmatter
+2. Applies transcription corrections from `corrections.yaml`
+3. Strips Signal/Telegram wrappers (`[Signal Michael id:...]`)
+4. **Content stays intact** — sections_remove, sensitivity are just in frontmatter
+5. Moves processed files to `intake/processed/`
 
-### Step 5: Push to Bot Memory
+**Output in reference/transcripts/:**
+```yaml
+---
+title: "Implementing User Authentication"
+slug: 2026-01-28-user-auth
+date: 2026-01-28
+type: canonical
+tags: [auth, backend, voice]
+---
+
+[Clean conversation content with sections removed per CONFIG]
+
+---
+<!-- === BACKMATTER === -->
+
+## Summary
+...
+```
+
+### Step 4: Export (Filter + Redact)
+
+Use `/export` to generate filtered exports per profile:
+
+```bash
+python -m components.distill.lib.cli export --profile bot
+```
+
+Profiles defined in `exports.yaml`:
+```yaml
+exports:
+  bot:
+    description: "Content synced to bot memory"
+    output_dir: exports/bot
+    include:
+      scope: [transcripts]
+    exclude:
+      sensitivity: [sensitive, restricted]
+    redaction: [names, health]
+```
+
+This:
+1. Finds canonical files matching include/exclude rules
+2. Applies redaction (replaces sensitive terms with [REDACTED])
+3. Generates transcript variants in `exports/bot/`
+
+### Step 5: Push to Bot
+
+Use `/push` to sync exports to bot memory:
 
 ```bash
 ./tools/push.sh --verbose
 ```
 
-This syncs `exports/bot/` to the bot's memory directory.
+This rsyncs `exports/bot/` to the bot's memory directory.
 
 ---
 
-## JSONL Format
+## Quick Reference
 
-Each line in a session file is a JSON object:
+### Skills
 
-```json
-{"role": "human", "content": "Hello", "timestamp": "2026-01-29T10:00:00Z"}
-{"role": "assistant", "content": "Hi there!", "timestamp": "2026-01-29T10:00:05Z"}
-{"role": "tool_use", "name": "Bash", "input": {"command": "ls"}, "timestamp": "..."}
-{"role": "tool_result", "content": "file1.txt\nfile2.txt", "timestamp": "..."}
+| Skill | What it does |
+|-------|-------------|
+| `/pull` | Pull JSONL + convert to intake/ |
+| `/convert` | Add CONFIG block (AI-assisted) |
+| `/intake` | Batch canonicalize files with CONFIG |
+| `/export` | Generate filtered exports |
+| `/push` | Sync to bot memory |
+
+### CLI Commands
+
+```bash
+# Parse JSONL to delimited markdown (automatic with /pull)
+python -m components.distill.lib.cli parse-jsonl sessions/*.jsonl -o intake/
+
+# Canonicalize with CONFIG
+python -m components.distill.lib.cli canonicalize intake/*.md -o reference/transcripts/
+
+# Generate variants with redaction
+python -m components.distill.lib.cli variants reference/transcripts/ --redact health,names
+
+# Export per profile
+python -m components.distill.lib.cli export --profile bot
+
+# Debug: show parsed CONFIG
+python -m components.distill.lib.cli parse intake/file.md
 ```
 
-**Roles:**
-- `human` — User messages
-- `assistant` — Bot responses
-- `tool_use` — Tool invocations
-- `tool_result` — Tool outputs
-- `system` — System messages
+### Directory Structure
 
----
-
-## Simple vs Full Pipeline
-
-### Simple Pipeline (bruba-godo)
-
-1. Pull JSONL: `./tools/pull-sessions.sh`
-2. Convert: `python tools/helpers/parse-jsonl.py session.jsonl > doc.md`
-3. Review and extract manually
-4. Push: `./tools/push.sh`
-
-Good for quick extraction of specific content.
-
-### Full Pipeline (Advanced)
-
-1. Pull sessions with full processing
-2. Canonicalize with frontmatter and tagging
-3. Generate variants (redacted versions for different audiences)
-4. Automatic mining into reference docs
-
-Required for filtered exports with redaction. This would require a more sophisticated document processing pipeline.
+| Directory | Contents |
+|-----------|----------|
+| `sessions/*.jsonl` | Raw JSONL from bot (archived) |
+| `sessions/.pulled` | Tracking file for pulled IDs |
+| `intake/*.md` | Delimited markdown (awaiting CONFIG) |
+| `intake/processed/` | Originals after canonicalization |
+| `reference/transcripts/` | Canonical files with frontmatter |
+| `exports/bot/` | Filtered + redacted for bot |
+| `exports/rag/` | Filtered for RAG systems |
 
 ---
 
@@ -122,119 +209,54 @@ Required for filtered exports with redaction. This would require a more sophisti
 
 ### Sessions are Immutable After Close
 
-Once you say `/reset`, that session is closed. The JSONL file won't change. This means:
-- Safe to pull once per session
-- Can delete from bot after pulling
-- No need to re-sync old sessions
+Once a session is closed (via `/reset`), the JSONL file won't change. Safe to pull once.
 
 ### Active Session
 
-The active session is still being written. Don't pull it — it's incomplete. Use `/convo` to view the active session without pulling.
+The active session is still being written. `/pull` skips it automatically. Use `/convo` to view active content.
 
-### Large Sessions
+### Transcription Corrections
 
-Very long sessions produce large JSONL files. The markdown conversion handles this, but manual review becomes tedious. Consider:
-- Breaking long conversations into topics
-- Extracting only the valuable parts
-- Using search/grep to find specific content
-
-### Tool Output Noise
-
-Tool outputs (especially file reads) can dominate transcripts. The parse-jsonl helper summarizes these, but you may want to filter further for clean documentation.
-
----
-
-## Transcription Corrections
-
-Voice messages transcribed by Whisper often have errors. The parser supports automatic corrections.
-
-### Enabling Corrections
-
-```bash
-# Use default corrections file (config/corrections.yaml)
-python tools/helpers/parse-jsonl.py session.jsonl --corrections
-
-# Use custom corrections file
-python tools/helpers/parse-jsonl.py session.jsonl --corrections-file /path/to/my-corrections.yaml
-```
-
-### Corrections File Format
-
-The corrections file (`config/corrections.yaml`) uses simple YAML format:
+Voice messages often have transcription errors. The canonicalize step applies corrections from `components/distill/config/corrections.yaml`:
 
 ```yaml
-# AI/Tech Terms
-chatgpt: ChatGPT
-chat gpt: ChatGPT
-openai: OpenAI
-claude: Claude
-clawdbot: Clawdbot
-llm: LLM
-api: API
-
-# Programming Terms
-javascript: JavaScript
-github: GitHub
-
-# Whisper Artifacts (removed entirely)
-"[music]": ""
-"[applause]": ""
+corrections:
+  - pattern: "bruba godo"
+    replacement: "bruba-godo"
+  - pattern: "clod bot"
+    replacement: "Clawdbot"
 ```
 
-Corrections are:
-- Case-insensitive matching
-- Case-preserving replacement (when possible)
-- Empty values remove the match entirely
+### Sensitivity Categories
 
-### Built-in Whisper Cleanup
+Define what gets redacted per export profile:
 
-Even without `--corrections`, the parser removes:
-- Timestamp patterns (`[00:00:00.000 --> 00:00:05.000]`)
-- Speaker labels (`[SPEAKER_00]`)
-- Multiple spaces and orphaned punctuation
+- `names` — Personal names
+- `health` — Medical/health content
+- `personal` — Addresses, phone numbers
+- `financial` — Financial details
 
-### Customizing Corrections
+Mark sensitive content in the CONFIG block, and it gets redacted automatically during export.
 
-Edit `config/corrections.yaml` to add your own corrections:
+---
 
+## Notes (2026-01-31)
+
+### Walls of Text and Large Code Blocks
+
+Use `sections_remove` for walls of text, pasted docs, and large code blocks you want to summarize. The `description` field becomes the replacement text.
+
+Example CONFIG:
 ```yaml
-# Your name variations
-john: John
-johnny: John
-
-# Project-specific terms
-myproject: MyProject
+sections_remove:
+  - start: "does this look right? --- ## 2.5 Session Continuity"
+    end: "can you tdraft that change"
+    description: "[Pasted documentation: Section 2.5 Session Continuity — continuation file pattern]"
 ```
 
----
-
-## Files Reference
-
-| File | Purpose |
-|------|---------|
-| `sessions/*.jsonl` | Raw pulled session files |
-| `sessions/.pulled` | List of already-pulled session IDs |
-| `intake/*.md` | Converted markdown awaiting processing |
-| `reference/*.md` | Processed reference documents |
-| `exports/bot/*.md` | Content ready to push to bot |
-
----
-
-## Commands Quick Reference
-
-```bash
-# Pull closed sessions from bot
-./tools/pull-sessions.sh
-
-# View active session (without pulling)
-# Use /convo skill
-
-# Convert JSONL to markdown
-python tools/helpers/parse-jsonl.py sessions/session.jsonl > intake/doc.md
-
-# Convert with transcription corrections (for voice)
-python tools/helpers/parse-jsonl.py sessions/session.jsonl --corrections > intake/doc.md
-
-# Push content to bot memory
-./tools/push.sh
+Output in export:
 ```
+[Removed: [Pasted documentation: Section 2.5 Session Continuity — continuation file pattern]]
+```
+
+This approach works for any content type (documentation, logs, debug output, large code blocks).

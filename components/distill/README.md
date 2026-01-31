@@ -13,85 +13,102 @@ With distill, bruba-godo is **"A managed AI assistant where conversations become
 The conversation → knowledge loop is what makes the system valuable:
 
 ```
-conversations → pull → distill → knowledge → export → push → bot memory
+/pull → intake/ → /convert → /intake → reference/ → /export → exports/ → /push
 ```
 
 ## What Distill Does
 
-1. **Canonicalize** — Convert raw JSONL to clean markdown with frontmatter
-2. **Generate variants** — Create different versions (redacted, summarized)
-3. **Extract knowledge** — Mine conversations for reusable reference content
-4. **Filter for export** — Apply sensitivity filters before pushing to bot
+1. **Parse JSONL** — Convert raw Clawdbot sessions to delimited markdown
+2. **Canonicalize** — Transform with CONFIG blocks into clean markdown with YAML frontmatter
+3. **Generate variants** — Create transcript and summary versions with redaction
+4. **Filter for export** — Apply sensitivity filters per exports.yaml profiles
+
+## Key Concept: What Gets Removed vs Marked
+
+**REMOVED from file (by `/convert`, AI-powered):**
+- **Noise only** — heartbeats, exec denials, system errors, `HEARTBEAT_OK` responses
+- These are deleted before canonicalize runs
+
+**MARKED in CONFIG (applied later at `/export`):**
+- `sections_remove` — debugging tangents, off-topic discussions, walls of text, large code blocks
+- `sensitivity` — names, health info, personal details
+
+Use `sections_remove` for anything you want replaced with a description (pasted docs, log dumps, large code blocks). The `description` field becomes the replacement text.
+
+The **canonical file keeps all content** except noise. CONFIG just marks what to process at export time.
 
 ## Prerequisites
 
 - Python 3.8+
-- Required packages (see setup.sh)
-
-## Setup
-
-```bash
-./components/distill/setup.sh
-```
-
-The setup script will:
-1. Check Python version
-2. Create virtual environment (optional)
-3. Install dependencies
-4. Create initial config
+- PyYAML (`pip install pyyaml`)
 
 ## Usage
 
-### Basic Pipeline
+### Full Pipeline (via Skills)
 
 ```bash
-# Pull sessions from bot
-./tools/pull-sessions.sh
-
-# Process with distill (converts JSONL → markdown)
-python -m components.distill.lib.cli process sessions/*.jsonl
-
-# Generate variants (canonical, redacted, summary)
-python -m components.distill.lib.cli variants reference/transcripts/
-
-# Push processed content to bot
-./tools/push.sh
+/pull              # Pull JSONL sessions, auto-convert to intake/*.md
+/convert <file>    # AI-assisted: add CONFIG block + summary to intake file
+/intake            # Batch canonicalize files WITH CONFIG → reference/transcripts/
+/export            # Generate filtered exports per exports.yaml profiles
+/push              # Push exports to bot memory
 ```
 
-### Via Skills
+### CLI Commands
 
 ```bash
-/pull           # Pull sessions from bot
-/distill        # Process and generate variants
-/push           # Push to bot memory
-```
+# Step 1: JSONL → Delimited Markdown (automatic with /pull)
+python -m components.distill.lib.cli parse-jsonl sessions/*.jsonl -o intake/
 
-Or all at once:
-```bash
-/sync --full    # Pull → distill → push
+# Step 2: Split large files (automatic with /intake, or manual)
+python -m components.distill.lib.cli split intake/large-file.md -o intake/ --max-chars 60000
+
+# Step 3: Canonicalize (requires CONFIG block in file)
+python -m components.distill.lib.cli canonicalize intake/*.md -o reference/transcripts/ \
+    -c components/distill/config/corrections.yaml
+
+# Step 4: Generate Variants
+python -m components.distill.lib.cli variants reference/transcripts/ -o exports/ \
+    --redact health,names
+
+# Step 5: Export with profile filtering
+python -m components.distill.lib.cli export --profile bot
+
+# Debug: Show parsed CONFIG block
+python -m components.distill.lib.cli parse intake/some-file.md
 ```
 
 ## Configuration
 
-Edit `components/distill/config.yaml`:
+### exports.yaml (in repo root)
 
 ```yaml
-# Output variants to generate
-variants:
-  - canonical    # Full transcript with metadata
-  - transcript   # Clean readable version
-  - summary      # AI-generated summary
+exports:
+  bot:
+    description: "Content synced to bot memory"
+    output_dir: exports/bot
+    include:
+      scope: [transcripts]
+    exclude:
+      sensitivity: [sensitive, restricted]
+    redaction: [names, health]
 
-# Redaction rules
-redaction:
-  names: true      # Replace real names with placeholders
-  health: true     # Remove health-related content
-  financial: false # Keep financial discussions
+  rag:
+    description: "Content for external RAG systems"
+    output_dir: exports/rag
+    include:
+      scope: [reference, transcripts]
+```
 
-# LLM settings (for summary generation)
-llm:
-  model: claude-sonnet
-  max_tokens: 1000
+### corrections.yaml (voice transcription fixes)
+
+```yaml
+# components/distill/config/corrections.yaml
+corrections:
+  - pattern: "bruba godo"
+    replacement: "bruba-godo"
+  - pattern: "clod bot"
+    replacement: "Clawdbot"
 ```
 
 ## Directory Structure
@@ -101,38 +118,132 @@ components/distill/
 ├── README.md              # This file
 ├── setup.sh               # Setup script
 ├── validate.sh            # Validate configuration
-├── config.yaml            # Processing options
+├── config/
+│   └── corrections.yaml   # Voice transcription fixes
 ├── prompts/
-│   ├── AGENTS.snippet.md  # Bot instructions for distill workflow
-│   └── variant-*.md       # Prompts for generating variants
+│   └── AGENTS.snippet.md  # Bot instructions for distill workflow
 └── lib/
     ├── __init__.py
-    ├── cli.py             # Entry point
-    ├── processor.py       # Core processing
-    ├── canonicalize.py    # JSONL → canonical markdown
-    ├── variants.py        # Generate transcript/summary
-    ├── redactor.py        # Sensitivity redaction
-    └── frontmatter.py     # Metadata management
+    ├── cli.py             # CLI entry point
+    ├── clawdbot_parser.py # JSONL → delimited markdown
+    ├── models.py          # Data classes (v1/v2 CONFIG)
+    ├── parsing.py         # CONFIG block extraction
+    ├── canonicalize.py    # Delimited → canonical with frontmatter
+    ├── splitting.py       # Large file splitting along message boundaries
+    ├── variants.py        # Generate transcript/summary + redaction
+    ├── content.py         # Content manipulation utilities
+    └── output.py          # Output formatting
 ```
 
-## Output Locations
+## Pipeline Data Flow
 
-| Output | Directory | Description |
-|--------|-----------|-------------|
-| Raw sessions | `sessions/` | JSONL pulled from bot |
-| Converted | `sessions/converted/` | Markdown versions |
-| Reference | `reference/transcripts/` | Processed transcripts |
-| Exports | `exports/bot/` | Filtered for bot memory |
+```
+sessions/*.jsonl              (raw from bot, archived)
+    ↓ parse-jsonl (automatic with /pull)
+intake/*.md                   (delimited markdown, no CONFIG)
+    ↓ /convert (AI-assisted)
+    │   1. REMOVES noise (heartbeats, exec denials) from file
+    │   2. MARKS content in CONFIG (sections_remove, sensitivity)
+    │   3. Adds backmatter summary
+intake/*.md                   (noise removed, has CONFIG block)
+    ↓ /intake (canonicalize, NOT AI)
+    │   - Reads CONFIG → YAML frontmatter
+    │   - Applies corrections.yaml
+    │   - Strips Signal wrappers [Signal ...]
+    │   - Content stays intact (sections_remove etc just in frontmatter)
+reference/transcripts/*.md    (canonical with YAML frontmatter, full content)
+    ↓ /export (NOT AI)
+    │   - Applies sections_remove (actually removes)
+    │   - Applies redaction per exports.yaml profile
+exports/bot/*.md              (filtered + redacted for bot)
+    ↓ /push
+bot memory
+```
 
-## Without Distill
+## CONFIG Block Format (v2)
 
-The system still works without distill:
-- Sessions stay as raw JSONL
-- No automatic transcript processing
-- Manual conversion with `parse-jsonl.py`
-- No variants or redaction
+The `/convert` skill generates this structure:
 
-Distill is what transforms the basic tooling into a **knowledge management system**.
+```yaml
+title: "Conversation Title"
+slug: 2026-01-28-topic-slug
+date: 2026-01-28
+source: bruba
+tags: [voice, technical]
+description: "One-line summary"
+
+sections_remove:
+  - start: "First words of section to remove..."
+    end: "First words of section end..."
+    description: "Debugging tangent"
+  - start: "does this look right? --- ## 2.5"
+    end: "can you draft that change"
+    description: "[Pasted documentation: Section 2.5 — topic summary]"
+  - start: "```bash\n# Debug output"
+    end: "```"
+    description: "[Code: 45 lines bash - debug output]"
+
+sensitivity:
+  terms:
+    names: [Michael, Jane]
+    health: [condition, medication]
+  sections:
+    - start: "Start of sensitive section..."
+      end: "End of sensitive section..."
+      tags: [health]
+```
+
+The `description` field in `sections_remove` becomes the replacement text in exports. Use patterns like:
+- `[Pasted documentation: topic]` for walls of pasted text
+- `[Code: N lines lang - what it does]` for large code blocks
+- `[Log output: N lines - what it shows]` for log dumps
+
+## Large File Handling
+
+Files over 60,000 characters are automatically split by `/intake` along message boundaries.
+
+### Split Behavior
+
+- **Threshold:** 60,000 characters (configurable with `--max-chars`)
+- **Minimum per chunk:** 5 messages (configurable with `--min-messages`)
+- **Splits on:** `=== MESSAGE N | ROLE ===` boundaries only (never mid-message)
+- **Even distribution:** Messages distributed roughly equally across chunks
+
+### Split Output
+
+Each chunk gets:
+- Updated CONFIG block with part metadata (`part: 1`, `total_parts: 3`)
+- Updated slug (`original-slug-part-1`)
+- Continuation notes between parts
+
+**Example:**
+```markdown
+**[Continued from Part 1 of 3]**
+
+=== MESSAGE 5 | USER ===
+...
+
+---
+**[Conversation continues in Part 3 of 3]**
+
+=== EXPORT CONFIG ===
+title: "Original Title"
+slug: "2026-01-31-topic-part-2"
+part: 2
+total_parts: 3
+messages: "5-8"
+...
+=== END CONFIG ===
+```
+
+### Manual Splitting
+
+```bash
+python -m components.distill.lib.cli split intake/large-file.md \
+    --max-chars 60000 \
+    --min-messages 5 \
+    -o intake/
+```
 
 ## Troubleshooting
 
@@ -143,21 +254,18 @@ Run from the bruba-godo root directory, or set PYTHONPATH:
 export PYTHONPATH=/path/to/bruba-godo
 ```
 
-### "Missing dependency: X"
+### "No EXPORT CONFIG block found"
 
-Run setup again:
-```bash
-./components/distill/setup.sh
-```
+The file needs a CONFIG block. Run `/convert <file>` to add one.
 
-### "LLM API error"
+### "Error: exports.yaml not found"
 
-Check your API credentials in `.env`:
-```bash
-ANTHROPIC_API_KEY=sk-ant-...
-```
+Create exports.yaml in repo root (see Configuration above).
 
-## Related
+## Related Skills
 
-- [Intake Pipeline](../../docs/intake-pipeline.md) — How sessions flow through processing
-- [Vision](../../docs/Vision.md) — Why distill matters
+- `/pull` — Pull sessions + auto-convert to intake/
+- `/convert` — AI-assisted CONFIG generation
+- `/intake` — Batch canonicalization
+- `/export` — Generate filtered exports
+- `/push` — Push to bot memory

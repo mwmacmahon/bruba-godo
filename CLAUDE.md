@@ -20,8 +20,10 @@ Common patterns:
 ```
 Bot Skills:
   Daemon:    /status, /launch, /stop, /restart
-  Files:     /mirror, /pull, /push, /sync
+  Files:     /mirror, /pull, /push
+  Sync:      /sync (full pipeline), /prompt-sync (prompts only)
   Config:    /config, /update, /component, /prompts
+  Pipeline:  /convert, /intake, /export
   Code:      /code
   Convo:     /convo
   Setup:     (run tools/setup-agent.sh)
@@ -64,13 +66,15 @@ bruba-godo/
 ├── mirror/                  # BOT STATE (gitignored)
 │   └── prompts/             # Current bot prompts
 ├── sessions/                # RAW SESSIONS (gitignored)
-│   ├── *.jsonl              # JSONL files from bot
-│   └── converted/           # Markdown conversions
+│   └── *.jsonl              # JSONL files from bot (archived)
+├── intake/                  # DELIMITED MARKDOWN (gitignored)
+│   ├── *.md                 # Awaiting CONFIG (from /pull)
+│   └── processed/           # Originals after canonicalization
 ├── reference/               # PROCESSED CONTENT (gitignored)
 │   └── transcripts/         # Canonicalized conversations
 ├── exports/                 # SYNC OUTPUTS (gitignored)
-│   └── bot/                 # Content ready to push to bot memory
-├── intake/                  # Raw files awaiting processing (gitignored)
+│   ├── bot/                 # Content for bot memory
+│   └── rag/                 # Content for RAG systems
 └── logs/                    # Script logs (gitignored)
 ```
 
@@ -149,15 +153,19 @@ Common paths (on bot machine):
 | `/stop` | Stop the daemon |
 | `/restart` | Restart the daemon |
 | `/mirror` | Pull bot files locally |
-| `/pull` | Pull closed sessions |
+| `/pull` | Pull closed sessions + convert to intake/ |
 | `/push` | Push content to bot memory |
-| `/sync` | Assemble prompts + push (with conflict detection) |
+| `/sync` | Full pipeline sync (prompts + content) |
+| `/prompt-sync` | Assemble prompts + push (with conflict detection) |
 | `/config` | Configure heartbeat, exec allowlist |
 | `/component` | Manage optional components (signal, voice, distill, etc.) |
 | `/prompts` | Manage prompt assembly, resolve conflicts, explain config |
 | `/update` | Update clawdbot version |
 | `/code` | Review and migrate staged code |
 | `/convo` | Load active conversation |
+| `/convert` | Add CONFIG block to intake file (AI-assisted) |
+| `/intake` | Batch canonicalize files with CONFIG |
+| `/export` | Generate filtered exports from canonical files |
 
 ## Prompt Assembly Pipeline
 
@@ -237,13 +245,27 @@ Each component can contribute:
 
 ## Content Pipeline
 
-For syncing content to bot memory:
+Full pipeline for processing conversations to bot memory:
 
-1. Add markdown files to `reference/`
-2. Generate export: `cp reference/*.md exports/bot/` (or use full filtering)
-3. Push to bot: `./tools/push.sh`
+```
+/pull                    # Pull JSONL sessions, convert to intake/*.md
+  ↓
+/convert <file>          # AI-assisted: add CONFIG block + summary
+  ↓
+/intake                  # Canonicalize → reference/transcripts/
+  ↓
+/export                  # Filter + redact → exports/bot/
+  ↓
+/push                    # Sync exports to bot memory
+```
 
-Exports are filtered according to `exports.yaml` definitions.
+**Quick reference:**
+- `intake/` — Delimited markdown awaiting CONFIG
+- `intake/processed/` — Originals after canonicalization
+- `reference/transcripts/` — Canonical files with frontmatter
+- `exports/bot/` — Filtered + redacted for bot
+
+Export profiles in `exports.yaml` control filtering and redaction per destination.
 
 ## Git Policy
 
