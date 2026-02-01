@@ -26,6 +26,9 @@ user/
 # Planning docs (internal only)
 docs/meta/
 
+# Claude Code work logs (local only, exported to bot)
+docs/cc_logs/
+
 # macOS
 .DS_Store
 

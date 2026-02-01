@@ -21,10 +21,20 @@ source "$(dirname "$0")/lib.sh"
 
 # Parse arguments
 NO_INDEX=false
+TOOLS_ONLY=false
+UPDATE_ALLOWLIST=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --no-index)
             NO_INDEX=true
+            shift
+            ;;
+        --tools-only)
+            TOOLS_ONLY=true
+            shift
+            ;;
+        --update-allowlist)
+            UPDATE_ALLOWLIST=true
             shift
             ;;
         *)
@@ -34,15 +44,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 if ! parse_common_args "$@"; then
-    echo "Usage: $0 [--dry-run] [--verbose] [--no-index]"
+    echo "Usage: $0 [--dry-run] [--verbose] [--no-index] [--tools-only] [--update-allowlist]"
     echo ""
     echo "Push content bundles to bot memory."
     echo ""
     echo "Options:"
-    echo "  --dry-run, -n   Show what would be synced without doing it"
-    echo "  --verbose, -v   Show detailed output"
-    echo "  --quiet, -q     Summary output only (default)"
-    echo "  --no-index      Skip memory reindex after sync"
+    echo "  --dry-run, -n       Show what would be synced without doing it"
+    echo "  --verbose, -v       Show detailed output"
+    echo "  --quiet, -q         Summary output only (default)"
+    echo "  --no-index          Skip memory reindex after sync"
+    echo "  --tools-only        Sync only component tools (skip content)"
+    echo "  --update-allowlist  Update exec-approvals with component tool entries"
     exit 0
 fi
 
@@ -58,6 +70,55 @@ mkdir -p "$LOG_DIR"
 rotate_log "$LOG_FILE"
 
 log "=== Pushing Content to Bot ==="
+
+# Sync component tools function
+# Syncs components/*/tools/ to bot's ~/clawd/tools/ with executable permissions
+sync_component_tools() {
+    local tools_synced=0
+    local tool_rsync_opts="-avz --chmod=+x"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        tool_rsync_opts="$tool_rsync_opts --dry-run"
+    fi
+    if [[ "$VERBOSE" != "true" ]]; then
+        tool_rsync_opts="$tool_rsync_opts --quiet"
+    fi
+
+    for component_dir in "$ROOT_DIR/components"/*/tools; do
+        if [[ -d "$component_dir" ]]; then
+            local component
+            component=$(basename "$(dirname "$component_dir")")
+            log "  Syncing $component tools..."
+            rsync $tool_rsync_opts "$component_dir/" "$SSH_HOST:$REMOTE_WORKSPACE/tools/"
+            if [[ "$DRY_RUN" != "true" ]]; then
+                tools_synced=$((tools_synced + $(find "$component_dir" -type f | wc -l | tr -d ' ')))
+            fi
+        fi
+    done
+    echo "$tools_synced"
+}
+
+# Handle --tools-only mode (early exit)
+if [[ "$TOOLS_ONLY" == "true" ]]; then
+    log "=== Syncing Component Tools Only ==="
+    TOOLS_COUNT=$(sync_component_tools)
+    log "=== Tool Sync Complete ==="
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "Tools: dry run complete"
+    else
+        echo "Tools: $TOOLS_COUNT files synced"
+    fi
+
+    # Update allowlist if requested
+    if [[ "$UPDATE_ALLOWLIST" == "true" ]]; then
+        log "Updating exec-approvals allowlist..."
+        ALLOWLIST_ARGS=""
+        [[ "$DRY_RUN" == "true" ]] && ALLOWLIST_ARGS="--dry-run"
+        [[ "$VERBOSE" == "true" ]] && ALLOWLIST_ARGS="$ALLOWLIST_ARGS --verbose"
+        "$ROOT_DIR/tools/update-allowlist.sh" $ALLOWLIST_ARGS
+    fi
+
+    exit 0
+fi
 
 # Read remote_path from config.yaml for bot profile
 REMOTE_PATH=$(python3 -c "
@@ -200,6 +261,22 @@ if [[ "$CLONE_REPO_CODE" == "true" ]]; then
         CODE_COUNT=$(find "$ROOT_DIR/scripts" "$ROOT_DIR/docs" "$ROOT_DIR/tools" -type f 2>/dev/null | wc -l | tr -d ' ')
         log "  Synced ~$CODE_COUNT repo files"
     fi
+fi
+
+# 5. Sync component tools
+log "Syncing component tools..."
+TOOLS_COUNT=$(sync_component_tools)
+if [[ "$DRY_RUN" != "true" ]]; then
+    log "  $TOOLS_COUNT tool files synced"
+fi
+
+# 6. Update allowlist if requested
+if [[ "$UPDATE_ALLOWLIST" == "true" ]]; then
+    log "Updating exec-approvals allowlist..."
+    ALLOWLIST_ARGS=""
+    [[ "$DRY_RUN" == "true" ]] && ALLOWLIST_ARGS="--dry-run"
+    [[ "$VERBOSE" == "true" ]] && ALLOWLIST_ARGS="$ALLOWLIST_ARGS --verbose"
+    "$ROOT_DIR/tools/update-allowlist.sh" $ALLOWLIST_ARGS
 fi
 
 # Trigger reindex if not dry run

@@ -11,9 +11,9 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 MODELS = {
-    "opus": "claude-opus-4-20250514",
-    "sonnet": "claude-sonnet-4-20250514",
-    "haiku": "claude-haiku-4-20250514",
+    "opus": "claude-opus-4-5",
+    "sonnet": "claude-sonnet-4-5",
+    "haiku": "claude-haiku-4-5",
 }
 
 

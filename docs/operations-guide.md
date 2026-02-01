@@ -154,7 +154,25 @@ Before approving staged code:
 
 ### Allowlist Update Procedure
 
-After migrating a tool:
+**Automated (for component tools):**
+
+Component tools with `allowlist.json` files are updated automatically:
+
+```bash
+# Check what entries are needed
+./tools/update-allowlist.sh --check
+
+# Add missing entries
+./tools/update-allowlist.sh
+
+# Or as part of push
+./tools/push.sh --tools-only --update-allowlist
+
+# Restart daemon after changes
+ssh bruba 'clawdbot daemon restart'
+```
+
+**Manual (for custom tools):**
 
 ```bash
 # 1. Add pattern to exec-approvals.json
@@ -270,8 +288,11 @@ ssh bruba 'clawdbot config set tools.exec.security allowlist'
 │  Operator Machine                          Bot Machine                      │
 │  ────────────────                          ───────────                      │
 │                                                                             │
-│  bundles/bot/  ─────────── push ─────────► ~/clawd/memory/                  │
+│  exports/bot/  ─────────── push ─────────► ~/clawd/memory/                  │
 │  (content to sync)                         (searchable via memory_search)   │
+│                                                                             │
+│  components/*/tools/ ───── push ─────────► ~/clawd/tools/                   │
+│  (component tools)                         (executable scripts)             │
 │                                                                             │
 │  mirror/       ◄────────── mirror ──────── ~/clawd/                         │
 │  (local backup)                            MEMORY.md, journals, etc.        │
@@ -297,8 +318,11 @@ ssh bruba 'clawdbot config set tools.exec.security allowlist'
 # Pull closed session transcripts
 ./tools/pull-sessions.sh --verbose
 
-# Push content to bot memory
+# Push content to bot memory (includes component tools)
 ./tools/push.sh --verbose
+
+# Push only component tools (skip content)
+./tools/push.sh --tools-only
 
 # Reindex bot's memory after push
 ssh bruba "clawdbot memory index"

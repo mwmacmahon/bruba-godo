@@ -1,6 +1,6 @@
 # Voice Component
 
-**Status:** Planned
+**Status:** Partial
 
 Voice input and output for your bot.
 
@@ -19,21 +19,22 @@ This component will enable:
 ## Setup
 
 ```bash
-# Coming soon
-./components/voice/setup.sh
+# Sync voice tools to bot
+./tools/push.sh --tools-only
+
+# Or as part of regular push
+./tools/push.sh
 ```
+
+Tools are synced to `~/clawd/tools/` with executable permissions.
 
 ## Notes
 
-This component is not yet implemented. Voice support requires:
-1. Audio capture/playback on the remote machine
-2. Whisper installation and configuration
-3. TTS engine selection and setup
-4. Integration with Clawdbot's message handling
+**What exists:**
+- `prompts/AGENTS.snippet.md` — Voice handling instructions for the bot
+- `tools/` — Three voice processing scripts (dictation, transcription, TTS)
+- `allowlist.json` — Exec-approvals entries for voice tools
 
-For now, you can manually set up voice by:
-1. Installing whisper: `pip install openai-whisper`
-2. Configuring your bot's AGENTS.md to handle voice messages
-3. Setting up a voice message handler script
-
-See the example prompts for voice handling.
+**TODO:**
+- `setup.sh` — Interactive setup script
+- `validate.sh` — Configuration validation

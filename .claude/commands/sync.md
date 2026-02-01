@@ -49,6 +49,41 @@ Only after ALL conflicts are resolved, continue.
 ./tools/push.sh --verbose
 ```
 
+#### Step 5: Validate Allowlist
+
+Check component tool allowlist entries:
+
+```bash
+./tools/update-allowlist.sh --check
+```
+
+**IF DISCREPANCIES ARE DETECTED:**
+
+Show the output to the user. The script reports:
+- **Missing entries** (in components but not on bot) → need to add
+- **Orphan entries** (on bot but not in components) → may need to remove
+
+Ask user:
+- [A] Add missing entries only
+- [R] Remove orphan entries only
+- [B] Both (add missing + remove orphans)
+- [S] Skip
+
+If user chooses to update:
+```bash
+./tools/update-allowlist.sh              # Both add and remove
+./tools/update-allowlist.sh --add-only   # Only add missing
+./tools/update-allowlist.sh --remove-only # Only remove orphans
+```
+
+#### Step 6: Restart Daemon
+
+Restart daemon to apply synced changes (prompts, allowlist, memory index):
+
+```bash
+./tools/bot clawdbot daemon restart
+```
+
 ---
 
 ### 2. Content Pipeline

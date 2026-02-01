@@ -263,7 +263,13 @@ Syncs `exports/bot/` subdirectories to appropriate remote locations:
 - `transcripts/` → `~/clawd/memory/transcripts/`
 - `refdocs/` → `~/clawd/memory/refdocs/`
 - `docs/` → `~/clawd/memory/docs/`
+- `components/*/tools/` → `~/clawd/tools/` (with executable permissions)
 - Triggers memory reindex on bot
+
+**Tools-only sync:**
+```bash
+./tools/push.sh --tools-only  # Skip content, sync only component tools
+```
 
 ---
 

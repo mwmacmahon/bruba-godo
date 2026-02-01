@@ -18,12 +18,22 @@ python3 tests/run_tests.py test_variants
 ./tests/test-export-prompts.sh
 ./tests/test-prompt-assembly.sh --quick
 ./tests/test-e2e-pipeline.sh
+./tests/test-component-tools.sh --quick
+./tests/test-lib.sh --quick
+./tests/test-mirror.sh --quick
+./tests/test-pull-sessions.sh --quick
+./tests/test-push.sh --quick
 
 # Full test suite
 python3 tests/run_tests.py -v && \
   ./tests/test-export-prompts.sh && \
   ./tests/test-prompt-assembly.sh --quick && \
-  ./tests/test-e2e-pipeline.sh
+  ./tests/test-e2e-pipeline.sh && \
+  ./tests/test-component-tools.sh --quick && \
+  ./tests/test-lib.sh --quick && \
+  ./tests/test-mirror.sh --quick && \
+  ./tests/test-pull-sessions.sh --quick && \
+  ./tests/test-push.sh --quick
 ```
 
 ## Test Structure
@@ -33,11 +43,16 @@ tests/
 ├── run_tests.py                    # Test runner (works without pytest)
 ├── test_variants.py                # Variant generation tests (24 tests)
 ├── test_export.py                  # Export pipeline tests (18 tests)
-├── test_convert_doc.py             # convert-doc.py script tests (11 tests)
+├── test_convert_doc.py             # convert-doc.py script tests (15 tests)
 ├── test_detect_conflicts.sh        # Conflict detection tests (18 tests)
 ├── test-export-prompts.sh          # Profile targeting tests (38 tests)
 ├── test-prompt-assembly.sh         # Prompt assembly tests (13 tests)
 ├── test-e2e-pipeline.sh            # E2E content pipeline tests (10 tests)
+├── test-component-tools.sh         # Component tool sync tests (36 tests)
+├── test-lib.sh                     # Shared library tests (9 tests)
+├── test-mirror.sh                  # Mirror script tests (7 tests)
+├── test-pull-sessions.sh           # Pull sessions tests (9 tests)
+├── test-push.sh                    # Push script tests (12 tests)
 └── fixtures/                       # Test fixtures
     ├── FIXTURES.md                 # Fixture documentation
     ├── 001-ui-artifacts/
@@ -121,8 +136,13 @@ Tests for `scripts/convert-doc.py`, an isolated LLM document conversion script.
 | `test-export-prompts.sh` | 38 | Profile targeting, prompt export, silent mode content |
 | `test-prompt-assembly.sh` | 13 | Prompt assembly from templates + components |
 | `test-e2e-pipeline.sh` | 10 | Full content pipeline: intake → reference → exports |
+| `test-component-tools.sh` | 36 | Component tool sync, allowlist automation, validation |
+| `test-lib.sh` | 9 | Shared library: config loading, arg parsing, log rotation |
+| `test-mirror.sh` | 7 | Mirror script: date filtering, token redaction |
+| `test-pull-sessions.sh` | 9 | Pull sessions: state file, deduplication, JSON parsing |
+| `test-push.sh` | 12 | Push script: config parsing, file counting, routing |
 
-**Total tests: 136** (57 Python + 79 Shell)
+**Total tests: 209** (57 Python + 152 Shell)
 
 #### What's Tested in `test-export-prompts.sh`
 
@@ -142,6 +162,70 @@ Tests for `scripts/convert-doc.py`, an isolated LLM document conversion script.
 - **File movement** - Original moved to intake/processed/
 - **Export generation** - CLI exports to exports/bot/transcripts/ with prefix
 - **Content preservation** - Frontmatter, messages, backmatter intact
+
+#### What's Tested in `test-component-tools.sh`
+
+Tests component audit Phase B-E implementation:
+
+- **Component tools discovery** - voice, web-search, reminders have tools/
+- **Allowlist.json validation** - Valid JSON, entries array, pattern+id fields, ${WORKSPACE} placeholder
+- **validate-components.sh** - Script runs, reports counts, no errors on current state
+- **update-allowlist.sh --check** - Status output (requires SSH, skipped in --quick)
+- **update-allowlist.sh --dry-run** - Dry run works (requires SSH, skipped in --quick)
+- **Allowlist expansion** - ${WORKSPACE} placeholder correctly expanded
+- **AGENTS.snippet.md wiring** - Snippets exist and are in config.yaml agents_sections
+- **Push script options** - --tools-only, sync_component_tools(), --update-allowlist
+- **Orphan detection** - find_orphan_entries(), --add-only, --remove-only flags
+- **Sync skill integration** - Validate Allowlist step in sync.md
+
+#### What's Tested in `test-lib.sh`
+
+Tests for `tools/lib.sh` shared library functions:
+
+- **Config loading** - YAML parsing, path resolution, missing file handling
+- **Default values** - Fallbacks for missing config keys
+- **Argument parsing** - --dry-run, --verbose, --quiet, --help flags
+- **Command existence** - require_commands success/failure
+- **Log rotation** - Rotates large files, skips small files
+
+#### What's Tested in `test-mirror.sh`
+
+Tests for `tools/mirror.sh` local logic:
+
+- **Date filtering regex** - Matches YYYY-MM-DD prefixed files
+- **Invalid date rejection** - Rejects non-date-prefixed filenames
+- **Token redaction** - botToken and generic token fields
+- **Field preservation** - Non-token fields stay intact
+- **Directory structure** - Creates prompts/memory/config/tools subdirs
+- **CORE_FILES list** - All expected prompt files included
+
+#### What's Tested in `test-pull-sessions.sh`
+
+Tests for `tools/pull-sessions.sh` local logic:
+
+- **State file operations** - Read, write, append to .pulled
+- **Session deduplication** - Already-pulled detection via grep
+- **Force re-pull** - Removes then re-adds session ID
+- **JSON parsing** - Session ID extraction from sessions.json
+- **Empty handling** - Empty JSON and empty state file
+- **Exact matching** - Session IDs matched exactly (no partial matches)
+- **Summary format** - Output text formatting
+
+#### What's Tested in `test-push.sh`
+
+Tests for `tools/push.sh` core logic:
+
+- **Config parsing** - exports.bot.remote_path extraction
+- **Default values** - Fallback to 'memory' for missing remote_path
+- **File counting** - Recursive .md file count in exports/bot/
+- **Zero file case** - Handles empty exports directory
+- **Subdirectory list** - All expected subdirs in iteration
+- **Core-prompts routing** - Separate destination for core-prompts/
+- **Root-level files** - Detection excludes subdirectories
+- **Rsync options** - --dry-run, --verbose/--quiet toggle
+- **Argument flags** - --no-index, --tools-only, --update-allowlist present
+- **Tools-only mode** - Early exit pattern
+- **Clone repo code** - Conditional check exists
 
 ## Fixtures
 
@@ -273,7 +357,12 @@ Before committing changes to the distill pipeline:
 python3 tests/run_tests.py -v && \
   ./tests/test-export-prompts.sh && \
   ./tests/test-prompt-assembly.sh --quick && \
-  ./tests/test-e2e-pipeline.sh
+  ./tests/test-e2e-pipeline.sh && \
+  ./tests/test-component-tools.sh --quick && \
+  ./tests/test-lib.sh --quick && \
+  ./tests/test-mirror.sh --quick && \
+  ./tests/test-pull-sessions.sh --quick && \
+  ./tests/test-push.sh --quick
 
 # Verify profile targeting
 python3 -m components.distill.lib.cli export --profile bot --verbose

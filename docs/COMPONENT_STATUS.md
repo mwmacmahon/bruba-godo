@@ -34,8 +34,8 @@ Last updated: 2026-01-31
 | cc-packets | Prompt-Only | ✓ | - | - | - | Claude Code packet handling |
 | repo-reference | Prompt-Only | ✓ | - | - | - | Repository reference guidance |
 | voice | Partial | ✓ | ✓ 3 | - | - | Has snippet + tools but no setup/validate |
-| web-search | Partial | - | ✓ 2 | - | - | Has tools but missing snippet |
-| reminders | Partial | - | ✓ 2 | - | - | Has tools but missing snippet |
+| web-search | Partial | ✓ | ✓ 2 | - | - | Has snippet + tools but no setup/validate |
+| reminders | Partial | ✓ | ✓ 2 | - | - | Has AGENTS + TOOLS snippets + tools |
 
 ## Tools Inventory
 
@@ -54,27 +54,28 @@ Last updated: 2026-01-31
 
 ## Prompt Assembly Wiring
 
-All components with snippets are wired into `exports.yaml` → `agents_sections`:
+All components with snippets are wired into `config.yaml` → `agents_sections`:
 
 ```
 header → http-api → first-run → session → continuity → memory → distill →
 safety → bot:exec-approvals → cc-packets → external-internal → workspace →
-repo-reference → group-chats → tools → voice → heartbeats → signal → make-it-yours
+repo-reference → group-chats → tools → web-search → reminders → voice →
+heartbeats → signal → make-it-yours
 ```
 
-**Not in agents_sections** (no snippets):
-- web-search
-- reminders
+## Automation Tools
 
-## Gaps to Address
+| Tool | Purpose |
+|------|---------|
+| `./tools/push.sh --tools-only` | Sync component tools to bot |
+| `./tools/push.sh --update-allowlist` | Update exec-approvals entries |
+| `./tools/update-allowlist.sh` | Bidirectional allowlist sync (add missing, remove orphans) |
+| `./tools/update-allowlist.sh --check` | Check allowlist status without changes |
+| `./tools/validate-components.sh` | Check component consistency |
 
-1. **voice**: README says "Planned" but is actually Partial (has snippet + tools)
-2. **web-search**: Has tools, needs snippet and agents_sections entry
-3. **reminders**: Has tools, needs snippet and agents_sections entry
-4. **No tool sync**: push.sh doesn't sync component tools to bot
-5. **No allowlist automation**: exec-approvals updated manually
+**Allowlist sync in /sync:** Step 5 validates allowlist after push, prompts to add/remove entries.
 
 ## See Also
 
-- [Implementation packets](../workspace/output/packets/) for each phase
-- [Operations Guide](operations-guide.md) for current workarounds
+- [Operations Guide](operations-guide.md) for day-to-day usage
+- [cc_logs/2026-01-31-component-audit-complete.md](cc_logs/2026-01-31-component-audit-complete.md) for implementation details

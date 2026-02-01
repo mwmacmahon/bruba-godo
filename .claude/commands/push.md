@@ -41,14 +41,54 @@ For full filtering/redaction support, a more advanced document processing pipeli
 
 Or with options:
 ```bash
-./tools/push.sh --dry-run    # See what would sync
-./tools/push.sh --verbose    # Detailed output
-./tools/push.sh --no-index   # Skip memory reindex
+./tools/push.sh --dry-run         # See what would sync
+./tools/push.sh --verbose         # Detailed output
+./tools/push.sh --no-index        # Skip memory reindex
+./tools/push.sh --tools-only      # Sync only component tools
+./tools/push.sh --update-allowlist # Also update exec-approvals
 ```
 
 This:
 1. Rsyncs `exports/bot/` → Bot's `~/clawd/memory/`
-2. Triggers `clawdbot memory index` to reindex
+2. Syncs component tools (`components/*/tools/`) → Bot's `~/clawd/tools/`
+3. Optionally updates exec-approvals allowlist (with `--update-allowlist`)
+4. Triggers `clawdbot memory index` to reindex
+
+## Component Tools
+
+Component tools are automatically synced to the bot's `~/clawd/tools/` directory with executable permissions.
+
+Tools from these components are synced:
+- `components/voice/tools/` (tts.sh, whisper-clean.sh, voice-status.sh)
+- `components/web-search/tools/` (web-search.sh, ensure-web-reader.sh)
+- `components/reminders/tools/` (cleanup-reminders.sh, helpers/)
+
+To sync only tools (skip content):
+```bash
+./tools/push.sh --tools-only
+```
+
+## Exec-Approvals Allowlist
+
+Component tools need exec-approvals entries to be callable by the bot. Use `--update-allowlist` to automatically add missing entries:
+
+```bash
+# Sync tools and update allowlist
+./tools/push.sh --tools-only --update-allowlist
+
+# Check what entries are needed
+./tools/update-allowlist.sh --check
+
+# Update allowlist standalone
+./tools/update-allowlist.sh
+```
+
+Each component defines required entries in `allowlist.json`:
+- `components/voice/allowlist.json`
+- `components/web-search/allowlist.json`
+- `components/reminders/allowlist.json`
+
+After allowlist changes, restart the daemon: `ssh bruba 'clawdbot daemon restart'`
 
 ## Arguments
 

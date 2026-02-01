@@ -1,6 +1,6 @@
 # Reminders Component
 
-**Status:** Planned
+**Status:** Partial
 
 Scheduled reminders and notifications.
 
@@ -19,21 +19,23 @@ This component will enable:
 ## Setup
 
 ```bash
-# Coming soon
-./components/reminders/setup.sh
+# Sync reminder tools to bot
+./tools/push.sh --tools-only
+
+# Or as part of regular push
+./tools/push.sh
 ```
+
+Tools are synced to `~/clawd/tools/` with executable permissions.
 
 ## Notes
 
-This component is not yet implemented. Reminder support requires:
-1. A persistent scheduler (survives daemon restarts)
-2. Integration with your notification channels
-3. Natural language time parsing
-4. Recurring reminder support
+**What exists:**
+- `prompts/AGENTS.snippet.md` — Reminder handling instructions for the bot
+- `prompts/TOOLS.snippet.md` — Tool documentation for reminder commands
+- `tools/` — Reminder scripts (cleanup-reminders.sh)
+- `allowlist.json` — Exec-approvals entries
 
-Possible approaches:
-- System reminders (macOS Reminders, Linux at/cron)
-- Dedicated reminder service
-- Clawdbot heartbeat-based checking
-
-See the remindctl tool for an example implementation.
+**TODO:**
+- `setup.sh` — Interactive setup script
+- `validate.sh` — Configuration validation

@@ -7,7 +7,7 @@ Optional add-ons for extending your bot's capabilities.
 | Component | Status | Prompts | Description |
 |-----------|--------|---------|-------------|
 | [Signal](signal/) | **Ready** | ✅ | Connect via Signal messenger |
-| [Voice](voice/) | Prompt Ready | ✅ | Voice input/output (whisper, TTS) |
+| [Voice](voice/) | Partial | ✅ | Voice input/output (whisper, TTS) |
 | [Session](session/) | Prompt Ready | ✅ | Every Session, Greeting, Continuation |
 | [Memory](memory/) | Prompt Ready | ✅ | Memory management workflow |
 | [Heartbeats](heartbeats/) | Prompt Ready | ✅ | Proactive behavior on heartbeat polls |
@@ -17,13 +17,14 @@ Optional add-ons for extending your bot's capabilities.
 | [Continuity](continuity/) | Prompt Ready | ✅ | Continuation packet announce |
 | [CC-Packets](cc-packets/) | Prompt Ready | ✅ | Claude Code packet exchange |
 | [Distill](distill/) | **Ready** | ✅ | Conversation → knowledge pipeline (full) |
-| [Reminders](reminders/) | Planned | — | Scheduled reminders |
-| [Web Search](web-search/) | Planned | — | Web search integration |
+| [Reminders](reminders/) | Partial | ✅ | Scheduled reminders |
+| [Web Search](web-search/) | Partial | ✅ | Web search integration |
 | Calendar | Planned | — | Apple Calendar integration |
 
 **Status key:**
 - **Ready** — Full setup.sh, validate.sh, prompts, and working code
 - **Prompt Ready** — Prompt snippet extracted, setup TBD
+- **Partial** — Some pieces (snippet or tools) but not complete
 - **Planned** — README only
 
 ## How Components Work
@@ -61,6 +62,9 @@ Snippets are assembled into final prompts by the prompt assembly system. See `te
 # Or use the /component skill
 /component setup signal
 /component validate signal
+
+# Validate all components
+./tools/validate-components.sh
 ```
 
 ## Creating New Components
@@ -98,6 +102,23 @@ components/
         └── AGENTS.snippet.md
 ```
 
+## Component Tools
+
+Some components include executable tools in `tools/` directories. These are automatically synced to the bot's `~/clawd/tools/` during `/push`:
+
+```bash
+# Sync all component tools
+./tools/push.sh --tools-only
+
+# Or as part of regular push (content + tools)
+./tools/push.sh
+```
+
+Components with tools:
+- `voice/tools/` — TTS, transcription, voice status
+- `web-search/tools/` — Web search wrapper, container management
+- `reminders/tools/` — Reminder cleanup utilities
+
 ## Notes
 
 - Components are optional — base bot works without them
@@ -105,3 +126,4 @@ components/
 - Setup scripts are idempotent — safe to re-run
 - Components may require additional software on the remote machine
 - Prompt snippets are assembled by `/sync` into final prompts
+- Component tools are synced by `/push` with executable permissions

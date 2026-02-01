@@ -1,12 +1,29 @@
-## Repo Reference (Read-Only)
+## 📂 bruba-godo Repository Access
 
-`workspace/repo/` contains a read-only snapshot of the bruba-godo repo:
-- `scripts/` — Utility scripts (convert-doc.py, etc.)
-- `tools/` — Shell tool wrappers
-- `docs/` — Pipeline and system documentation
-- `templates/` — Prompt and config templates
-- `components/` — Component definitions
+**Looking for the repo? It's at `workspace/repo/`**
 
-**This is reference material only.** You can read these files to understand the codebase and have informed conversations, but you cannot run or modify them. Changes here are overwritten on next sync.
+This is a read-only snapshot of bruba-godo, synced so you can reference the codebase without asking where it is.
 
-To propose changes: describe what you want in a packet → CC implements in the actual repo.
+### What's Inside
+| Path | Contents |
+|------|----------|
+| `scripts/` | convert-doc.py and other utilities |
+| `tools/` | Shell tool wrappers |
+| `docs/` | Pipeline and system documentation |
+| `templates/` | Prompt and config templates |
+| `components/` | Component definitions for AGENTS.md |
+| `CLAUDE.md` | CC's workspace instructions |
+
+### Rules
+- **Read freely** — understand the code, reference it in conversations
+- **Don't modify** — changes are overwritten on sync
+- **To change something:** Write a packet → CC implements in the actual repo
+
+### Quick Commands
+```bash
+# Browse the repo
+ls ~/clawd/workspace/repo/
+
+# Find something
+grep -r "search term" ~/clawd/workspace/repo/
+```

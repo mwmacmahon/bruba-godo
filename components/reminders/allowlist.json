@@ -1,0 +1,5 @@
+{
+  "entries": [
+    {"pattern": "${WORKSPACE}/tools/cleanup-reminders.sh", "id": "cleanup-reminders"}
+  ]
+}

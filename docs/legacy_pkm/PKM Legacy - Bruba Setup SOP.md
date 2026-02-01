@@ -165,7 +165,7 @@ clawdbot onboard --install-daemon
 | Prompt | Answer |
 |--------|--------|
 | Auth method | Anthropic token (Claude Code CLI) |
-| Default model | anthropic/claude-opus-4-5-20250514 |
+| Default model | anthropic/claude-opus-4-5 |
 | Gateway bind | Loopback (127.0.0.1) |
 | Channel | Telegram (Bot API) |
 | DM policy | Pairing (recommended) |

@@ -107,8 +107,8 @@ def _generate_summary(content: str, metadata: dict, config: dict) -> str:
 
     # Map friendly names to model IDs
     model_map = {
-        'claude-sonnet': 'claude-sonnet-4-20250514',
-        'claude-haiku': 'claude-3-5-haiku-latest',
+        'claude-sonnet': 'claude-sonnet-4-5',
+        'claude-haiku': 'claude-haiku-4-5',
     }
     model_id = model_map.get(model, model)
 

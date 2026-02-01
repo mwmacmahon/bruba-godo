@@ -1,6 +1,6 @@
 # Web Search Component
 
-**Status:** Active
+**Status:** Partial
 
 Provides web search capability through a sandboxed sub-agent architecture. The main agent cannot access web tools directly; instead it invokes a restricted `web-reader` agent that runs in a Docker sandbox.
 
@@ -92,11 +92,13 @@ Use cases:
 
 ## Setup
 
-1. Copy scripts to bot:
+1. Sync scripts to bot:
    ```bash
-   # Currently manual - component tool sync not yet implemented
-   scp components/web-search/tools/*.sh bruba:~/clawd/tools/
-   ssh bruba 'chmod +x ~/clawd/tools/web-search.sh ~/clawd/tools/ensure-web-reader.sh'
+   # Sync all component tools (including web-search)
+   ./tools/push.sh --tools-only
+
+   # Or as part of regular push
+   ./tools/push.sh
    ```
 
 2. Add to exec-approvals on bot:
@@ -119,8 +121,14 @@ From the main agent, web searches are triggered via:
 
 The script returns JSON with the reader's response.
 
-## TODO
+## Notes
 
-- [ ] Component tool sync in `/push` (copy `components/*/tools/` to bot)
-- [ ] AGENTS.snippet.md for web search instructions
-- [ ] validate.sh for checking Docker/agent config
+**What exists:**
+- `prompts/AGENTS.snippet.md` — Web search instructions for the bot
+- `tools/web-search.sh` — Wrapper script for web reader agent
+- `tools/ensure-web-reader.sh` — Container management script
+- `allowlist.json` — Exec-approvals entries
+
+**TODO:**
+- `setup.sh` — Interactive setup script
+- `validate.sh` — Docker/agent config validation
