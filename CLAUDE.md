@@ -33,8 +33,7 @@ Bot Skills:
 
 ```
 bruba-godo/
-├── config.yaml.example      # Bot connection settings template
-├── exports.yaml             # Export definitions for content sync
+├── config.yaml.example      # Bot settings + export definitions template
 ├── tools/
 │   ├── bot                  # SSH wrapper
 │   ├── lib.sh               # Shared functions
@@ -59,8 +58,7 @@ bruba-godo/
 │   ├── distill/             # Conversation → knowledge pipeline
 │   └── ...                  # Other components
 ├── user/                    # USER CUSTOMIZATIONS (gitignored)
-│   ├── prompts/             # Personal prompt additions
-│   └── exports.yaml         # Personal export profiles
+│   └── prompts/             # Personal prompt additions
 ├── mirror/                  # BOT STATE (gitignored)
 │   └── prompts/             # Current bot prompts
 ├── sessions/                # RAW SESSIONS (gitignored)
@@ -104,11 +102,11 @@ local:
   intake: intake
   reference: reference
   exports: exports
-```
 
-Export definitions in `exports.yaml`:
+# Copy repo code to bot workspace during push
+clone_repo_code: false
 
-```yaml
+# Export definitions (profiles for content filtering/syncing)
 exports:
   bot:
     description: "Content synced to bot memory"
@@ -119,6 +117,10 @@ exports:
     exclude:
       sensitivity: [sensitive, restricted]
     redaction: [names, health]
+    agents_sections:
+      - header
+      - http-api
+      # ... section order for AGENTS.md assembly
 ```
 
 ## Bot Commands
@@ -173,31 +175,37 @@ Common paths (on bot machine):
 
 ## Prompt Assembly Pipeline
 
-Prompts are assembled from **config-driven section order**. The `agents_sections` list in `exports.yaml` (under the `bot` profile) defines exactly what sections appear and in what order.
+All prompt files (AGENTS.md, TOOLS.md, MEMORY.md, etc.) are assembled from **config-driven section order**. Each prompt file has a `{name}_sections` list in `config.yaml`.
 
 **Section types:**
-- `name` → component (`components/{name}/prompts/AGENTS.snippet.md`)
-- `name` → template section (`templates/prompts/sections/{name}.md`)
+- `base` → full template (`templates/prompts/{NAME}.md`)
+- `name` → component snippet (`components/{name}/prompts/{NAME}.snippet.md`)
+- `name` → template section (`templates/prompts/sections/{name}.md`) — AGENTS.md only
 - `bot:name` → bot-managed section (from mirror's `<!-- BOT-MANAGED: name -->`)
 
-**Example config (in exports.yaml):**
+**Example config (in config.yaml):**
 ```yaml
 exports:
   bot:
     agents_sections:
       - header              # template section
       - http-api            # component
-      - first-run           # template section
-      - session             # component
       - bot:exec-approvals  # bot-managed (preserved from remote)
-      - safety              # template section
       ...
+    tools_sections:
+      - base                # full template
+      - reminders           # component snippet
+    memory_sections:
+      - base
+    identity_sections:
+      - base
 ```
 
 **Run assembly:**
 ```bash
-./tools/assemble-prompts.sh
-./tools/assemble-prompts.sh --verbose  # show details
+./tools/assemble-prompts.sh              # assemble all prompt files
+./tools/assemble-prompts.sh --verbose    # show details
+./tools/assemble-prompts.sh --force      # skip conflict check
 ```
 
 **Section markers in output:**
@@ -210,6 +218,8 @@ exports:
 ...bot's content (preserved)...
 <!-- /BOT-MANAGED: exec-approvals -->
 ```
+
+**Conflict detection:** Run `./tools/detect-conflicts.sh` to check all prompt files for bot changes before pushing.
 
 See `templates/prompts/README.md` for full documentation, or use `/prompts` for help.
 
@@ -276,7 +286,7 @@ Full pipeline for processing conversations to bot memory:
 
 **Note:** `/export` scans all of `reference/` recursively. Files need YAML frontmatter with `scope` tags to be included.
 
-Export profiles in `exports.yaml` control filtering and redaction per destination.
+Export profiles in `config.yaml` control filtering and redaction per destination.
 
 ## Git Policy
 

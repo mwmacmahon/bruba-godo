@@ -21,6 +21,10 @@ The path to a file in `intake/` (without CONFIG). If omitted, show available fil
 
 ## Instructions
 
+**IMPORTANT: Context Isolation**
+
+This skill uses `scripts/convert-doc.py` for document analysis to prevent context bloat. The script makes isolated API calls — document content dies when the script exits. CC only sees the analysis results.
+
 ### 1. Select Target File
 
 If no file specified, list files in intake/ without CONFIG blocks:
@@ -40,20 +44,46 @@ Show a clickable link so the user can view the file:
    View: code intake/<session-id>.md
 ```
 
-### 3. Read and Analyze
+### 3. Analyze via Script
 
-Read the entire conversation. Analyze for:
+**DO NOT read the file directly.** Instead, call the conversion script:
 
-**To REMOVE from file (noise):**
-- Heartbeat interrupts (exec denials + `HEARTBEAT_OK` responses)
-- System error messages (gateway timeouts, etc.)
-- Other zero-value system cruft
+```bash
+python3 scripts/convert-doc.py intake/<file>.md "Analyze this conversation for CONFIG block generation.
 
-**To MARK in CONFIG (applied at export):**
-- **Metadata**: Title, date (from Signal timestamps), source, tags
-- **Sections to remove**: Debugging tangents, off-topic, failed attempts, walls of text, large code blocks
-- **Sensitivity terms**: Names, health info, personal details (by category)
-- **Sensitivity sections**: Longer passages with sensitive content
+Identify and report:
+
+1. NOISE TO DELETE (remove from file):
+   - Heartbeat interrupts (exec denials + HEARTBEAT_OK responses)
+   - System errors (gateway timeouts, etc.)
+   - Zero-value system cruft
+   Format: msg number, type, brief description
+
+2. SECTIONS TO REMOVE (mark in CONFIG):
+   - Debugging tangents, off-topic discussions
+   - Walls of text, large code blocks, pasted docs
+   - Failed attempts
+   Format: msg range, type, description (will be replacement text)
+
+3. SENSITIVITY:
+   - Terms by category: names, health, personal, financial
+   - Sections with sensitive content
+   Format: category → [terms] or msg range + tags
+
+4. METADATA:
+   - Suggested title
+   - Date (from timestamps)
+   - Source (bruba/claude-projects/claude-code/voice-memo)
+   - Tags
+
+5. ARTIFACTS:
+   - Large pasted content, code blocks, logs
+   Format: type, size, recommendation (remove/keep)
+
+Output as structured analysis table."
+```
+
+Parse the script output to extract findings.
 
 **Automatic (handled by canonicalize):**
 - Signal/Telegram wrappers (`[Signal Michael id:... 2026-01-28 ...]`) → stripped automatically
@@ -142,9 +172,31 @@ If user approved noise deletion, use Edit tool to **actually remove** those mess
 
 **This is the ONLY thing that gets removed from the file.** Everything else (sections_remove, sensitivity) is just marked in CONFIG — the content stays in the file.
 
-### 7. Generate CONFIG Block
+### 7. Generate CONFIG Block via Script
 
-Based on analysis + user decisions, generate the CONFIG block:
+After user approval of findings, call the script to generate the CONFIG block. Pass the approved decisions in the prompt:
+
+```bash
+python3 scripts/convert-doc.py intake/<file>.md "Generate CONFIG block with:
+- title: <approved>
+- date: <approved>
+- source: <approved>
+- tags: <approved>
+- sections_remove: <approved list with anchors>
+- sensitivity: <approved terms/sections>
+
+Use exact anchors from the document (5-50 words, unique).
+Output ONLY the CONFIG block in this format:
+
+=== EXPORT CONFIG ===
+title: ...
+description: ...
+slug: YYYY-MM-DD-topic-slug
+...
+=== END CONFIG ==="
+```
+
+Expected CONFIG format:
 
 ```yaml
 === EXPORT CONFIG ===
@@ -158,7 +210,7 @@ tags: [tag1, tag2]
 sections_remove:
   - start: "First 5-50 words of section start..."
     end: "First 5-50 words of section end..."
-    description: "Why removed OR replacement text like [Pasted documentation: topic]"
+    description: "Why removed OR replacement text"
 
 sensitivity:
   terms:
@@ -171,37 +223,35 @@ sensitivity:
 === END CONFIG ===
 ```
 
-### 8. Generate Summary (Backmatter)
+### 8. Generate Backmatter via Script
 
-Generate structured summary:
+Call the script to generate the summary backmatter:
 
-```markdown
+```bash
+python3 scripts/convert-doc.py intake/<file>.md "Generate BACKMATTER summary for this conversation.
+
+Output in this exact format:
+
 ---
 <!-- === BACKMATTER === -->
 
 ## Summary
-
 [2-4 sentences: What is this about? Current state?]
 
 ## What Was Discussed
-
-[Narrative arc of the conversation. Scale to substance.]
+[Narrative arc. Scale to substance.]
 
 ## Decisions Made
-
 - **[Decision]** — [Why]
 
 ## Outputs
-
 - [What was created/updated]
 
 ## Open Threads
-
-[Unresolved questions. Omit if none.]
+[Unresolved questions. Omit section if none.]
 
 ## Continuation Context
-
-[Context for future work on this topic]
+[Context for future work on this topic]"
 ```
 
 ### 9. Show Final CONFIG for Approval

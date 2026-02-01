@@ -16,7 +16,7 @@ Commands:
     parse-jsonl   Convert Clawdbot JSONL sessions to delimited markdown
     canonicalize  Convert delimited markdown (with CONFIG) to canonical format
     variants      Generate variants (transcript, summary) from canonical files
-    export        Generate filtered exports per exports.yaml profiles
+    export        Generate filtered exports per config.yaml profiles
     split         Split large files along message boundaries
     auto-config   Generate minimal CONFIG block for files without one
     parse         Debug: show parsed CONFIG block from a file
@@ -267,8 +267,8 @@ def cmd_export(args):
         print("Install with: pip install pyyaml")
         sys.exit(1)
 
-    # Find exports.yaml
-    exports_path = Path(args.config) if args.config else Path('exports.yaml')
+    # Find config.yaml (exports section)
+    exports_path = Path(args.config) if args.config else Path('config.yaml')
     if not exports_path.exists():
         print(f"Error: {exports_path} not found")
         sys.exit(1)
@@ -787,7 +787,7 @@ def main():
     # export command
     export_parser = subparsers.add_parser(
         'export',
-        help='Generate filtered exports per exports.yaml profiles'
+        help='Generate filtered exports per config.yaml profiles'
     )
     export_parser.add_argument(
         '--profile', '-p',
@@ -799,7 +799,7 @@ def main():
     )
     export_parser.add_argument(
         '--config', '-c',
-        help='Path to exports.yaml (default: exports.yaml)'
+        help='Path to config.yaml (default: config.yaml)'
     )
     export_parser.set_defaults(func=cmd_export)
 

@@ -18,3 +18,75 @@ local:
   intake: intake
   reference: reference
   exports: exports
+
+# Copy repo code (scripts, docs, prompts) to bot workspace during push
+# Read-only reference - bot can read to understand codebase, not execute
+clone_repo_code: false
+
+# Export definitions
+# Defines how content is filtered and synced to destinations
+exports:
+  bot:
+    description: "Content synced to bot memory"
+    output_dir: exports/bot
+    remote_path: memory
+    include:
+      scope: [meta, reference, transcripts]
+      type: [prompt, doc, refdoc, claude_code_log]
+    exclude:
+      sensitivity: [sensitive, restricted]
+    redaction: [names, health]
+    # Section order for prompt file assembly
+    # - base → include full template (templates/prompts/{NAME}.md)
+    # - name → component (components/{name}/prompts/{NAME}.snippet.md)
+    # - name → template section (templates/prompts/sections/{name}.md)
+    # - bot:name → bot-managed section (preserved from mirror)
+    agents_sections:
+      - header
+      - http-api
+      - first-run
+      - session
+      - continuity
+      - memory
+      - distill
+      - safety
+      - bot:exec-approvals
+      - cc-packets
+      - external-internal
+      - workspace
+      - repo-reference
+      - group-chats
+      - tools
+      - voice
+      - heartbeats
+      - signal
+      - make-it-yours
+
+    # TOOLS.md assembly
+    tools_sections:
+      - base              # templates/prompts/TOOLS.md
+      # - reminders       # components/reminders/prompts/TOOLS.snippet.md (if enabled)
+
+    # HEARTBEAT.md assembly
+    heartbeat_sections:
+      - base
+
+    # Note: USER.md, IDENTITY.md, SOUL.md, MEMORY.md, BOOTSTRAP.md are NOT assembled
+    # They are managed directly by the bot and not overwritten during sync
+
+  claude:
+    description: "Prompts for Claude Projects / Claude Code"
+    output_dir: exports/claude
+    include:
+      type: [prompt, doc, refdoc]
+      scope: [meta, reference, transcripts]
+
+  tests:
+    description: "Local testing profile"
+    output_dir: exports/tests
+    include:
+      type: [prompt]
+      scope: [meta, reference, transcripts]
+
+defaults:
+  redaction: []

@@ -33,6 +33,7 @@ tests/
 ├── run_tests.py                    # Test runner (works without pytest)
 ├── test_variants.py                # Variant generation tests (24 tests)
 ├── test_export.py                  # Export pipeline tests (18 tests)
+├── test_convert_doc.py             # convert-doc.py script tests (11 tests)
 ├── test_detect_conflicts.sh        # Conflict detection tests (18 tests)
 ├── test-export-prompts.sh          # Profile targeting tests (38 tests)
 ├── test-prompt-assembly.sh         # Prompt assembly tests (13 tests)
@@ -58,8 +59,9 @@ tests/
 |--------|-------|-------------|
 | `test_variants.py` | 24 | Variant generation from canonical files |
 | `test_export.py` | 18 | Export pipeline routing and frontmatter preservation |
+| `test_convert_doc.py` | 15 | Isolated document conversion script |
 
-**Total Python tests: 42**
+**Total Python tests: 57**
 
 #### What's Tested in `test_variants.py`
 
@@ -78,6 +80,31 @@ tests/
 - **Frontmatter preservation** - Type/scope preserved in variant output
 - **Footer handling** - "End of Transcript" only for transcript types
 
+#### What's Tested in `test_convert_doc.py`
+
+Tests for `scripts/convert-doc.py`, an isolated LLM document conversion script.
+
+**CLI tests (5):**
+- **Usage message** - Shows usage when no file argument provided
+- **API key required** - Errors when `ANTHROPIC_API_KEY` not set
+- **File validation** - Errors for nonexistent files
+- **Help flag** - `--help` shows usage and model options
+- **Invalid model** - Rejects invalid model choices
+
+**Unit tests (7):**
+- **Script structure** - Shebang, imports, main function, messages.create
+- **Environment config** - Uses `ANTHROPIC_API_KEY` from environment
+- **Prompt formatting** - Prompt + content combined with separator
+- **Default prompt** - Fallback when no prompt argument given
+- **Token limits** - Reasonable max_tokens setting (8192)
+- **Model flag structure** - Has MODELS dict with opus/sonnet/haiku, default opus
+- **Model IDs** - Valid Claude model identifiers
+
+**Integration tests (3, require `ANTHROPIC_API_KEY`):**
+- **Basic API call** - Simple conversion works end-to-end
+- **Multi-invocation workflow** - Exploratory → initial config → refined config
+- **Stateless behavior** - Different prompts on same file produce different outputs
+
 #### What's Tested in `test_detect_conflicts.sh`
 
 - **No conflicts** - Clean state when mirror matches config
@@ -95,12 +122,12 @@ tests/
 | `test-prompt-assembly.sh` | 13 | Prompt assembly from templates + components |
 | `test-e2e-pipeline.sh` | 10 | Full content pipeline: intake → reference → exports |
 
-**Total tests: 121** (42 Python + 79 Shell)
+**Total tests: 136** (57 Python + 79 Shell)
 
 #### What's Tested in `test-export-prompts.sh`
 
 - **Prompt file existence** - Export.md, Transcription.md (Export-Claude.md merged)
-- **exports.yaml profiles** - bot, claude, tests profiles defined
+- **config.yaml exports profiles** - bot, claude, tests profiles defined
 - **Unified prompts** - Single Export.md with conditional file access behavior
 - **Subdirectory structure** - Prompts go to exports/{profile}/prompts/
 - **Frontmatter preservation** - YAML frontmatter retained in exports

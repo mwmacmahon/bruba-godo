@@ -58,19 +58,3 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 ## Add Your Tools Here
 
 *(Document your specific tools, paths, and configurations below)*
-
-### Example: Reminders
-```
-**Binary:** /opt/homebrew/bin/remindctl (if installed)
-```
-
-### Example: Calendar
-```
-**Binary:** /opt/homebrew/bin/icalBuddy (if installed)
-```
-
-### Example: Voice Tools
-```
-**Location:** ~/clawd/tools/
-(Add paths to TTS/STT scripts if configured)
-```

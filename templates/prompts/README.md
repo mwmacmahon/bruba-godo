@@ -1,15 +1,15 @@
 # Prompt Assembly System
 
-This document explains how bot prompts (like AGENTS.md) are assembled from modular sections.
+This document explains how bot prompts are assembled from modular sections.
 
 ## Overview
 
-The prompt assembly system uses **config-driven section ordering**:
+All prompt files (AGENTS.md, TOOLS.md, MEMORY.md, etc.) are assembled using **config-driven section ordering**:
 
-- **Config defines order** — `config.yaml` lists sections in the exact order they appear
-- **Three section types** — components, template sections, and bot-managed
+- **Config defines order** — `config.yaml` lists sections per file (`agents_sections`, `tools_sections`, etc.)
+- **Four section types** — base templates, components, template sections, and bot-managed
 - **Bot sections preserve position** — bot's own additions stay where they belong
-- **Conflict detection** — automatically detects when bot adds/edits content
+- **Conflict detection** — automatically detects when bot adds/edits content in any prompt file
 
 ## Quick Start
 
@@ -28,42 +28,56 @@ The prompt assembly system uses **config-driven section ordering**:
 
 | Type | Prefix | Source | Who Controls |
 |------|--------|--------|--------------|
-| Component | (none) | `components/{name}/prompts/AGENTS.snippet.md` | Operator |
-| Template section | (none) | `templates/prompts/sections/{name}.md` | Operator |
+| Base template | `base` | `templates/prompts/{NAME}.md` | Operator |
+| Component | (none) | `components/{name}/prompts/{NAME}.snippet.md` | Operator |
+| Template section | (none) | `templates/prompts/sections/{name}.md` (AGENTS.md only) | Operator |
 | Bot-managed | `bot:` | Mirror's `<!-- BOT-MANAGED: name -->` blocks | Bot |
 
 ### Resolution Order
 
-For each entry in `agents_sections`, the assembler checks:
+For each entry in a `*_sections` list, the assembler checks:
 
-1. **`bot:name`** → Extract from mirror's BOT-MANAGED sections
-2. **Component** → `components/{name}/prompts/AGENTS.snippet.md`
-3. **Template section** → `templates/prompts/sections/{name}.md`
-4. **Error** if not found
+1. **`base`** → Include full template (`templates/prompts/{NAME}.md`)
+2. **`bot:name`** → Extract from mirror's BOT-MANAGED sections
+3. **Component** → `components/{name}/prompts/{NAME}.snippet.md`
+4. **Template section** → `templates/prompts/sections/{name}.md` (AGENTS.md only)
+5. **Error** if not found
 
 ## Config Structure
 
 ```yaml
-# exports.yaml (under bot profile)
-agents_sections:
-  - header                # Template section (title + intro)
-  - http-api              # Component (Message Triggers, HTTP API)
-  - first-run             # Template section
-  - session               # Component (Every Session, Greeting)
-  - continuity            # Component
-  - memory                # Component
-  - distill               # Component (PKM resources)
-  - safety                # Template section
-  - bot:exec-approvals    # Bot-managed (preserved from remote)
-  - cc-packets            # Component (Claude Code packet exchange)
-  - external-internal     # Template section
-  - workspace             # Component
-  - group-chats           # Component
-  - tools                 # Template section
-  - voice                 # Component
-  - heartbeats            # Component
-  - signal                # Component
-  - make-it-yours         # Template section
+# config.yaml (under exports.bot)
+exports:
+  bot:
+    # AGENTS.md - complex, many sections
+    agents_sections:
+      - header                # Template section
+      - http-api              # Component
+      - session               # Component
+      - bot:exec-approvals    # Bot-managed
+      - voice                 # Component
+      - make-it-yours         # Template section
+
+    # TOOLS.md - base template + components
+    tools_sections:
+      - base                  # Full template
+      - reminders             # Component snippet
+
+    # MEMORY.md - base only (bot can add sections)
+    memory_sections:
+      - base
+
+    # Other prompt files - base only for now
+    identity_sections:
+      - base
+    soul_sections:
+      - base
+    user_sections:
+      - base
+    bootstrap_sections:
+      - base
+    heartbeat_sections:
+      - base
 ```
 
 ## File Structure
@@ -72,31 +86,35 @@ agents_sections:
 bruba-godo/
 ├── config.yaml                              # Section order defined here
 ├── templates/prompts/
-│   ├── sections/                            # Template sections
+│   ├── AGENTS.md                            # Not used directly (assembled from sections)
+│   ├── TOOLS.md                             # Base template for TOOLS.md
+│   ├── MEMORY.md                            # Base template for MEMORY.md
+│   ├── IDENTITY.md, SOUL.md, etc.           # Base templates for other files
+│   ├── sections/                            # Template sections (AGENTS.md only)
 │   │   ├── header.md
 │   │   ├── first-run.md
-│   │   ├── safety.md
-│   │   ├── external-internal.md
-│   │   ├── tools.md
-│   │   └── make-it-yours.md
+│   │   └── ...
 │   └── README.md                            # This file
 ├── components/
-│   ├── session/prompts/AGENTS.snippet.md
-│   ├── memory/prompts/AGENTS.snippet.md
-│   ├── heartbeats/prompts/AGENTS.snippet.md
-│   ├── group-chats/prompts/AGENTS.snippet.md
-│   ├── workspace/prompts/AGENTS.snippet.md
-│   ├── voice/prompts/AGENTS.snippet.md
-│   ├── http-api/prompts/AGENTS.snippet.md
-│   ├── distill/prompts/AGENTS.snippet.md
-│   ├── continuity/prompts/AGENTS.snippet.md
-│   ├── cc-packets/prompts/AGENTS.snippet.md
-│   └── signal/prompts/AGENTS.snippet.md
-├── mirror/prompts/AGENTS.md                 # Remote state (has BOT-MANAGED sections)
-├── exports/bot/core-prompts/AGENTS.md       # Assembled output
+│   ├── session/prompts/
+│   │   └── AGENTS.snippet.md                # AGENTS.md section
+│   ├── reminders/prompts/
+│   │   └── TOOLS.snippet.md                 # TOOLS.md section
+│   ├── voice/prompts/
+│   │   ├── AGENTS.snippet.md                # Voice section in AGENTS.md
+│   │   └── TOOLS.snippet.md                 # Voice tool config (if needed)
+│   └── ...
+├── mirror/prompts/
+│   ├── AGENTS.md                            # Remote state
+│   ├── TOOLS.md                             # Remote state
+│   └── ...
+├── exports/bot/core-prompts/
+│   ├── AGENTS.md                            # Assembled output
+│   ├── TOOLS.md                             # Assembled output
+│   └── ...
 └── tools/
-    ├── assemble-prompts.sh                  # Build assembled from config
-    └── detect-conflicts.sh                  # Find new bot sections / edits
+    ├── assemble-prompts.sh                  # Build all prompt files
+    └── detect-conflicts.sh                  # Check all files for conflicts
 ```
 
 ## Assembly Process

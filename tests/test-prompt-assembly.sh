@@ -136,15 +136,15 @@ test_bot_section_simulation() {
 
     MIRROR_FILE="mirror/prompts/AGENTS.md"
     BACKUP_FILE="mirror/prompts/AGENTS.md.test-backup"
-    EXPORTS_BACKUP="exports.yaml.test-backup"
+    EXPORTS_BACKUP="config.yaml.test-backup"
 
     # Backup files
     cp "$MIRROR_FILE" "$BACKUP_FILE"
-    cp exports.yaml "$EXPORTS_BACKUP"
+    cp config.yaml "$EXPORTS_BACKUP"
 
     cleanup() {
         mv "$BACKUP_FILE" "$MIRROR_FILE" 2>/dev/null || true
-        mv "$EXPORTS_BACKUP" exports.yaml 2>/dev/null || true
+        mv "$EXPORTS_BACKUP" config.yaml 2>/dev/null || true
     }
     trap cleanup EXIT
 
@@ -162,9 +162,9 @@ test_bot_section_simulation() {
         return 1
     fi
 
-    # 3c: Add to exports.yaml agents_sections (under bot profile)
-    sed -i.bak 's/- heartbeats/- heartbeats\n      - bot:test-section/' exports.yaml
-    rm -f exports.yaml.bak
+    # 3c: Add to config.yaml agents_sections (under bot profile)
+    sed -i.bak 's/- heartbeats/- heartbeats\n      - bot:test-section/' config.yaml
+    rm -f config.yaml.bak
 
     # 3d: Re-assemble
     output=$(./tools/assemble-prompts.sh 2>&1)

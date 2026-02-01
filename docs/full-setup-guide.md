@@ -586,6 +586,81 @@ For security isolation, you may want multiple agents with different permission p
 - Reader runs sandboxed in Docker
 - Agents communicate via `sessions_send` or exec wrappers
 
+### Web Reader Auto-Start
+
+The web-reader runs in a Docker sandbox that stops when idle. To ensure it's available on login:
+
+**1. Create startup script:**
+```bash
+cat > ~/clawd/tools/ensure-web-reader.sh << "EOF"
+#!/bin/bash
+# Ensure web-reader sandbox is running
+
+READER_STATUS=$(clawdbot sandbox list 2>&1 | grep -A3 "web-reader")
+
+if echo "$READER_STATUS" | grep -q "running"; then
+    echo "web-reader: already running"
+    exit 0
+fi
+
+echo "web-reader: starting..."
+RESULT=$(clawdbot agent --agent web-reader -m "ping" --local --json 2>&1)
+
+if echo "$RESULT" | grep -q "payloads"; then
+    echo "web-reader: started successfully"
+    exit 0
+else
+    echo "web-reader: failed to start"
+    echo "$RESULT"
+    exit 1
+fi
+EOF
+chmod +x ~/clawd/tools/ensure-web-reader.sh
+```
+
+**2. Create launchd plist for auto-start:**
+```bash
+cat > ~/Library/LaunchAgents/com.bruba.web-reader.plist << "EOF"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.bruba.web-reader</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/bruba/clawd/tools/ensure-web-reader.sh</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/bruba/.clawdbot/logs/web-reader-launch.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/bruba/.clawdbot/logs/web-reader-launch.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/bruba/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>
+EOF
+
+# Load the agent
+launchctl load ~/Library/LaunchAgents/com.bruba.web-reader.plist
+```
+
+**3. Verify:**
+```bash
+launchctl list | grep web-reader
+# Should show: -    0    com.bruba.web-reader
+
+clawdbot sandbox list
+# Should show web-reader as running
+```
+
+**Note:** Docker Desktop must also be configured to start at login (Docker Desktop → Settings → General → "Start Docker Desktop when you sign in").
+
 ### Migration from Single to Multi-Agent
 
 | Setting | Single-Agent | Multi-Agent |
@@ -703,6 +778,7 @@ Working shell config for the bot account:
 export PATH="$HOME/.npm-global/bin:$PATH"    # npm globals (clawdbot)
 export PATH="/opt/homebrew/bin:$PATH"         # Homebrew
 export PATH="$HOME/.local/bin:$PATH"          # Local binaries
+export PATH="/usr/local/bin:$PATH"            # System binaries (Docker CLI symlink)
 ```
 
 **~/.zshenv:**

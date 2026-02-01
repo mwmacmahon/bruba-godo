@@ -43,6 +43,10 @@ load_config() {
     REFERENCE_DIR="$ROOT_DIR/${LOCAL_REFERENCE:-reference}"
     EXPORTS_DIR="$ROOT_DIR/${LOCAL_EXPORTS:-exports}"
 
+    # Clone repo code option (default: false)
+    CLONE_REPO_CODE=$(grep "^clone_repo_code:" "$config_file" | awk '{print $2}' | tr -d '"')
+    CLONE_REPO_CODE="${CLONE_REPO_CODE:-false}"
+
     # Derived remote paths
     REMOTE_SESSIONS="$REMOTE_CLAWDBOT/agents/$REMOTE_AGENT_ID/sessions"
 }

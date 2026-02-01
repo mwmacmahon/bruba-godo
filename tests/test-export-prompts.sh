@@ -5,7 +5,7 @@
 # 1. Prompt files exist in components/distill/prompts/
 # 2. Export CLI can scan and process prompts
 # 3. Prompts get renamed correctly (Export.md → Prompt - Export.md)
-# 4. exports.yaml has correct profiles
+# 4. config.yaml has correct profiles
 #
 # Run from repo root: ./tests/test-export-prompts.sh
 
@@ -70,22 +70,22 @@ fi
 
 echo ""
 
-# Test 2: Check exports.yaml profiles
-echo "--- Test 2: exports.yaml Profiles ---"
+# Test 2: Check config.yaml profiles
+echo "--- Test 2: config.yaml Profiles ---"
 
-if grep -q "^  bot:" exports.yaml; then
+if grep -q "^  bot:" config.yaml; then
     pass "bot profile exists"
 else
-    fail "bot profile not found in exports.yaml"
+    fail "bot profile not found in config.yaml"
 fi
 
-if grep -q "^  claude:" exports.yaml; then
+if grep -q "^  claude:" config.yaml; then
     pass "claude profile exists"
 else
-    fail "claude profile not found in exports.yaml"
+    fail "claude profile not found in config.yaml"
 fi
 
-if grep -q "type: \[prompt\]" exports.yaml; then
+if grep -q "type: \[prompt\]" config.yaml; then
     pass "type: [prompt] filter exists"
 else
     warn "type: [prompt] filter not found (may need to add)"

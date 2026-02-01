@@ -7,7 +7,7 @@
 #   ./tools/push.sh --verbose    # Detailed output
 #   ./tools/push.sh --no-index   # Skip memory reindex
 #
-# Reads exports.yaml for filter configuration, syncs exports/bot/ to bot's memory/
+# Reads config.yaml for filter configuration, syncs exports/bot/ to bot's memory/
 #
 # IMPORTANT: This script ADDS files to bot memory. It does NOT delete existing files.
 # To sync with deletion, use rsync --delete manually with the full content set.
@@ -59,10 +59,10 @@ rotate_log "$LOG_FILE"
 
 log "=== Pushing Content to Bot ==="
 
-# Read remote_path from exports.yaml for bot profile
+# Read remote_path from config.yaml for bot profile
 REMOTE_PATH=$(python3 -c "
 import yaml
-with open('$ROOT_DIR/exports.yaml') as f:
+with open('$ROOT_DIR/config.yaml') as f:
     config = yaml.safe_load(f)
     path = config.get('exports', {}).get('bot', {}).get('remote_path', 'memory')
     print(path if path else 'memory')
@@ -158,6 +158,48 @@ if [[ "$ROOT_FILES" -gt 0 ]]; then
         log "  Synced $ROOT_FILES root files"
     fi
     TOTAL_SYNCED=$((TOTAL_SYNCED + ROOT_FILES))
+fi
+
+# 4. Sync repo code if enabled
+if [[ "$CLONE_REPO_CODE" == "true" ]]; then
+    log "Syncing repo code to $SSH_HOST:$REMOTE_WORKSPACE/workspace/repo/"
+
+    REPO_RSYNC_OPTS="-avz --delete"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        REPO_RSYNC_OPTS="$REPO_RSYNC_OPTS --dry-run"
+    fi
+    if [[ "$VERBOSE" != "true" ]]; then
+        REPO_RSYNC_OPTS="$REPO_RSYNC_OPTS --quiet"
+    fi
+
+    # Include only specific directories/files, exclude ephemeral content
+    rsync $REPO_RSYNC_OPTS \
+        --exclude='intake/' \
+        --exclude='exports/' \
+        --exclude='bundles/' \
+        --exclude='.git/' \
+        --exclude='__pycache__/' \
+        --exclude='*.pyc' \
+        --exclude='node_modules/' \
+        --exclude='mirror/' \
+        --exclude='sessions/' \
+        --exclude='logs/' \
+        --exclude='reference/' \
+        --exclude='user/' \
+        --include='scripts/***' \
+        --include='docs/***' \
+        --include='templates/***' \
+        --include='components/***' \
+        --include='tools/***' \
+        --include='README.md' \
+        --include='CLAUDE.md' \
+        --exclude='*' \
+        "$ROOT_DIR/" "$SSH_HOST:$REMOTE_WORKSPACE/workspace/repo/"
+
+    if [[ "$DRY_RUN" != "true" ]]; then
+        CODE_COUNT=$(find "$ROOT_DIR/scripts" "$ROOT_DIR/docs" "$ROOT_DIR/tools" -type f 2>/dev/null | wc -l | tr -d ' ')
+        log "  Synced ~$CODE_COUNT repo files"
+    fi
 fi
 
 # Trigger reindex if not dry run

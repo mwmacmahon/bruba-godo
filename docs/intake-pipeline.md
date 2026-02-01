@@ -54,6 +54,13 @@ Sure, I can help with that.
 
 Use `/convert <file>` for AI-assisted CONFIG block generation.
 
+**Context Isolation:** The `/convert` skill uses `scripts/convert-doc.py` for document analysis. This prevents CC context bloat when processing multiple documents — the script makes isolated API calls, and document content dies when the script exits.
+
+```bash
+# Underlying script (called by /convert)
+python3 scripts/convert-doc.py intake/file.md "Analyze for CONFIG" --model opus
+```
+
 **`/convert` does TWO things:**
 
 1. **REMOVES noise from the file:**

@@ -41,6 +41,7 @@ The **canonical file keeps all content** except noise. CONFIG just marks what to
 
 - Python 3.8+
 - PyYAML (`pip install pyyaml`)
+- Anthropic SDK (`pip install anthropic`) — for `/convert` skill
 
 ## Usage
 
@@ -53,6 +54,23 @@ The **canonical file keeps all content** except noise. CONFIG just marks what to
 /export            # Generate filtered exports per exports.yaml profiles
 /push              # Push exports to bot memory
 ```
+
+### Context Isolation Script
+
+The `/convert` skill uses `scripts/convert-doc.py` for document analysis to prevent CC context bloat:
+
+```bash
+# Analyze document (isolated API call)
+python3 scripts/convert-doc.py intake/file.md "Analyze for CONFIG generation"
+
+# With model selection (default: opus)
+python3 scripts/convert-doc.py intake/file.md "Generate summary" --model sonnet
+python3 scripts/convert-doc.py intake/file.md "Quick analysis" -m haiku
+```
+
+**Why?** When CC reads documents directly, the content stays in context. For multi-document processing, this causes bloat. The script makes isolated API calls — content dies when the script exits, CC only sees the result.
+
+**Models:** opus (default), sonnet, haiku
 
 ### CLI Commands
 

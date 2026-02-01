@@ -77,9 +77,8 @@ local:
   mirror: mirror
 EOF
 
-    # Create minimal exports.yaml with agents_sections
-    cat > "$TEMP_DIR/exports.yaml" << 'EOF'
-version: 1
+    # Add agents_sections to config.yaml
+    cat >> "$TEMP_DIR/config.yaml" << 'EOF'
 exports:
   bot:
     agents_sections:
