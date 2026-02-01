@@ -22,6 +22,7 @@ Consolidated troubleshooting reference for common issues. For setup procedures, 
 | "Cannot connect" | SSH config issue | Check `~/.ssh/config` |
 | Memory tools not appearing | Plugin not enabled | Add `group:memory` to `tools.sandbox.tools.allow` |
 | Non-interactive SSH fails | .zshrc not loaded | Create `~/.zshenv` sourcing `~/.zshrc` |
+| Tailscale serve won't connect | Wrong account | Run `tailscale serve` on bot account, not admin |
 
 ---
 
@@ -269,28 +270,64 @@ clawdbot memory index --verbose
 
 ## HTTP API Issues
 
+### Tailscale Serve Setup
+
+**Critical insight:** Each macOS user account has its own isolated localhost. `tailscale serve` must run under the **same account** as the gateway.
+
+**Wrong:**
+```bash
+# On admin user (dadbook) — DOESN'T WORK
+tailscale serve --bg 18789
+# This proxies to dadbook's localhost, but gateway is on bruba's localhost
+```
+
+**Correct:**
+```bash
+# On bot account (bruba) — same account as gateway
+ssh bruba 'tailscale serve --bg 18789'
+```
+
+**Architecture:**
+```
+Phone → Tailscale HTTPS → tailscale serve (bruba account)
+                                    ↓
+                          http://127.0.0.1:18789
+                                    ↓
+                          clawdbot gateway (bruba account)
+```
+
+**Gateway config stays on loopback** — don't change `bind: "loopback"` to `tailnet` or `all`. Let tailscale serve handle external access while gateway stays locked to localhost.
+
+**Endpoint:** `https://dadmini.tail042aa8.ts.net/v1/chat/completions`
+
+**To verify:**
+```bash
+ssh bruba 'tailscale serve status'
+```
+
+**To tear down:**
+```bash
+ssh bruba 'tailscale serve --https=443 off'
+```
+
 ### WebChat Won't Connect
 
 **Symptom:** `disconnected (1008): control ui requires HTTPS or localhost (secure context)`
 
 **Cause:** WebChat requires a secure context (HTTPS or localhost). LAN bind mode doesn't work.
 
-**Fix:** Use Tailscale serve:
-```bash
-# On main user (not bot account)
-tailscale serve --bg 18789
-
-# Access via Tailscale URL
+**Fix:** Use Tailscale serve (see above), then access via:
+```
 https://your-machine.tail042aa8.ts.net/chat?session=main
 ```
 
-### Gateway Bind Issues
+### Gateway Bind Options
 
 **Problem:** Gateway bound to loopback (127.0.0.1) is unreachable from phone
 
 **Don't do:** Change `bind: "loopback"` to `bind: "all"` — exposes endpoint to entire LAN
 
-**Do:** Keep gateway on loopback, use Tailscale's HTTPS proxy
+**Do:** Keep gateway on loopback, use Tailscale serve for external access
 
 **Security properties:**
 - Gateway only listens on 127.0.0.1 (not exposed to LAN)
@@ -485,4 +522,5 @@ Response depends on ownership model:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.1 | 2026-02-01 | Fixed Tailscale serve docs — must run on bot account due to localhost isolation |
 | 1.0.0 | 2026-02-01 | Initial version (consolidated from legacy PKM docs) |
