@@ -10,9 +10,8 @@ Running an AI agent with tool access is powerful but risky. bruba-godo provides 
 
 - **Sandboxed execution** — Bot runs on a separate machine with limited permissions. You manage it remotely via SSH from your more trusted operator machine.
 - **Controlled tool promotion** — Let your bot build its own tools, but you review and approve before they get promoted to the allowlist.
-- **Knowledge extraction** — Parse bot conversations with AI assistance and convert them to efficient reference docs for RAG. All those casual text exchanges become structured knowledge.
-- **Always-on assistant** — Text or voice message your bot anytime to ask questions, dump knowledge, or do light vibecoding.
-- **Convenience features** — Auto-continuation packets when you reset conversations, voice message transcripts forwarded to Signal chat, and more.
+- **Knowledge extraction** — Parse bot conversations with AI assistance and convert them to efficient reference docs for RAG. All those casual text exchanges become structured knowledge, and transcripts become reference documents stripped of bloat and with sensitive information redacted.
+- **Convenience features** — Auto-continuation packets for smoother context rollover when you reset conversations, full TTS/STT integration, and more.
 - **Modular components** — Use what you need. Signal integration, voice I/O, and other components are optional add-ons.
 
 ## Features
@@ -102,56 +101,20 @@ Bot Skills:
 
 ## Directory Structure
 
-```
-bruba-godo/
-├── config.yaml.example      # Connection settings template
-├── exports.yaml             # Export definitions
-├── docs/                    # Documentation
-│   ├── setup.md             # Comprehensive setup guide
-│   ├── operations-guide.md  # Day-to-day operations
-│   └── security-model.md    # Security reference
-├── tools/
-│   ├── bot                  # SSH wrapper
-│   ├── lib.sh               # Shared functions
-│   ├── mirror.sh            # Mirror bot files
-│   ├── pull-sessions.sh     # Pull closed sessions
-│   ├── push.sh              # Push content to bot
-│   ├── assemble-prompts.sh  # Build prompts from config
-│   ├── detect-conflicts.sh  # Find new bot sections / edits
-│   ├── provision-bot.sh     # Full bot provisioning
-│   └── helpers/             # Python utilities
-├── components/              # Optional add-ons
-│   ├── signal/              # Signal messenger
-│   ├── voice/               # Voice I/O
-│   ├── session/             # Session workflow
-│   ├── memory/              # Memory management
-│   ├── heartbeats/          # Proactive behavior
-│   ├── distill/             # Conversation → knowledge
-│   └── ...                  # More components
-├── .claude/commands/        # Skill definitions
-├── templates/
-│   ├── prompts/
-│   │   ├── sections/        # Template sections (header, safety, etc.)
-│   │   └── README.md        # Prompt assembly documentation
-│   └── config/              # clawdbot.json templates
-├── tests/                   # Test suite
-│   ├── test-prompt-assembly.sh  # Automated tests
-│   └── prompt-assembly-tests.md # Test protocols
-├── mirror/                  # Local file backup (gitignored)
-├── sessions/                # Pulled sessions (gitignored)
-├── intake/                  # Raw conversations awaiting CONFIG (gitignored)
-├── reference/
-│   ├── transcripts/         # Canonical conversation files (gitignored)
-│   └── refdocs/             # Reference documents for bot memory (gitignored)
-├── exports/                 # Filtered exports for sync (gitignored)
-│   ├── bot/
-│   │   ├── core-prompts/    # Assembled AGENTS.md → ~/clawd/
-│   │   ├── prompts/         # Prompt - *.md → ~/clawd/memory/prompts/
-│   │   ├── transcripts/     # Transcript - *.md → ~/clawd/memory/transcripts/
-│   │   └── ...              # Other content subdirectories
-│   └── claude/              # Content for Claude Projects/Code
-└── logs/                    # Script logs (gitignored)
-```
+| Directory | Purpose |
+|-----------|---------|
+| `docs/` | Documentation (setup, operations, security, pipeline) |
+| `tools/` | Scripts for bot management (mirror, push, pull, etc.) |
+| `components/` | Optional add-ons (signal, voice, distill, etc.) |
+| `templates/` | Starter files for new agents (prompts, config) |
+| `.claude/commands/` | Claude Code skill definitions |
+| `tests/` | Test suite for prompt assembly |
+| `mirror/` | Local copy of bot files (gitignored) |
+| `sessions/` | Pulled session transcripts (gitignored) |
+| `intake/` | Raw conversations awaiting CONFIG (gitignored) |
+| `reference/` | Processed content (transcripts, refdocs) (gitignored) |
+| `exports/` | Filtered content ready for sync (gitignored) |
+| `logs/` | Script execution logs (gitignored) |
 
 ## Manual Tool Usage
 
