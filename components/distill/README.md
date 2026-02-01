@@ -57,15 +57,15 @@ The **canonical file keeps all content** except noise. CONFIG just marks what to
 
 ### Context Isolation Script
 
-The `/convert` skill uses `scripts/convert-doc.py` for document analysis to prevent CC context bloat:
+The `/convert` skill uses `tools/helpers/convert-doc.py` for document analysis to prevent CC context bloat:
 
 ```bash
 # Analyze document (isolated API call)
-python3 scripts/convert-doc.py intake/file.md "Analyze for CONFIG generation"
+python3 tools/helpers/convert-doc.py intake/file.md "Analyze for CONFIG generation"
 
 # With model selection (default: opus)
-python3 scripts/convert-doc.py intake/file.md "Generate summary" --model sonnet
-python3 scripts/convert-doc.py intake/file.md "Quick analysis" -m haiku
+python3 tools/helpers/convert-doc.py intake/file.md "Generate summary" --model sonnet
+python3 tools/helpers/convert-doc.py intake/file.md "Quick analysis" -m haiku
 ```
 
 **Why?** When CC reads documents directly, the content stays in context. For multi-document processing, this causes bloat. The script makes isolated API calls — content dies when the script exits, CC only sees the result.

@@ -9,13 +9,39 @@ config.yaml
 # Environment variables
 .env
 
-# Local state and output
-logs/
-mirror/
-sessions/
-intake/
-reference/
-exports/
+# Local state and output (keep directory structure via .gitkeep)
+logs/*
+!logs/.gitkeep
+
+mirror/*
+!mirror/.gitkeep
+
+sessions/*
+!sessions/.gitkeep
+
+intake/*
+!intake/.gitkeep
+!intake/processed/
+intake/processed/*
+!intake/processed/.gitkeep
+
+reference/*
+!reference/.gitkeep
+!reference/transcripts/
+!reference/refdocs/
+reference/transcripts/*
+reference/refdocs/*
+!reference/transcripts/.gitkeep
+!reference/refdocs/.gitkeep
+
+exports/*
+!exports/.gitkeep
+!exports/bot/
+!exports/claude/
+exports/bot/*
+exports/claude/*
+!exports/bot/.gitkeep
+!exports/claude/.gitkeep
 
 # Assembled outputs (generated from templates + components + user)
 assembled/

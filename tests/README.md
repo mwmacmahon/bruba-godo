@@ -97,7 +97,7 @@ tests/
 
 #### What's Tested in `test_convert_doc.py`
 
-Tests for `scripts/convert-doc.py`, an isolated LLM document conversion script.
+Tests for `tools/helpers/convert-doc.py`, an isolated LLM document conversion script.
 
 **CLI tests (5):**
 - **Usage message** - Shows usage when no file argument provided

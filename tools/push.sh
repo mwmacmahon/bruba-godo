@@ -247,7 +247,6 @@ if [[ "$CLONE_REPO_CODE" == "true" ]]; then
         --exclude='logs/' \
         --exclude='reference/' \
         --exclude='user/' \
-        --include='scripts/***' \
         --include='docs/***' \
         --include='templates/***' \
         --include='components/***' \

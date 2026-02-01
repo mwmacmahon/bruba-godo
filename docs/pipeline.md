@@ -192,11 +192,11 @@ defaults:
 
 AI-assisted analysis of intake file to add frontmatter + backmatter CONFIG block.
 
-**Context Isolation:** Uses `scripts/convert-doc.py` for document analysis to prevent CC context bloat. The script makes isolated API calls — document content dies when the script exits, CC only sees the analysis results.
+**Context Isolation:** Uses `tools/helpers/convert-doc.py` for document analysis to prevent CC context bloat. The script makes isolated API calls — document content dies when the script exits, CC only sees the analysis results.
 
 ```bash
 # The script (used internally by /convert)
-python3 scripts/convert-doc.py intake/file.md "Analyze for CONFIG" --model opus
+python3 tools/helpers/convert-doc.py intake/file.md "Analyze for CONFIG" --model opus
 ```
 
 **`/convert` does TWO things:**

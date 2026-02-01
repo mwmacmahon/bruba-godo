@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for scripts/convert-doc.py
+Tests for tools/helpers/convert-doc.py
 
 Run with:
     python tests/run_tests.py test_convert_doc
@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 TOOL_ROOT = Path(__file__).parent.parent
-SCRIPT_PATH = TOOL_ROOT / "scripts" / "convert-doc.py"
+SCRIPT_PATH = TOOL_ROOT / "tools" / "helpers" / "convert-doc.py"
 
 try:
     import pytest

@@ -23,7 +23,7 @@ The path to a file in `intake/` (without CONFIG). If omitted, show available fil
 
 **IMPORTANT: Context Isolation**
 
-This skill uses `scripts/convert-doc.py` for document analysis to prevent context bloat. The script makes isolated API calls — document content dies when the script exits. CC only sees the analysis results.
+This skill uses `tools/helpers/convert-doc.py` for document analysis to prevent context bloat. The script makes isolated API calls — document content dies when the script exits. CC only sees the analysis results.
 
 ### 1. Select Target File
 
@@ -49,7 +49,7 @@ Show a clickable link so the user can view the file:
 **DO NOT read the file directly.** Instead, call the conversion script:
 
 ```bash
-python3 scripts/convert-doc.py intake/<file>.md "Analyze this conversation for CONFIG block generation.
+python3 tools/helpers/convert-doc.py intake/<file>.md "Analyze this conversation for CONFIG block generation.
 
 Identify and report:
 
@@ -177,7 +177,7 @@ If user approved noise deletion, use Edit tool to **actually remove** those mess
 After user approval of findings, call the script to generate the CONFIG block. Pass the approved decisions in the prompt:
 
 ```bash
-python3 scripts/convert-doc.py intake/<file>.md "Generate CONFIG block with:
+python3 tools/helpers/convert-doc.py intake/<file>.md "Generate CONFIG block with:
 - title: <approved>
 - date: <approved>
 - source: <approved>
@@ -228,7 +228,7 @@ sensitivity:
 Call the script to generate the summary backmatter:
 
 ```bash
-python3 scripts/convert-doc.py intake/<file>.md "Generate BACKMATTER summary for this conversation.
+python3 tools/helpers/convert-doc.py intake/<file>.md "Generate BACKMATTER summary for this conversation.
 
 Output in this exact format:
 
