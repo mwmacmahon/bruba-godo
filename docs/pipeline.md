@@ -268,7 +268,7 @@ tags: [export-pipeline, testing]
 ### Stage 3: Canonicalize
 
 ```bash
-/intake
+/intake 
 ```
 
 **`/intake` is NOT AI-powered.** It does deterministic processing:

@@ -291,6 +291,12 @@ def cmd_export(args):
             print(f"Available profiles: {', '.join(exports.keys())}")
             sys.exit(1)
         exports = {args.profile: exports[args.profile]}
+    else:
+        # When running all profiles, skip those with skip_auto_export: true
+        exports = {
+            name: config for name, config in exports.items()
+            if not config.get('skip_auto_export', False)
+        }
 
     # Find canonical files in reference/ AND docs/
     input_dir = Path(args.input) if args.input else Path('reference')
@@ -330,6 +336,9 @@ def cmd_export(args):
         output_dir = Path(profile_config.get('output_dir', f'exports/{profile_name}'))
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Check if we should flatten all output to a single directory
+        flatten_export = profile_config.get('flatten_export', False)
+
         # Get filtering rules
         include_rules = profile_config.get('include', {})
         exclude_rules = profile_config.get('exclude', {})
@@ -340,6 +349,7 @@ def cmd_export(args):
 
         # Process each canonical file
         processed = 0
+        unchanged = 0
         skipped = 0
 
         for canonical_path in canonical_files:
@@ -365,14 +375,21 @@ def cmd_export(args):
 
                     # Use output_name from frontmatter if specified, otherwise use stem
                     output_name = config.get('output_name', canonical_path.stem)
-                    # Prompts go to prompts/ subdirectory
-                    prompts_dir = output_dir / "prompts"
+                    # Prompts go to prompts/ subdirectory (unless flattened)
+                    if flatten_export:
+                        prompts_dir = output_dir
+                    else:
+                        prompts_dir = output_dir / "prompts"
                     prompts_dir.mkdir(parents=True, exist_ok=True)
                     out_path = prompts_dir / f"Prompt - {output_name}.md"
-                    out_path.write_text(content, encoding='utf-8')
-                    processed += 1
-                    if args.verbose:
-                        print(f"  -> {out_path}")
+                    if _write_if_changed(out_path, content):
+                        processed += 1
+                        if args.verbose:
+                            print(f"  -> {out_path}")
+                    else:
+                        unchanged += 1
+                        if args.verbose:
+                            print(f"  (unchanged) {out_path.name}")
 
                 else:
                     # Canonical files: full parsing with backmatter
@@ -387,7 +404,10 @@ def cmd_export(args):
 
                     # Determine output subdirectory and prefix based on content type
                     subdir, prefix = _get_content_subdirectory_and_prefix(canonical_path, config)
-                    content_output_dir = output_dir / subdir
+                    if flatten_export:
+                        content_output_dir = output_dir
+                    else:
+                        content_output_dir = output_dir / subdir
                     content_output_dir.mkdir(parents=True, exist_ok=True)
 
                     # Generate variants with redaction
@@ -405,20 +425,30 @@ def cmd_export(args):
                     if result.transcript:
                         out_name = f"{prefix}{canonical_path.stem}.md" if prefix else f"{canonical_path.stem}.md"
                         out_path = content_output_dir / out_name
-                        out_path.write_text(result.transcript, encoding='utf-8')
-                        processed += 1
-                        if args.verbose:
-                            print(f"  -> {out_path}")
+                        if _write_if_changed(out_path, result.transcript):
+                            processed += 1
+                            if args.verbose:
+                                print(f"  -> {out_path}")
+                        else:
+                            unchanged += 1
+                            if args.verbose:
+                                print(f"  (unchanged) {out_path.name}")
 
                     # Write summary if generated
                     if result.summary:
-                        summary_dir = output_dir / "summaries"
+                        if flatten_export:
+                            summary_dir = output_dir
+                        else:
+                            summary_dir = output_dir / "summaries"
                         summary_dir.mkdir(parents=True, exist_ok=True)
                         summary_name = f"Summary - {canonical_path.stem}.md"
                         summary_path = summary_dir / summary_name
-                        summary_path.write_text(result.summary, encoding='utf-8')
-                        if args.verbose:
-                            print(f"  -> {summary_path}")
+                        if _write_if_changed(summary_path, result.summary):
+                            if args.verbose:
+                                print(f"  -> {summary_path}")
+                        else:
+                            if args.verbose:
+                                print(f"  (unchanged) {summary_path.name}")
 
             except Exception as e:
                 print(f"  Error processing {canonical_path.name}: {e}")
@@ -427,7 +457,7 @@ def cmd_export(args):
                     traceback.print_exc()
                 skipped += 1
 
-        print(f"  Processed: {processed}, Skipped: {skipped}")
+        print(f"  Written: {processed}, Unchanged: {unchanged}, Skipped: {skipped}")
         print(f"  Output: {output_dir}/")
 
     print("\nExport complete.")
@@ -544,6 +574,20 @@ def cmd_split(args):
                 traceback.print_exc()
 
     print(f"\nSummary: {split_files}/{total_files} files split into {chunks_created} chunks")
+
+
+def _write_if_changed(path: Path, content: str) -> bool:
+    """
+    Write content to path only if it differs from existing content.
+
+    Returns True if file was written, False if skipped (identical).
+    """
+    if path.exists():
+        existing = path.read_text(encoding='utf-8')
+        if existing == content:
+            return False
+    path.write_text(content, encoding='utf-8')
+    return True
 
 
 def _parse_prompt_frontmatter(content: str) -> dict:

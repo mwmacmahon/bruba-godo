@@ -27,7 +27,9 @@ from components.distill.lib.variants import (
 )
 
 # Import the routing function - need to access it from cli module
-from components.distill.lib.cli import _get_content_subdirectory_and_prefix
+from components.distill.lib.cli import _get_content_subdirectory_and_prefix, _write_if_changed
+import tempfile
+import os
 
 try:
     import pytest
@@ -403,6 +405,86 @@ External reference content.
 
 
 # =============================================================================
+# Unit tests for _write_if_changed
+# =============================================================================
+
+def test_write_if_changed_creates_new_file():
+    """Test that _write_if_changed creates a new file."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "new_file.md"
+        content = "Hello, world!"
+
+        result = _write_if_changed(path, content)
+
+        assert result is True
+        assert path.exists()
+        assert path.read_text() == content
+
+
+def test_write_if_changed_skips_identical():
+    """Test that _write_if_changed skips writing identical content."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "existing.md"
+        content = "Same content"
+
+        # Create initial file
+        path.write_text(content)
+        original_mtime = os.path.getmtime(path)
+
+        # Small delay to ensure mtime would change if written
+        import time
+        time.sleep(0.01)
+
+        # Try to write same content
+        result = _write_if_changed(path, content)
+
+        assert result is False
+        # mtime should be unchanged
+        assert os.path.getmtime(path) == original_mtime
+
+
+def test_write_if_changed_overwrites_different():
+    """Test that _write_if_changed overwrites when content differs."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "changing.md"
+
+        # Create initial file
+        path.write_text("Original content")
+        original_mtime = os.path.getmtime(path)
+
+        # Small delay
+        import time
+        time.sleep(0.01)
+
+        # Write different content
+        new_content = "Updated content"
+        result = _write_if_changed(path, new_content)
+
+        assert result is True
+        assert path.read_text() == new_content
+        # mtime should have changed
+        assert os.path.getmtime(path) != original_mtime
+
+
+def test_write_if_changed_handles_empty_file():
+    """Test that _write_if_changed handles empty files correctly."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "empty.md"
+
+        # Create empty file
+        path.write_text("")
+
+        # Write empty content - should skip
+        result = _write_if_changed(path, "")
+        assert result is False
+
+        # Write non-empty content - should write
+        result = _write_if_changed(path, "content")
+        assert result is True
+        assert path.read_text() == "content"
+
+
+# =============================================================================
 # Test runner
 # =============================================================================
 
@@ -431,6 +513,11 @@ def run_all_tests():
         # Integration
         test_full_doc_export_flow,
         test_full_refdoc_export_flow,
+        # Write if changed
+        test_write_if_changed_creates_new_file,
+        test_write_if_changed_skips_identical,
+        test_write_if_changed_overwrites_different,
+        test_write_if_changed_handles_empty_file,
     ]
 
     print("\nRunning export pipeline tests...\n")

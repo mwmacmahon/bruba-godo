@@ -145,7 +145,7 @@ python -m components.distill.lib.cli canonicalize intake/<file>.md \
 #### Step 4: Generate exports
 
 ```bash
-python -m components.distill.lib.cli export --profile bot --verbose
+python -m components.distill.lib.cli export --verbose
 ```
 
 #### Step 5: Push to bot memory
