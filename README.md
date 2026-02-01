@@ -6,7 +6,9 @@ Control center for running a personal AI assistant on a dedicated machine, manag
 
 An AI assistant that actually accumulates knowledge and capabilities over time. Every conversation feeds back into its memory. It can build its own tools, and you approve the good ones. It runs sandboxed on a separate machine so when it screws up (and it will), the blast radius is contained.
 
-The endgame: a persistent, evolving AI collaborator that knows your projects, remembers your preferences, and gets more capable the longer you work with it.
+The endgame: a persistent, evolving AI collaborator that knows your projects, remembers your preferences, and gets more capable the longer you work with it. 
+
+More importantly, your conversations become a source of value - transcripts are cleaned, stripped of bloat, summarized, sensitive info marked, and become reference material for RAG or just direct reference, as aided by automatically growing tracker files that index your conversations with summaries. 
 
 ## Where It's At
 
@@ -21,7 +23,7 @@ The core architecture is working. I use this daily.
 - **Claude Code integration** — Skill commands (`/sync`, `/push`, `/pull`, etc.) for common operations.
 - **Voice I/O** — Speech-to-text input, text-to-speech output.
 - **Reminders integration** — Apple Reminders access.
-- **Web search** — Search capability for the bot.
+- **Web search** — Search capability for the bot. Accomplished with a locked down Dockerized reader agent for maximum prompt injection protection.
 
 **Not built yet:**
 - Multi-bot support (architecture could handle it, nothing built)
