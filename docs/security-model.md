@@ -10,7 +10,7 @@ description: "Threat model, permissions, and security practices"
 Security reference for bot instances running Clawdbot. Covers threat model, permission boundaries, known gaps, and operational security practices.
 
 > **Related docs:**
-> - [Full Setup Guide](full-setup-guide.md) — Configuration procedures
+> - [Setup Guide](setup.md) — Configuration procedures
 > - [Operations Guide](operations-guide.md) — Day-to-day usage
 
 ---
@@ -26,6 +26,43 @@ Security reference for bot instances running Clawdbot. Covers threat model, perm
 7. [Operational Security](#operational-security)
 8. [Incident Response](#incident-response)
 9. [Security Checklist](#security-checklist)
+
+---
+
+## Active Security Issues
+
+Tracked issues requiring attention.
+
+### Issue 1: Exec Command Scoping
+
+**Status:** Blocked — Approval UX broken
+
+**Current state:** Filesystem commands (wc, ls, head, tail, grep, du) have full disk access within bot account. Security relies on account isolation only.
+
+**Target state:** Commands scoped to workspace via exec-approvals.json patterns, with approval required for access outside that scope.
+
+**Blockers:**
+- Signal: Approval requests don't appear
+- Dashboard: Only one approval popup for multiple pending approvals
+- No way to list/view/manage pending approvals programmatically
+
+### Issue 2: Config File Protection (Agent Self-Escalation)
+
+**Status:** Partially Fixed
+
+**Issue:** Agent can edit `~/.clawdbot/exec-approvals.json` directly using edit/write tools.
+
+**Root cause:** The file serves dual purposes:
+1. Allowlist patterns (should be lockable)
+2. Usage metadata — `lastUsedAt` timestamps (daemon needs to write)
+
+**Partial fix applied:**
+- `clawdbot.json` locked (root:staff) — protects `tools.deny` list
+- `exec-approvals.json` cannot be locked — daemon writes timestamps
+
+**Remaining risk:** Agent can self-escalate by adding binaries to allowlist.
+
+**Proper solution:** Clawdbot feature request — separate allowlist from metadata.
 
 ---
 

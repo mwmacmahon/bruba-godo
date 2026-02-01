@@ -450,3 +450,35 @@ Build for value:
 2. **Components** extend what the bot can do
 3. **Distill** closes the conversation→knowledge loop
 4. **Bidirectional sync** preserves bot's changes
+
+---
+
+## Decision Log
+
+Historical record of key architectural and implementation decisions.
+
+| Decision | Date | Rationale |
+|----------|------|-----------|
+| Separate Mac account | 2026-01-25 | Isolation during trust-building |
+| Start with meta scope | 2026-01-25 | Prove value before expanding |
+| Local embeddings | 2026-01-25 | Privacy > convenience |
+| Source install | 2026-01-25 | Control > simplicity |
+| Human-in-the-loop /convert | 2026-01-26 | Quality > automation |
+| Sessions as authoritative | 2026-01-26 | Journals unreliable |
+| Three-flow architecture | 2026-01-26 | Clear separation of concerns |
+| Bundle-based sync | 2026-01-26 | Integrate with existing system |
+| Signal for mobile interface | 2026-01-26 | True E2EE, native voice |
+| Manual Tailscale serve | 2026-01-26 | Simpler than built-in; avoids bind conflicts |
+| Mac Mini required (not Linux) | 2026-01-26 | iCloud Drive E2EE doesn't work on Linux |
+| Python whisper (not whisper.cpp) | 2026-01-26 | Handles m4a format from Signal |
+| Full path in daemon config | 2026-01-26 | Daemon doesn't load .zshrc |
+| Prefer local transcription | 2026-01-26 | Privacy; cloud APIs only when local fails |
+| Exec lockdown (gateway + allowlist) | 2026-01-27 | sandbox.mode: off alone doesn't enforce allowlist |
+| Token economics accepted (~8k base) | 2026-01-27 | 10x more efficient than Claude Projects |
+| Context tracking via session_status | 2026-01-27 | Threshold warnings at 100k/150k/180k |
+| Unscoped filesystem commands | 2026-01-27 | Approval UX broken; account isolation sufficient |
+| Local TTS (sherpa-onnx) | 2026-01-27 | Privacy-first voice responses; no cloud TTS |
+| Exec self-escalation documented | 2026-01-27 | Agent can edit exec-approvals.json; known gap |
+| Prompt-driven voice (not auto) | 2026-01-28 | Clawdbot media pipeline doesn't invoke wrappers |
+| Web search via reader subagent | 2026-01-28 | Tool isolation for injection safety |
+| Bot-agnostic operator design | 2026-01-30 | Prompts and scripts outlive any specific framework |

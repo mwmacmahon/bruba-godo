@@ -54,7 +54,7 @@ Wrapper script that invokes the web-reader agent. Add to main agent's exec-appro
 Ensures the web-reader Docker container is running. The sandbox stops when idle, so this script starts it by sending a ping to the agent.
 
 Use cases:
-- Run at login via launchd (see full-setup-guide.md)
+- Run at login via launchd (see docs/setup.md)
 - Health check before web searches
 - Manual container recovery
 
@@ -109,7 +109,7 @@ Use cases:
    ]" > /tmp/ea.json && mv /tmp/ea.json ~/.clawdbot/exec-approvals.json'
    ```
 
-3. (Optional) Set up auto-start - see `docs/full-setup-guide.md` "Web Reader Auto-Start" section
+3. (Optional) Set up auto-start - see `docs/setup.md` "Multi-Agent Setup" section
 
 ## Usage
 

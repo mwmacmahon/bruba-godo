@@ -7,7 +7,7 @@ description: "Day-to-day bot operations and maintenance tasks"
 
 # Operations Guide
 
-Day-to-day operations reference for managing your bot. For initial setup, see [Full Setup Guide](full-setup-guide.md).
+Day-to-day operations reference for managing your bot. For initial setup, see [Setup Guide](setup.md).
 
 ---
 
@@ -380,7 +380,7 @@ scope: [reference]
 
 These are included in `/export` and synced alongside transcripts.
 
-See [Intake Pipeline](intake-pipeline.md) for full details.
+See [Pipeline Documentation](pipeline.md) for full details.
 
 ### Sync Troubleshooting
 

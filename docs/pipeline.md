@@ -199,6 +199,43 @@ AI-assisted analysis of intake file to add frontmatter + backmatter CONFIG block
 python3 scripts/convert-doc.py intake/file.md "Analyze for CONFIG" --model opus
 ```
 
+**`/convert` does TWO things:**
+
+1. **REMOVES noise from the file:**
+   - Heartbeat interrupts (exec denials + `HEARTBEAT_OK`)
+   - System error messages
+   - These are deleted before canonicalize runs
+
+2. **MARKS content in CONFIG block (applied later at export):**
+   - **Metadata:** title, slug, date, source, tags
+   - **Sections to remove:** debugging tangents, off-topic content
+   - **Sensitivity markers:** names, health info, personal details
+   - **Code blocks:** walls of text, artifacts with keep/summarize/remove actions
+   - **Summary backmatter:** what was discussed, decisions made
+
+**CRITICAL:** Only noise is removed from the file. Everything else stays — CONFIG just marks it for processing at `/export` time.
+
+**CONFIG block format:**
+```yaml
+=== EXPORT CONFIG ===
+title: "Implementing User Authentication"
+slug: 2026-01-28-user-auth
+date: 2026-01-28
+source: bruba
+tags: [auth, backend, voice]
+description: "Built JWT auth system"
+
+sections_remove:
+  - start: "Let me check the error logs"
+    end: "Okay the logs show it's a path issue"
+    description: "Debugging session"
+
+sensitivity:
+  terms:
+    names: [Michael]
+[END CONFIG]
+```
+
 **Frontmatter controls export routing:**
 
 | type | Output directory | Prefix |
@@ -234,10 +271,40 @@ tags: [export-pipeline, testing]
 /intake
 ```
 
+**`/intake` is NOT AI-powered.** It does deterministic processing:
+
+```bash
+python -m components.distill.lib.cli canonicalize intake/*.md \
+    -o reference/transcripts/ \
+    -c components/distill/config/corrections.yaml \
+    --move intake/processed
+```
+
 Processes files with CONFIG blocks:
-- Moves to `reference/transcripts/`
-- Applies corrections from `components/distill/config/corrections.yaml`
-- Original moved to `intake/processed/`
+1. Parses the CONFIG block → YAML frontmatter
+2. Applies transcription corrections from `corrections.yaml`
+3. Strips Signal/Telegram wrappers (`[Signal Michael id:...]`)
+4. **Content stays intact** — sections_remove, sensitivity are just in frontmatter
+5. Moves processed files to `intake/processed/` (via `--move` flag)
+
+**Output in reference/transcripts/:**
+```yaml
+---
+title: "Implementing User Authentication"
+slug: 2026-01-28-user-auth
+date: 2026-01-28
+type: canonical
+tags: [auth, backend, voice]
+---
+
+[Clean conversation content with sections removed per CONFIG]
+
+---
+[BACKMATTER SECTION]
+
+## Summary
+...
+```
 
 ### Stage 4: Export
 
@@ -427,6 +494,185 @@ When bot modifies a section and you want to keep it:
 1. Ensure bot wrapped section with `<!-- BOT-MANAGED: name -->`
 2. Change `name` to `bot:name` in `exports.yaml` agents_sections
 3. Run `/prompt-sync`
+
+---
+
+## Reference Documents
+
+Besides conversation transcripts, you can sync reference documents to bot memory.
+
+### Adding Reference Docs
+
+Place markdown files in `reference/refdocs/`:
+
+```bash
+cp ~/docs/my-guide.md reference/refdocs/
+```
+
+### Frontmatter Requirements
+
+Files must have YAML frontmatter to be included in exports:
+
+```yaml
+---
+title: My Guide
+date: 2026-01-28
+scope: [reference]
+---
+
+# My Guide
+...
+```
+
+The `scope` tag determines which export profiles include the file (per `exports.yaml`).
+
+### How It Works
+
+1. `/export` scans all of `reference/` recursively (`rglob("*.md")`)
+2. Files without frontmatter are skipped with an error
+3. Files matching the profile's `include`/`exclude` rules are exported
+4. `/push` syncs exports to bot memory
+
+This lets you manage both conversation transcripts (`reference/transcripts/`) and static reference docs (`reference/refdocs/`) in one pipeline.
+
+---
+
+## Tips
+
+### Sessions are Immutable After Close
+
+Once a session is closed (via `/reset`), the JSONL file won't change. Safe to pull once.
+
+### Active Session
+
+The active session is still being written. `/pull` skips it automatically. Use `/convo` to view active content.
+
+### Transcription Corrections
+
+Voice messages often have transcription errors. The canonicalize step applies corrections from `components/distill/config/corrections.yaml`:
+
+```yaml
+corrections:
+  - pattern: "bruba godo"
+    replacement: "bruba-godo"
+  - pattern: "clod bot"
+    replacement: "Clawdbot"
+```
+
+### Walls of Text and Large Code Blocks
+
+Use `sections_remove` for walls of text, pasted docs, and large code blocks you want to summarize. The `description` field becomes the replacement text.
+
+Example CONFIG:
+```yaml
+sections_remove:
+  - start: "does this look right? --- ## 2.5 Session Continuity"
+    end: "can you draft that change"
+    description: "[Pasted documentation: Section 2.5 Session Continuity — continuation file pattern]"
+```
+
+Output in export:
+```
+[Removed: [Pasted documentation: Section 2.5 Session Continuity — continuation file pattern]]
+```
+
+This approach works for any content type (documentation, logs, debug output, large code blocks).
+
+---
+
+## Troubleshooting
+
+---
+
+## Export Selection & Redaction
+
+### Bundle Selection Logic
+
+Files are selected based on tag matching:
+
+```python
+# Pseudocode for file selection
+def should_include_file(file_tags, profile_config):
+    include = profile_config.get('include', {})
+    exclude = profile_config.get('exclude', {})
+
+    # EXCLUDE: File rejected if ANY tag matches ANY exclude value
+    for category, values in exclude.items():
+        if any(tag in file_tags for tag in values):
+            return False
+
+    # INCLUDE: File must have AT LEAST ONE tag from EACH include category
+    for category, values in include.items():
+        if not any(tag in file_tags for tag in values):
+            return False
+
+    return True
+```
+
+**Key distinction:**
+- `include`/`exclude` → Which FILES go to export
+- `redaction` → What CONTENT is redacted within files
+
+### Sensitivity System
+
+The sensitivity system controls what content gets redacted. Two levels:
+
+1. **Definition** — What to redact (in file frontmatter)
+2. **Application** — Which categories to redact (per profile)
+
+#### Sensitivity Categories
+
+| Category | Content Type | Example Terms |
+|----------|--------------|---------------|
+| `health` | Medical, medications | `Zoloft`, `therapy session` |
+| `personal` | Private details | `divorce`, `dating` |
+| `names` | People and companies | `Dr. Smith`, `Acme Corp` |
+| `financial` | Money, accounts | `$150k salary` |
+
+#### Term-Based Redaction
+
+Individual terms replaced with `[REDACTED]`:
+
+```yaml
+# In file frontmatter
+sensitivity:
+  terms:
+    health: Zoloft, anxiety
+    names: Dr. Chen
+```
+
+Result when `health` and `names` in profile's redaction list:
+```
+Original: "I talked to Dr. Chen about my anxiety."
+Redacted: "I talked to [REDACTED] about my [REDACTED]."
+```
+
+#### Section-Based Redaction
+
+Entire sections between anchors replaced:
+
+```yaml
+sensitivity:
+  sections:
+    - start: "BEGIN SENSITIVE"
+      end: "END SENSITIVE"
+      tags: [health, personal]
+      description: "health discussion"
+```
+
+Result: `[Redacted: health discussion]`
+
+### Redaction Flow
+
+```
+File Frontmatter              Profile Config              Output
+────────────────              ──────────────              ──────
+sensitivity:                  redaction:
+  terms:                        - health
+    health: [Zoloft]   +        - names          →    [REDACTED]
+    names: [Dr. Chen]           (personal not    →    [REDACTED]
+    personal: [my cat]           listed)          →    my cat (kept)
+```
 
 ---
 

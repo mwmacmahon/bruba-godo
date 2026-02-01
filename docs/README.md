@@ -17,10 +17,7 @@ description: "Index of bruba-godo documentation with navigation"
 
 | Document | Description |
 |----------|-------------|
-| [full-setup-guide.md](full-setup-guide.md) | Complete setup (prerequisites → security hardening) |
-| [quickstart-new-machine.md](quickstart-new-machine.md) | Condensed setup for experienced users |
-| [setup-remote-machine.md](setup-remote-machine.md) | Bot machine preparation |
-| [setup-operator-ssh.md](setup-operator-ssh.md) | SSH configuration |
+| [setup.md](setup.md) | Complete setup guide (prerequisites → security hardening) |
 
 ## Operations
 
@@ -28,10 +25,10 @@ description: "Index of bruba-godo documentation with navigation"
 |----------|-------------|
 | [operations-guide.md](operations-guide.md) | Day-to-day usage |
 | [security-model.md](security-model.md) | Threat model, permissions, hardening |
-| [intake-pipeline.md](intake-pipeline.md) | Session processing workflow |
+| [pipeline.md](pipeline.md) | Content processing pipeline (intake → export) |
 
 ## Components
 
 | Document | Description |
 |----------|-------------|
-| [signal-setup-guide.md](signal-setup-guide.md) | Signal channel + voice handling |
+| [../components/signal/README.md](../components/signal/README.md) | Signal channel + voice handling |

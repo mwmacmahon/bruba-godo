@@ -64,7 +64,7 @@ Artifact - *.md         (exported artifacts)
 
 **Expected files found:**
 - Doc - COMPONENT_STATUS.md
-- Doc - full-setup-guide.md
+- Doc - setup.md
 - Doc - operations-guide.md
 - Doc - pipeline.md
 - Doc - security-model.md

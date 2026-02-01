@@ -10,7 +10,7 @@
 #   ./tools/provision-bot.sh --bot-name mybot    # With options
 #
 # Prerequisites:
-#   - SSH access to remote machine (see docs/setup-operator-ssh.md)
+#   - SSH access to remote machine (see docs/setup.md)
 #   - Clawdbot installed on remote machine
 #   - jq available locally (for JSON manipulation)
 #
@@ -85,7 +85,7 @@ Options:
   --help, -h            Show this help
 
 Prerequisites:
-  1. SSH access configured (see docs/setup-operator-ssh.md)
+  1. SSH access configured (see docs/setup.md)
   2. Clawdbot installed on remote: npm install -g clawdbot
   3. jq available locally: brew install jq (or apt install jq)
 
@@ -149,7 +149,7 @@ else
     echo "FAILED"
     echo ""
     echo "ERROR: Cannot connect to $SSH_HOST" >&2
-    echo "Check your SSH config. See docs/setup-operator-ssh.md for help." >&2
+    echo "Check your SSH config. See docs/setup.md for help." >&2
     exit 1
 fi
 

@@ -35,11 +35,7 @@ Before using bruba-godo, you need:
 3. **Clawdbot** installed on the remote machine
 4. **Claude Code** on your operator machine (optional but recommended for skills)
 
-For detailed setup instructions, see:
-- [Quick start (new machine)](docs/quickstart-new-machine.md) — Condensed setup
-- [Full setup guide](docs/full-setup-guide.md) — Comprehensive configuration
-- [Setting up the remote machine](docs/setup-remote-machine.md) — Create service account, enable SSH
-- [Setting up operator SSH access](docs/setup-operator-ssh.md) — SSH keys, config, troubleshooting
+For detailed setup instructions, see [Setup Guide](docs/setup.md).
 
 ## Quick Start
 
@@ -51,7 +47,7 @@ sudo dscl . -create /Users/bruba  # macOS
 npm install -g clawdbot
 ```
 
-See [docs/setup-remote-machine.md](docs/setup-remote-machine.md) for full instructions.
+See [Setup Guide](docs/setup.md#part-1-remote-machine-setup) for full instructions.
 
 ### 2. Configure SSH Access
 
@@ -66,7 +62,7 @@ ssh-copy-id bruba@<remote-ip>
 #     User bruba
 ```
 
-See [docs/setup-operator-ssh.md](docs/setup-operator-ssh.md) for full instructions.
+See [Setup Guide](docs/setup.md#part-2-operator-machine-setup) for full instructions.
 
 ### 3. Clone and Provision
 
@@ -111,7 +107,7 @@ bruba-godo/
 ├── config.yaml.example      # Connection settings template
 ├── exports.yaml             # Export definitions
 ├── docs/                    # Documentation
-│   ├── full-setup-guide.md  # Comprehensive setup
+│   ├── setup.md             # Comprehensive setup guide
 │   ├── operations-guide.md  # Day-to-day operations
 │   └── security-model.md    # Security reference
 ├── tools/
@@ -228,12 +224,11 @@ After provisioning, add optional features:
 
 | Document | Purpose |
 |----------|---------|
-| [Full Setup Guide](docs/full-setup-guide.md) | Complete setup from scratch |
+| [Setup Guide](docs/setup.md) | Complete setup from scratch |
 | [Operations Guide](docs/operations-guide.md) | Day-to-day usage reference |
 | [Security Model](docs/security-model.md) | Threat model, permissions, hardening |
-| [Intake Pipeline](docs/intake-pipeline.md) | Session processing workflow |
-| [Setup Remote Machine](docs/setup-remote-machine.md) | Bot machine preparation |
-| [Setup Operator SSH](docs/setup-operator-ssh.md) | SSH configuration |
+| [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
+| [Pipeline](docs/pipeline.md) | Content processing workflow |
 
 ## License
 

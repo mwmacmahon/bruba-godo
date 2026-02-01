@@ -1,69 +1,121 @@
 ---
 type: doc
 scope: reference
-title: "Full Setup Guide"
-description: "Complete Clawdbot setup from prerequisites to hardening"
+title: "Setup Guide"
+description: "Complete guide for setting up Clawdbot from scratch"
 ---
 
-# Full Setup Guide
+# Setup Guide
 
-Complete guide for setting up a personal AI assistant bot with Clawdbot. This guide covers everything from prerequisites to security hardening.
+Complete guide for setting up a personal AI assistant bot with Clawdbot. Covers remote machine preparation, operator configuration, and bot setup.
 
-> **Quick start?** See [quickstart-new-machine.md](quickstart-new-machine.md) for the condensed version.
 > **Already set up?** See the [Operations Guide](operations-guide.md) for day-to-day usage.
+> **Having issues?** See [Troubleshooting](troubleshooting.md).
 
 ---
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Create Service Account](#create-service-account)
-3. [Install Clawdbot](#install-clawdbot)
-4. [Configure SSH Access](#configure-ssh-access)
-5. [Run Onboarding Wizard](#run-onboarding-wizard)
-6. [Security Hardening](#security-hardening)
-7. [Exec Lockdown](#exec-lockdown)
-8. [Config File Protection](#config-file-protection)
-9. [Config Architecture Reference](#config-architecture-reference)
-10. [Memory Plugin](#memory-plugin)
-11. [Project Context Setup](#project-context-setup)
-12. [Multi-Agent Setup](#multi-agent-setup)
-13. [Troubleshooting](#troubleshooting)
-14. [Key Insights & Gotchas](#key-insights--gotchas)
+1. [Quick Start](#quick-start)
+2. [Prerequisites](#prerequisites)
+3. [Part 1: Remote Machine Setup](#part-1-remote-machine-setup)
+4. [Part 2: Operator Machine Setup](#part-2-operator-machine-setup)
+5. [Part 3: Bot Configuration](#part-3-bot-configuration)
+6. [Verification](#verification)
+7. [Next Steps](#next-steps)
+
+---
+
+## Quick Start
+
+For users who just need to get connected to an existing bot:
+
+### Quick Checklist
+
+- [ ] Bot user created on remote machine
+- [ ] SSH enabled and accessible
+- [ ] Clawdbot installed (`clawdbot --version` works)
+- [ ] API key set (`echo $ANTHROPIC_API_KEY`)
+- [ ] SSH key copied and config updated
+- [ ] config.yaml updated with new host
+- [ ] `./tools/bot echo ok` returns "ok"
+- [ ] Daemon started
+
+### Minimal Steps
+
+```bash
+# 1. Clone bruba-godo (if not already)
+git clone <repo-url>
+cd bruba-godo
+
+# 2. Copy and edit config
+cp config.yaml.example config.yaml
+# Edit: set ssh.host, remote.* paths, remote.agent_id
+
+# 3. Add SSH config (~/.ssh/config)
+Host bruba
+    HostName <ip>
+    User bruba
+
+# 4. Test connection
+./tools/bot echo ok
+
+# 5. First sync
+./tools/mirror.sh
+./tools/bot clawdbot status
+```
+
+For full setup from scratch, continue below.
 
 ---
 
 ## Prerequisites
 
-**On the remote machine:**
+### On the Remote Machine (Bot)
+
 - macOS or Linux
 - Homebrew (macOS) or apt/yum (Linux)
 - Docker Desktop (for sandboxed agents)
+- Node.js 18+
 
-**On your operator machine:**
+### On Your Operator Machine
+
 - SSH client
 - Claude Code (optional but recommended)
+- Git
 
-### Install Required Tools
+### Install Required Tools (Remote)
 
 ```bash
 # macOS: Xcode Command Line Tools
 xcode-select --install
+
+# Install Homebrew (if not present)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Node.js
+brew install node
 
 # Install pnpm (preferred for Clawdbot)
 npm install -g pnpm
 pnpm setup
 source ~/.zshrc
 
+# Install jq and signal-cli
+brew install jq signal-cli
+
 # Verify
 pnpm --version
+node --version
 ```
 
 ---
 
-## Create Service Account
+## Part 1: Remote Machine Setup
 
-### macOS
+### 1.1 Create Service Account
+
+#### macOS
 
 ```bash
 # Pick a username (e.g., bruba, mybot)
@@ -72,31 +124,64 @@ BOT_USER="bruba"
 # Create the user
 sudo dscl . -create /Users/$BOT_USER
 sudo dscl . -create /Users/$BOT_USER UserShell /bin/zsh
-sudo dscl . -create /Users/$BOT_USER UniqueID 505  # Check unused: dscl . -list /Users UniqueID
-sudo dscl . -create /Users/$BOT_USER PrimaryGroupID 20
+sudo dscl . -create /Users/$BOT_USER RealName "Bruba Bot"
+sudo dscl . -create /Users/$BOT_USER UniqueID 502  # Check unused: dscl . -list /Users UniqueID
+sudo dscl . -create /Users/$BOT_USER PrimaryGroupID 20  # staff group
 sudo dscl . -create /Users/$BOT_USER NFSHomeDirectory /Users/$BOT_USER
 
 # Create home directory
 sudo mkdir -p /Users/$BOT_USER
-sudo chown -R $BOT_USER:staff /Users/$BOT_USER
+sudo chown $BOT_USER:staff /Users/$BOT_USER
 
-# Enable Remote Login
-sudo systemsetup -setremotelogin on
-sudo dseditgroup -o edit -a $BOT_USER -t user com.apple.access_ssh
+# Optional: Set password (for sudo if needed)
+sudo dscl . -passwd /Users/$BOT_USER "temporary-password"
 ```
 
-### Linux
+#### Linux
 
 ```bash
 BOT_USER="bruba"
+
+# Create user with home directory
 sudo useradd -m -s /bin/bash $BOT_USER
+
+# Optional: set password
+sudo passwd $BOT_USER
 ```
 
----
+### 1.2 Enable SSH Access
 
-## Install Clawdbot
+#### macOS
 
-Clawdbot is installed directly on the bot account. SSH in as the bot user:
+```bash
+# Enable SSH (System Preferences → Sharing → Remote Login)
+sudo systemsetup -setremotelogin on
+
+# Add bot user to allowed SSH users
+sudo dseditgroup -o edit -a $BOT_USER -t user com.apple.access_ssh
+```
+
+Or via GUI: System Preferences → Sharing → Remote Login → Allow access for specific users → Add the bot user.
+
+#### Linux
+
+SSH is usually enabled by default. If not:
+
+```bash
+# Debian/Ubuntu
+sudo apt install openssh-server
+sudo systemctl enable ssh
+sudo systemctl start ssh
+
+# RHEL/Fedora
+sudo dnf install openssh-server
+sudo systemctl enable sshd
+sudo systemctl start sshd
+```
+
+### 1.3 Install Clawdbot
+
+SSH in as the bot user:
 
 ```bash
 ssh bruba
@@ -126,34 +211,143 @@ exit  # Back to your operator machine
 
 > **Note:** Source lives at `~/src/clawdbot/` on the bot account. See Operations Guide for update procedures.
 
----
+### 1.4 Set API Key
 
-## Configure SSH Access
-
-### On Your Operator Machine
+On the remote machine:
 
 ```bash
-# Generate key if needed
-ssh-keygen -t ed25519 -C "$(whoami)@$(hostname)"
-
-# Copy to bot machine
-ssh-copy-id bruba@<ip-or-hostname>
+# Add to ~/.zshrc
+echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc
+source ~/.zshrc
 ```
 
-### SSH Config
+Or create `~/.clawdbot/.env`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### 1.5 Create Workspace Directories
+
+```bash
+mkdir -p ~/clawd/{memory,memory/archive,tools,tools/helpers,output}
+```
+
+### Home Directory Structure
+
+After setup, the bot's home should have:
+
+```
+~/
+├── clawd/                    # Workspace root
+│   ├── memory/               # Long-term memory files
+│   │   └── archive/          # Archived memory
+│   ├── tools/                # Bot's scripts and utilities
+│   │   └── helpers/          # Helper scripts
+│   └── output/               # Generated files
+│
+├── .clawdbot/                # Created by Clawdbot installer
+│   ├── clawdbot.json         # Main config
+│   ├── exec-approvals.json   # Allowed executables
+│   └── agents/               # Per-agent data
+│       └── <agent-id>/
+│           ├── sessions/     # Conversation transcripts
+│           └── workspace/    # Agent's working area
+│
+└── .zshrc or .bashrc         # Shell config (API key here)
+```
+
+---
+
+## Part 2: Operator Machine Setup
+
+### 2.1 Generate SSH Key
+
+If you don't already have an SSH key (check `~/.ssh/id_ed25519`):
+
+```bash
+# Generate ed25519 key (recommended)
+ssh-keygen -t ed25519 -C "your-email@example.com"
+
+# Or RSA if ed25519 isn't supported
+ssh-keygen -t rsa -b 4096 -C "your-email@example.com"
+```
+
+Accept the default path and optionally set a passphrase.
+
+### 2.2 Copy Key to Remote
+
+#### Option A: Using ssh-copy-id (easiest)
+
+```bash
+ssh-copy-id bruba@<remote-ip-or-hostname>
+```
+
+#### Option B: Manual copy
+
+```bash
+# On your local machine
+cat ~/.ssh/id_ed25519.pub
+
+# Copy the output, then on the remote machine:
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+echo "paste-the-public-key-here" >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+### 2.3 Configure SSH Client
 
 Add to `~/.ssh/config`:
 
 ```
 Host bruba
-    HostName 192.168.1.100    # Replace with actual IP
-    User bruba
+    HostName 192.168.1.100    # Replace with actual IP or hostname
+    User bruba                 # Bot user account
+    Port 22                    # Default SSH port
     IdentityFile ~/.ssh/id_ed25519
 ```
 
-Test: `ssh bruba "clawdbot --version"`
+**Common configurations:**
 
-### Setup Bot Account Environment
+```
+# Local machine on same network
+Host bruba
+    HostName 192.168.1.100
+    User bruba
+
+# Machine behind router (port forwarded)
+Host bruba
+    HostName your-domain.com
+    User bruba
+    Port 2222
+
+# Via jump host / bastion
+Host bruba
+    HostName 10.0.0.50
+    User bruba
+    ProxyJump bastion.example.com
+
+# Tailscale / ZeroTier (use Tailscale IP)
+Host bruba
+    HostName 100.x.y.z
+    User bruba
+```
+
+### 2.4 Test Connection
+
+```bash
+# Simple test
+ssh bruba echo "Connection successful"
+
+# Check clawdbot
+ssh bruba clawdbot --version
+
+# Test the tools/bot wrapper (from bruba-godo directory)
+./tools/bot echo ok
+```
+
+### 2.5 Setup Bot Account Environment
 
 SSH in and configure non-interactive commands:
 
@@ -171,9 +365,76 @@ exit
 ssh bruba "clawdbot --version"
 ```
 
+### 2.6 Clone bruba-godo
+
+```bash
+cd /path/to/your/projects
+git clone <repo-url>
+cd bruba-godo
+```
+
+### 2.7 Configure bruba-godo
+
+```bash
+cp config.yaml.example config.yaml
+```
+
+Edit `config.yaml`:
+
+```yaml
+ssh:
+  host: bruba  # Must match SSH config
+
+remote:
+  home: /Users/bruba
+  workspace: /Users/bruba/clawd
+  clawdbot: /Users/bruba/.clawdbot
+  agent_id: bruba-main
+```
+
+### SSH Security Best Practices
+
+#### Disable Password Authentication
+
+After confirming key auth works, disable passwords on the remote:
+
+Edit `/etc/ssh/sshd_config`:
+
+```
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+```
+
+Reload: `sudo systemctl reload sshd`
+
+#### Use a Passphrase
+
+Protect your private key with a passphrase. Use `ssh-agent` to avoid retyping:
+
+```bash
+# Start agent
+eval "$(ssh-agent -s)"
+
+# Add key (will prompt for passphrase once)
+ssh-add ~/.ssh/id_ed25519
+
+# macOS: store in Keychain
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+```
+
+Add to `~/.ssh/config`:
+
+```
+Host *
+    AddKeysToAgent yes
+    UseKeychain yes  # macOS only
+```
+
 ---
 
-## Run Onboarding Wizard
+## Part 3: Bot Configuration
+
+### 3.1 Run Onboarding Wizard
 
 ```bash
 ssh bruba
@@ -190,9 +451,7 @@ clawdbot onboard --install-daemon
 | Channel | Signal (recommended) or Telegram |
 | DM policy | Pairing (recommended) |
 
----
-
-## Security Hardening
+### 3.2 Security Hardening
 
 Edit `~/.clawdbot/clawdbot.json` to restrict agent permissions:
 
@@ -231,9 +490,7 @@ clawdbot status
 clawdbot security audit
 ```
 
----
-
-## Exec Lockdown
+### 3.3 Exec Lockdown
 
 **Critical:** With `sandbox.mode: "off"`, exec-approvals.json is ignored unless you explicitly enable gateway exec with allowlist security.
 
@@ -245,7 +502,7 @@ ssh bruba 'clawdbot daemon restart'
 
 **Why:** Without these settings, the bot can run arbitrary commands. The allowlist only enforces when `host: gateway` + `security: allowlist` are set.
 
-### Exec Allowlist Structure
+#### Exec Allowlist Structure
 
 Allowlists are **per-agent**. If your agent ID is `bruba-main`, entries must be in `agents.bruba-main.allowlist`:
 
@@ -269,18 +526,13 @@ Allowlists are **per-agent**. If your agent ID is `bruba-main`, entries must be 
 }
 ```
 
-**Adding entries:**
-```bash
-ssh bruba 'cat ~/.clawdbot/exec-approvals.json | jq ".agents[\"bruba-main\"].allowlist += [{\"pattern\": \"/path/to/binary\", \"id\": \"my-entry\"}]" > /tmp/exec-approvals.json && mv /tmp/exec-approvals.json ~/.clawdbot/exec-approvals.json'
-```
-
 **Verify structure:**
 ```bash
 ssh bruba 'cat ~/.clawdbot/exec-approvals.json | jq ".agents | keys"'
 # Should return: ["bruba-main"]
 ```
 
-### Pattern Matching Behavior
+#### Pattern Matching Behavior
 
 **Important:** Patterns match the **binary path only**, not the full command string.
 
@@ -293,13 +545,11 @@ ssh bruba 'cat ~/.clawdbot/exec-approvals.json | jq ".agents | keys"'
 - Each command in a pipe must use full path
 - Redirections (`2>/dev/null`) break allowlist mode
 
----
-
-## Config File Protection
+### 3.4 Config File Protection
 
 The agent can use `edit` and `write` tools to modify config files. Two ownership models exist:
 
-### Option A: Bot-Owned (Simpler)
+#### Option A: Bot-Owned (Simpler)
 
 ```bash
 ssh bruba "chmod 600 ~/.clawdbot/clawdbot.json"
@@ -308,7 +558,7 @@ ssh bruba "chmod 600 ~/.clawdbot/exec-approvals.json"
 
 **Protection:** Medium — agent could still modify via write/edit tools, but 600 prevents other users from reading.
 
-### Option B: Root-Owned (Hardened)
+#### Option B: Root-Owned (Hardened)
 
 ```bash
 sudo chown root:staff /Users/bruba/.clawdbot/clawdbot.json
@@ -333,11 +583,9 @@ ssh bruba 'clawdbot config set tools.deny ...'
 sudo chown root:staff /Users/bruba/.clawdbot/clawdbot.json
 ```
 
----
+### 3.5 Config Architecture Reference
 
-## Config Architecture Reference
-
-### Top-Level Sections
+#### Top-Level Sections
 
 | Section | Purpose |
 |---------|---------|
@@ -349,7 +597,7 @@ sudo chown root:staff /Users/bruba/.clawdbot/clawdbot.json
 | `gateway` | Gateway server settings |
 | `plugins` | Plugin configurations |
 
-### agents.defaults vs agents.list[]
+#### agents.defaults vs agents.list[]
 
 **agents.defaults** — Base settings inherited by ALL agents:
 ```json
@@ -386,7 +634,7 @@ sudo chown root:staff /Users/bruba/.clawdbot/clawdbot.json
 }
 ```
 
-### Tool Configuration Layers
+#### Tool Configuration Layers
 
 Multiple layers control tool access (evaluated in order):
 
@@ -399,11 +647,9 @@ Multiple layers control tool access (evaluated in order):
 | 5. Agent allow | `agents.list[].tools.allow` | Agent-specific grants |
 | 6. Exec allowlist | `exec-approvals.json` | Binary whitelist |
 
----
+### 3.6 Memory Plugin
 
-## Memory Plugin
-
-### Enable Memory Plugin
+#### Enable Memory Plugin
 
 Edit `~/.clawdbot/clawdbot.json`:
 
@@ -437,7 +683,7 @@ Edit `~/.clawdbot/clawdbot.json`:
 }
 ```
 
-### Enable Memory Tools in Sandbox
+#### Enable Memory Tools in Sandbox
 
 If using sandboxed sessions, add to `~/.clawdbot/clawdbot.json`:
 
@@ -455,7 +701,7 @@ If using sandboxed sessions, add to `~/.clawdbot/clawdbot.json`:
 }
 ```
 
-### Initialize Embeddings
+#### Initialize Embeddings
 
 ```bash
 # Restart to download model (~600MB)
@@ -466,13 +712,13 @@ tail -f ~/.clawdbot/logs/gateway.log
 # Wait for "Model loaded successfully"
 ```
 
-### Memory Indexing Constraints
+#### Memory Indexing Constraints
 
 - **Predefined sources only** — `memory` maps to `~/clawd/memory/*.md` + `MEMORY.md`
 - **No subdirectory recursion** — Only direct children are indexed
 - **Symlinks not followed** — Files must be actual files, not symlinks
 
-### Check Index Status
+#### Check Index Status
 
 ```bash
 ssh bruba "clawdbot memory status"
@@ -480,19 +726,9 @@ ssh bruba "clawdbot memory status --verbose"
 ssh bruba "clawdbot memory index --verbose"  # Force reindex
 ```
 
----
+### 3.7 Project Context Setup
 
-## Project Context Setup
-
-### Create Workspace
-
-```bash
-ssh bruba
-mkdir -p ~/clawd/memory
-mkdir -p ~/clawd/tools
-```
-
-### Create Core Context Files
+#### Create Core Context Files
 
 | File | Purpose |
 |------|---------|
@@ -503,7 +739,7 @@ mkdir -p ~/clawd/tools
 | `~/clawd/TOOLS.md` | Local setup notes |
 | `~/clawd/MEMORY.md` | Curated long-term memory |
 
-### Configure Project Context
+#### Configure Project Context
 
 ```json
 {
@@ -520,7 +756,7 @@ mkdir -p ~/clawd/tools
 }
 ```
 
-### Test Memory System
+#### Test Memory System
 
 ```bash
 # Create test file
@@ -537,13 +773,11 @@ clawdbot memory search "universe"
 # Should find the test file
 ```
 
----
-
-## Multi-Agent Setup
+### 3.8 Multi-Agent Setup (Optional)
 
 For security isolation, you may want multiple agents with different permission profiles.
 
-### Example: Main + Web Reader
+#### Example: Main + Web Reader
 
 ```json
 {
@@ -586,229 +820,11 @@ For security isolation, you may want multiple agents with different permission p
 - Reader runs sandboxed in Docker
 - Agents communicate via `sessions_send` or exec wrappers
 
-### Web Reader Auto-Start
-
-The web-reader runs in a Docker sandbox that stops when idle. To ensure it's available on login:
-
-**1. Create startup script:**
-```bash
-cat > ~/clawd/tools/ensure-web-reader.sh << "EOF"
-#!/bin/bash
-# Ensure web-reader sandbox is running
-
-READER_STATUS=$(clawdbot sandbox list 2>&1 | grep -A3 "web-reader")
-
-if echo "$READER_STATUS" | grep -q "running"; then
-    echo "web-reader: already running"
-    exit 0
-fi
-
-echo "web-reader: starting..."
-RESULT=$(clawdbot agent --agent web-reader -m "ping" --local --json 2>&1)
-
-if echo "$RESULT" | grep -q "payloads"; then
-    echo "web-reader: started successfully"
-    exit 0
-else
-    echo "web-reader: failed to start"
-    echo "$RESULT"
-    exit 1
-fi
-EOF
-chmod +x ~/clawd/tools/ensure-web-reader.sh
-```
-
-**2. Create launchd plist for auto-start:**
-```bash
-cat > ~/Library/LaunchAgents/com.bruba.web-reader.plist << "EOF"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.bruba.web-reader</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/Users/bruba/clawd/tools/ensure-web-reader.sh</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>/Users/bruba/.clawdbot/logs/web-reader-launch.log</string>
-    <key>StandardErrorPath</key>
-    <string>/Users/bruba/.clawdbot/logs/web-reader-launch.log</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PATH</key>
-        <string>/Users/bruba/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-    </dict>
-</dict>
-</plist>
-EOF
-
-# Load the agent
-launchctl load ~/Library/LaunchAgents/com.bruba.web-reader.plist
-```
-
-**3. Verify:**
-```bash
-launchctl list | grep web-reader
-# Should show: -    0    com.bruba.web-reader
-
-clawdbot sandbox list
-# Should show web-reader as running
-```
-
-**Note:** Docker Desktop must also be configured to start at login (Docker Desktop → Settings → General → "Start Docker Desktop when you sign in").
-
-### Migration from Single to Multi-Agent
-
-| Setting | Single-Agent | Multi-Agent |
-|---------|--------------|-------------|
-| Agent ID | `main` (default) | `bruba-main` (explicit) |
-| Exec allowlist | `agents.main.allowlist` | `agents.bruba-main.allowlist` |
-| Workspace | `agents.defaults.workspace` | Per-agent `agents.list[].workspace` |
-
-**Key migration steps:**
-1. Rename exec-approvals namespace from `agents.main` to `agents.bruba-main`
-2. Set explicit agent ID in `agents.list[]`
-3. Review per-agent tool permissions
-
 ---
 
-## Troubleshooting
+## Verification
 
-### Memory Tools Not Appearing
-
-**Symptom:** Memory tools missing from available tools
-
-**Check:**
-1. Plugin loaded? `clawdbot status | grep Memory`
-2. Sandbox tools configured? `cat ~/.clawdbot/clawdbot.json | jq '.tools.sandbox.tools'`
-3. Restart after config change? `clawdbot daemon restart`
-
-### Memory Search Fails: "database is not open"
-
-**Fix:**
-```bash
-clawdbot memory index --verbose
-clawdbot memory status --deep  # Should show Dirty: no
-```
-
-**Nuclear option:**
-```bash
-clawdbot daemon stop
-rm -f ~/.clawdbot/memory/*.sqlite
-clawdbot daemon start
-clawdbot memory index --verbose
-```
-
-### Exec Command Denied
-
-**Check:**
-1. `tools.exec.host` is `"gateway"`
-2. `tools.exec.security` is `"allowlist"`
-3. Binary path in `exec-approvals.json` under correct agent ID
-4. Using full path in command
-
-### Non-Interactive SSH Commands Fail
-
-**Symptom:** `ssh bruba "clawdbot status"` shows "command not found"
-
-**Fix:**
-```bash
-ssh bruba
-cat > ~/.zshenv << 'EOF'
-source ~/.zshrc
-EOF
-exit
-```
-
-### Files Not Being Indexed
-
-**Check:**
-1. Files directly in `~/clawd/memory/`? (no subdirectories)
-2. Real files, not symlinks? (`ls -la`)
-3. Valid source name? Only `memory` works
-
----
-
-## Key Insights & Gotchas
-
-### Installation & Config
-
-1. **npm link doesn't work reliably** — Manual symlink may be needed: `ln -sf ~/src/clawdbot/dist/entry.js ~/.npm-global/bin/clawdbot`
-
-2. **Phone numbers need `--json` flag** — `+1...` gets parsed as a number otherwise:
-   ```bash
-   clawdbot config set --json channels.signal.account '"+12025551234"'  # Correct
-   clawdbot config set channels.signal.account +12025551234             # Wrong
-   ```
-
-3. **Daemon doesn't load .zshrc** — Use FULL PATH to binaries in clawdbot config
-
-4. **Source install > npm global** — Better for dev/debugging, easier to update
-
-### Signal Setup
-
-5. **qrencode doesn't work for Signal linking** — Use https://qr.io with "Text mode" instead; qrencode mishandles URL-encoded base64
-
-6. **Signal requires three-step setup:**
-   1. Configure clawdbot (enable channel, set account, cliPath, httpPort)
-   2. Link signal-cli to phone (via QR code)
-   3. Approve pairing in clawdbot
-
-7. **Signal daemon port conflict** — Default 8080 may conflict with other services; use `httpPort: 8088`
-
-### Sandbox & Permissions
-
-8. **Sandbox mode "all" breaks CLI tool access** — Use `sandbox.mode: "off"` for host CLI access. exec-approvals.json is still the security boundary.
-
-9. **TCC permissions are per-binary** — Running `remindctl authorize` in Terminal grants permission to Terminal, but Clawdbot uses Node.js. Have the bot execute the command to grant permission to Node.js.
-
-10. **exec-approvals.json requires explicit gateway mode** — With `sandbox.mode: "off"`, the allowlist is ignored unless you also set `tools.exec.host: "gateway"` and `tools.exec.security: "allowlist"`
-
-### Shell Config
-
-Working shell config for the bot account:
-
-**~/.zshrc:**
-```bash
-# PATH setup - order matters
-export PATH="$HOME/.npm-global/bin:$PATH"    # npm globals (clawdbot)
-export PATH="/opt/homebrew/bin:$PATH"         # Homebrew
-export PATH="$HOME/.local/bin:$PATH"          # Local binaries
-export PATH="/usr/local/bin:$PATH"            # System binaries (Docker CLI symlink)
-```
-
-**~/.zshenv:**
-```bash
-source ~/.zshrc
-```
-
-**~/.npmrc:**
-```
-prefix=/Users/bruba/.npm-global
-```
-
-### Debug Commands
-
-```bash
-# Check daemon environment
-ssh bruba "launchctl getenv PATH"
-
-# Watch logs for issues
-ssh bruba "tail -f /tmp/clawdbot/clawdbot-$(date +%Y-%m-%d).log"
-
-# Check if binary accessible
-ssh bruba "sudo -u bruba /bin/zsh -c 'which clawdbot'"
-```
-
----
-
-## Testing Checklist
-
-After setup, verify:
+### Testing Checklist
 
 | Test | Command/Action | Expected |
 |------|----------------|----------|
@@ -819,9 +835,7 @@ After setup, verify:
 | Exec working | Allowlisted command | Executes |
 | Exec blocked | Non-allowlisted command | Denied |
 
----
-
-## File Locations
+### File Locations
 
 | Path | Purpose |
 |------|---------|
@@ -836,8 +850,21 @@ After setup, verify:
 
 ---
 
+## Next Steps
+
+1. **Set up Signal channel** — See `components/signal/README.md` for Signal messaging setup
+2. **Configure heartbeat** — Use `/config` for proactive messages
+3. **Set up content sync** — See [Operations Guide](operations-guide.md) for `/mirror`, `/pull`, `/push`
+4. **Add exec-approvals** — Add tools the bot can run to the allowlist
+5. **Customize prompts** — Edit `~/clawd/` context files
+
+For troubleshooting, see [Troubleshooting Guide](troubleshooting.md).
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-01-30 | Initial version |
+| 2.0.0 | 2026-02-01 | Consolidated from 4 setup docs |
+| 1.0.0 | 2026-01-30 | Initial version (full-setup-guide.md) |
