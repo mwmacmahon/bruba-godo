@@ -1,5 +1,5 @@
 ---
-version: 2.1.0
+version: 2.2.0
 updated: 2026-02-02
 type: packet
 project: planning
@@ -68,13 +68,18 @@ This packet contains everything needed to complete Bruba's multi-agent architect
 │  • Conversations  │ │             │
 │  • File ops       │ │             │
 │  • Complex tasks  │ │             │
+│  • Siri async     │ │             │
 │                   │ │             │
-│  For research:    │ │             │
-│  sessions_send────┼─┼─────┐      │
-│  to Manager       │ │     │      │
-└───────────────────┘ │     │      │
-                      │     │      │
-                      ▼     ▼      ▼
+│  For web search:  │ │             │
+│  sessions_spawn───┼─┼─────────┐  │
+│  (sync, wait)     │ │         │  │
+│                   │ │         │  │
+│  For async work:  │ │         │  │
+│  sessions_send────┼─┼───┐     │  │
+│  to Manager       │ │   │     │  │
+└───────────────────┘ │   │     │  │
+                      │   │     │  │
+                      ▼   ▼     │  │
               ┌─────────────────────────┐
               │  bruba-manager          │
               │  ──────────────         │
@@ -83,36 +88,42 @@ This packet contains everything needed to complete Bruba's multi-agent architect
               │  Heartbeat: 15m         │
               │                         │
               │  Handles:               │
-              │  • Siri quick queries   │
+              │  • Siri sync queries    │
               │  • Heartbeat checks     │
-              │  • Spawning helpers     │
-              │  • Tracking helper state│
+              │  • Async background work│
+              │  • Tracking its helpers │
               │                         │
-              │  Tools: READ-ONLY       │
+              │  Tools: read + write    │
+              │  (state/results only)   │
               │  + sessions_*           │
-              └───────────┬─────────────┘
+              │           │             │
+              └───────────┼─────────────┘
                           │
-                          │ sessions_spawn
+                          │ sessions_spawn (async)
                           ▼
               ┌─────────────────────────┐
               │  Helper (ephemeral)     │
               │  ──────────────         │
-              │  Model: Sonnet          │
+              │  Model: Opus (preferred)│
               │  Lifetime: ~5-10 min    │
               │  Auto-archive: 60m      │
               │                         │
-              │  Has:                   │
-              │  • web_search           │
+              │  Has:                   │◄───── Main also spawns
+              │  • web_search           │       helpers (sync)
               │  • web_fetch            │
               │  • read (workspace)     │
               │  • write (results only) │
               │                         │
               │  On complete:           │
               │  • Write to file        │
-              │  • Announce to Manager  │
-              │  • Deliver to Signal    │
+              │  • Announce to spawner  │
+              │  • (Manager forwards)   │
               └─────────────────────────┘
 ```
+
+**Key distinction:**
+- **Main** spawns helpers for web search during conversations (synchronous, waits for result)
+- **Manager** spawns helpers for async/background tasks and tracks their lifecycle
 
 ### Why This Architecture
 
@@ -186,10 +197,10 @@ This is what's deployed after Phases 1-3:
         "heartbeat": { "every": "0m" },
         "sandbox": { "mode": "off" },
         "tools": {
-          "allow": ["read", "write", "edit", "apply_patch", "exec", 
-                    "memory_search", "memory_get", "sessions_list", 
+          "allow": ["read", "write", "edit", "apply_patch", "exec",
+                    "memory_search", "memory_get",
                     "sessions_send", "sessions_spawn", "session_status"],
-          "deny": ["cron", "gateway"]
+          "deny": ["web_search", "web_fetch", "sessions_list", "cron", "gateway"]
         }
       },
       {
@@ -208,21 +219,10 @@ This is what's deployed after Phases 1-3:
         },
         "sandbox": { "mode": "off" },
         "tools": {
-          "allow": ["read", "sessions_list", "sessions_send", "sessions_spawn",
+          "allow": ["read", "write", "sessions_list", "sessions_send", "sessions_spawn",
                     "session_status", "exec", "memory_search", "memory_get"],
-          "deny": ["write", "edit", "apply_patch", "browser", "canvas",
+          "deny": ["edit", "apply_patch", "web_search", "web_fetch", "browser", "canvas",
                    "gateway", "cron", "nodes", "process"]
-        }
-      },
-      {
-        "id": "web-reader",
-        "name": "Web Reader",
-        "workspace": "/Users/bruba/agents/bruba-reader",
-        "model": { "primary": "anthropic/claude-opus-4-5" },
-        "sandbox": { "mode": "all", "scope": "agent" },
-        "tools": {
-          "allow": ["web_fetch", "web_search", "read"],
-          "deny": ["exec", "write", "edit", "apply_patch", "memory_search"]
         }
       }
     ]
@@ -230,7 +230,7 @@ This is what's deployed after Phases 1-3:
   "tools": {
     "agentToAgent": {
       "enabled": true,
-      "allow": ["bruba-main", "bruba-manager", "web-reader"]
+      "allow": ["bruba-main", "bruba-manager"]
     }
   },
   "bindings": [
@@ -248,15 +248,19 @@ This is what's deployed after Phases 1-3:
 │   │   ├── IDENTITY.md
 │   │   ├── SOUL.md
 │   │   ├── TOOLS.md
+│   │   ├── AGENTS.md
 │   │   ├── MEMORY.md
 │   │   └── memory/
 │   ├── bruba-manager/        # Manager workspace
 │   │   ├── IDENTITY.md
 │   │   ├── SOUL.md
 │   │   ├── TOOLS.md
-│   │   └── HEARTBEAT.md
-│   └── bruba-reader/         # TO BE DELETED
-│       └── SOUL.md
+│   │   ├── AGENTS.md
+│   │   ├── HEARTBEAT.md
+│   │   ├── state/            # Helper tracking
+│   │   ├── results/          # Helper outputs
+│   │   └── inbox/            # Cron job outputs
+│   └── .archive/             # Archived agents (web-reader)
 └── .openclaw/
     ├── openclaw.json
     ├── exec-approvals.json
@@ -739,12 +743,7 @@ After Phase 4, your `openclaw.json` should look like:
     "defaults": {
       "workspace": "/Users/bruba/.openclaw/workspace",
       "compaction": { "mode": "safeguard" },
-      "maxConcurrent": 4,
-      "subagents": {
-        "maxConcurrent": 2,
-        "archiveAfterMinutes": 60,
-        "model": "anthropic/claude-sonnet-4-5"
-      }
+      "maxConcurrent": 4
     },
     "list": [
       {
@@ -759,8 +758,7 @@ After Phase 4, your `openclaw.json` should look like:
         "heartbeat": { "every": "0m" },
         "sandbox": { "mode": "off" },
         "tools": {
-          "allow": ["group:fs", "group:runtime", "group:sessions", "group:memory", "exec", "web_search", "web_fetch"],
-          "deny": ["cron", "gateway"]
+          "deny": ["web_fetch", "web_search", "browser", "canvas", "cron", "gateway"]
         }
       },
       {
@@ -779,16 +777,10 @@ After Phase 4, your `openclaw.json` should look like:
         },
         "sandbox": { "mode": "off" },
         "subagents": {
-          "maxConcurrent": 2,
-          "archiveAfterMinutes": 60,
-          "model": "anthropic/claude-sonnet-4-5"
+          "model": "anthropic/claude-opus-4-5"
         },
         "tools": {
-          "allow": ["read", "write", "sessions_list", "sessions_send",
-                    "sessions_spawn", "session_status", "exec",
-                    "memory_search", "memory_get"],
-          "deny": ["edit", "apply_patch", "browser", "canvas",
-                   "gateway", "cron", "nodes", "process"]
+          "deny": ["exec", "browser", "canvas"]
         }
       }
     ]
@@ -804,8 +796,7 @@ After Phase 4, your `openclaw.json` should look like:
     "subagents": {
       "tools": {
         "allow": ["web_search", "web_fetch", "read", "write"],
-        "deny": ["exec", "edit", "apply_patch", "gateway", "cron",
-                 "sessions_spawn", "browser", "canvas", "nodes"]
+        "deny": ["exec", "browser", "canvas", "cron", "gateway", "sessions_spawn"]
       }
     }
   },
@@ -828,6 +819,17 @@ After Phase 4, your `openclaw.json` should look like:
     }
   }
 }
+```
+
+**Tool configuration approach:**
+- **Main:** Deny-only list blocks web access (helpers do that) and admin tools
+- **Manager:** Minimal deny list (no exec, no browser/canvas). Spawns helpers with Opus.
+- **Subagents:** Explicit allow list for research tools + deny list for dangerous ops
+
+Tool configs are managed via bruba-godo's `config.yaml` and synced using:
+```bash
+./tools/update-agent-tools.sh --check   # Check for discrepancies
+./tools/update-agent-tools.sh           # Apply config.yaml → bot
 ```
 
 ---
@@ -972,7 +974,7 @@ Agent selection via `x-openclaw-agent-id` header:
 curl -X POST https://dadmini.ts.net/v1/chat/completions \
   -H 'Authorization: Bearer YOUR_GATEWAY_TOKEN' \
   -H 'x-openclaw-agent-id: bruba-manager' \
-  -d '{"model":"openclaw","messages":[{"role":"user","content":"[Via Siri] What time is it?"}]}'
+  -d '{"model":"openclaw","messages":[{"role":"user","content":"[From Siri] What time is it?"}]}'
 
 # To Main (async tasks)
 curl -X POST https://dadmini.ts.net/v1/chat/completions \
@@ -996,7 +998,7 @@ Quick queries — wait for response, Siri speaks it.
      ```json
      {
        "model": "openclaw",
-       "messages": [{"role":"user","content":"[Via Siri] [Shortcut Input]"}]
+       "messages": [{"role":"user","content":"[From Siri] [Shortcut Input]"}]
      }
      ```
 
@@ -1035,7 +1037,7 @@ Note: iOS Shortcuts fires the request but doesn't wait — Main processes in bac
 ```markdown
 ## Siri Requests
 
-Messages starting with "[Via Siri]" come from voice shortcuts.
+Messages starting with "[From Siri]" come from voice shortcuts.
 
 For these:
 - Respond concisely (Siri will speak it)
@@ -1184,7 +1186,7 @@ The operator workspace (bruba-godo) has been updated to support multi-agent prom
 agents:
   bruba-main:
     workspace: /Users/bruba/agents/bruba-main
-    prompts: [agents, tools, heartbeat]
+    prompts: [agents, tools]           # No heartbeat (disabled via every: 0m)
     remote_path: memory
     agents_sections:
       - header
@@ -1195,8 +1197,6 @@ agents:
     tools_sections:
       - base
       - reminders
-    heartbeat_sections:
-      - base
 
   bruba-manager:
     workspace: /Users/bruba/agents/bruba-manager
@@ -1305,7 +1305,68 @@ get_agents()
 load_agent_config "bruba-main"
 # Sets: AGENT_NAME, AGENT_WORKSPACE, AGENT_PROMPTS,
 #       AGENT_REMOTE_PATH, AGENT_MIRROR_DIR, AGENT_EXPORT_DIR
+
+# Get tool permissions from config.yaml
+get_agent_tools_deny "bruba-main"
+# Returns: JSON array of denied tools
+
+get_subagents_config
+# Returns: JSON object with subagent tool config
 ```
+
+### Tool Config Sync
+
+Agent tool permissions (allow/deny lists) are defined in `config.yaml` and synced to the bot's `openclaw.json`:
+
+```yaml
+# config.yaml
+agents:
+  bruba-main:
+    tools_deny:
+      - web_fetch
+      - web_search
+      - browser
+      - canvas
+      - cron
+      - gateway
+
+  bruba-manager:
+    tools_deny:
+      - exec
+      - browser
+      - canvas
+
+subagents:
+  tools_allow:
+    - web_search
+    - web_fetch
+    - read
+    - write
+  tools_deny:
+    - exec
+    - browser
+    - canvas
+    - cron
+    - gateway
+    - sessions_spawn
+```
+
+**Sync commands:**
+
+```bash
+# Check for discrepancies (config.yaml vs bot)
+./tools/update-agent-tools.sh --check
+
+# Apply config.yaml to bot
+./tools/update-agent-tools.sh --verbose
+
+# Integrated into /sync skill (Step 5b)
+```
+
+**Design:**
+- **Deny-only for agents:** Main and Manager use deny lists; allow is inherited from OpenClaw defaults
+- **Explicit allow for subagents:** Helpers get explicit allow list to restrict to research tools
+- **Order-independent comparison:** Sync detects actual differences, ignoring array ordering
 
 ### Verification
 
@@ -1331,4 +1392,4 @@ ls exports/bot/bruba-manager/core-prompts/
 
 This packet is self-contained. All configuration, file contents, commands, and verification steps are included. No external references needed.
 
-**Start with Phase 4a** — delete web-reader, configure helpers.
+**Implementation complete.** All phases done except optional morning cron (Phase 5).

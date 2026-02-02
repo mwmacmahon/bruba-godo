@@ -566,6 +566,186 @@ test_push_multi_agent() {
 }
 
 # ============================================================
+# Test 7: Agent Tools Config Parsing
+# ============================================================
+test_agent_tools_parsing() {
+    log ""
+    log "=== Test 7: Agent Tools Config Parsing ==="
+
+    source ./tools/lib.sh
+    load_config
+
+    # Check bruba-main tools_deny (deny-only config)
+    local main_deny
+    main_deny=$(get_agent_tools_deny "bruba-main")
+    if [[ -z "$main_deny" || "$main_deny" == "null" ]]; then
+        fail "bruba-main tools_deny not found in config.yaml"
+        return 1
+    fi
+
+    if echo "$main_deny" | grep -q "cron"; then
+        pass "bruba-main has 'cron' in tools_deny"
+    else
+        fail "bruba-main missing 'cron' in tools_deny"
+    fi
+
+    if echo "$main_deny" | grep -q "web_search"; then
+        pass "bruba-main has 'web_search' in tools_deny"
+    else
+        fail "bruba-main missing 'web_search' in tools_deny"
+    fi
+
+    if echo "$main_deny" | grep -q "gateway"; then
+        pass "bruba-main has 'gateway' in tools_deny"
+    else
+        fail "bruba-main missing 'gateway' in tools_deny"
+    fi
+
+    # Check bruba-manager tools_deny (deny-only config)
+    local mgr_deny
+    mgr_deny=$(get_agent_tools_deny "bruba-manager")
+    if echo "$mgr_deny" | grep -q "exec"; then
+        pass "bruba-manager has 'exec' in tools_deny"
+    else
+        fail "bruba-manager missing 'exec' in tools_deny"
+    fi
+}
+
+# ============================================================
+# Test 8: Subagent Tools Config Parsing
+# ============================================================
+test_subagent_tools_parsing() {
+    log ""
+    log "=== Test 8: Subagent Tools Config Parsing ==="
+
+    source ./tools/lib.sh
+    load_config
+
+    local subagent_config
+    subagent_config=$(get_subagents_config)
+
+    if [[ -z "$subagent_config" || "$subagent_config" == "null" ]]; then
+        fail "subagents config not found in config.yaml"
+        return 1
+    fi
+
+    if echo "$subagent_config" | grep -q "web_search"; then
+        pass "subagents has 'web_search' in tools_allow"
+    else
+        fail "subagents missing 'web_search' in tools_allow"
+    fi
+
+    if echo "$subagent_config" | grep -q "web_fetch"; then
+        pass "subagents has 'web_fetch' in tools_allow"
+    else
+        fail "subagents missing 'web_fetch' in tools_allow"
+    fi
+
+    # Check model config
+    if echo "$subagent_config" | grep -q "opus"; then
+        pass "subagents configured with opus model"
+    else
+        fail "subagents missing opus model configuration"
+    fi
+}
+
+# ============================================================
+# Test 9: Agent Tools Sync Dry-Run
+# ============================================================
+test_agent_tools_sync_dry_run() {
+    log ""
+    log "=== Test 9: Agent Tools Sync Dry-Run ==="
+
+    if [[ "$QUICK" == "true" ]]; then
+        skip "Agent tools sync (--quick mode)"
+        return 0
+    fi
+
+    # Check SSH connectivity
+    if ! ./tools/bot echo "ping" >/dev/null 2>&1; then
+        skip "Agent tools sync (no SSH connectivity)"
+        return 0
+    fi
+
+    # Run with --dry-run, should not error
+    output=$(./tools/update-agent-tools.sh --dry-run 2>&1)
+    if [[ $? -eq 0 ]]; then
+        pass "Agent tools sync dry-run completed"
+    else
+        fail "Agent tools sync dry-run failed: $output"
+        return 1
+    fi
+}
+
+# ============================================================
+# Test 10: Agent Tools Check
+# ============================================================
+test_agent_tools_check() {
+    log ""
+    log "=== Test 10: Agent Tools Check ==="
+
+    if [[ "$QUICK" == "true" ]]; then
+        skip "Agent tools check (--quick mode)"
+        return 0
+    fi
+
+    # Check SSH connectivity
+    if ! ./tools/bot echo "ping" >/dev/null 2>&1; then
+        skip "Agent tools check (no SSH connectivity)"
+        return 0
+    fi
+
+    # Run with --check, capture output
+    output=$(./tools/update-agent-tools.sh --check 2>&1)
+    # Should complete without error (may show discrepancies)
+    if [[ $? -eq 0 ]]; then
+        pass "Agent tools check completed"
+        if echo "$output" | grep -q "in sync"; then
+            pass "Agent tools are in sync with config"
+        else
+            log "  Note: Some discrepancies found (expected if config was just updated)"
+        fi
+    else
+        fail "Agent tools check failed: $output"
+    fi
+}
+
+# ============================================================
+# Test 11: Config Sync Round-Trip Verification
+# ============================================================
+test_config_sync_roundtrip() {
+    log ""
+    log "=== Test 11: Config Sync Round-Trip Verification ==="
+
+    if [[ "$QUICK" == "true" ]]; then
+        skip "Config sync round-trip (--quick mode)"
+        return 0
+    fi
+
+    # Check SSH connectivity
+    if ! ./tools/bot echo "ping" >/dev/null 2>&1; then
+        skip "Config sync round-trip (no SSH connectivity)"
+        return 0
+    fi
+
+    # This test verifies that running --check shows "in sync"
+    # after the config.yaml has been aligned with bot state
+    output=$(./tools/update-agent-tools.sh --check 2>&1)
+
+    if echo "$output" | grep -q "in sync"; then
+        pass "Agent tools config in sync with bot"
+    else
+        # Show what's different
+        fail "Config not in sync with bot"
+        if [[ "$VERBOSE" == "true" ]]; then
+            echo "  Discrepancies found:"
+            echo "$output" | grep -E "(allow|deny):" | head -10
+        fi
+        return 1
+    fi
+}
+
+# ============================================================
 # Main
 # ============================================================
 log "Prompt Assembly Test Suite (Multi-Agent)"
@@ -581,6 +761,11 @@ test_multiple_component_edits || true
 test_silent_transcript_mode || true
 test_sync_cycle || true
 test_push_multi_agent || true
+test_agent_tools_parsing || true
+test_subagent_tools_parsing || true
+test_agent_tools_sync_dry_run || true
+test_agent_tools_check || true
+test_config_sync_roundtrip || true
 
 log ""
 log "========================================"

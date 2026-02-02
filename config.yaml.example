@@ -18,25 +18,28 @@ local:
   intake: intake
   reference: reference
   exports: exports
+  assembled: assembled
 
 # Copy repo code (scripts, docs, prompts) to bot workspace during push
 # Read-only reference - bot can read to understand codebase, not execute
 clone_repo_code: false
 
-# Export definitions
-# Defines how content is filtered and synced to destinations
-exports:
-  bot:
-    description: "Content synced to bot memory"
-    output_dir: exports/bot
-    remote_path: memory
-    include:
-      scope: [meta, reference, transcripts]
-      type: [prompt, doc, refdoc, claude_code_log]
-    exclude:
-      sensitivity: [sensitive, restricted]
-    redaction: [names, health]
-    # Section order for prompt file assembly
+# Multi-agent configuration
+# Each agent has its own workspace and prompt assembly config
+agents:
+  <agent-id>-main:
+    workspace: /Users/<bot-username>/agents/<agent-id>-main
+    prompts: [agents, tools]  # Which prompt files to assemble
+    # Tool permissions (synced to openclaw.json via update-agent-tools.sh)
+    # Use deny-only: Main can do everything except web access and admin tools
+    tools_deny:
+      - web_fetch
+      - web_search
+      - browser
+      - canvas
+      - cron
+      - gateway
+    # Prompt assembly sections
     # - base → include full template (templates/prompts/{NAME}.md)
     # - name → component (components/{name}/prompts/{NAME}.snippet.md)
     # - name → template section (templates/prompts/sections/{name}.md)
@@ -57,33 +60,84 @@ exports:
       - repo-reference
       - group-chats
       - tools
+      # - web-search           # Enable for web search capability
+      # - reminders            # Enable for reminders integration
       - voice
-      - heartbeats
+      # - heartbeats           # Enable for heartbeat mode
       - signal
-      - make-it-yours
-
-    # TOOLS.md assembly
+      # - make-it-yours
     tools_sections:
-      - base              # templates/prompts/TOOLS.md
-      # - reminders       # components/reminders/prompts/TOOLS.snippet.md (if enabled)
-
-    # HEARTBEAT.md assembly
-    heartbeat_sections:
       - base
+      # - reminders            # Enable for reminders tool additions
+    # Export config for this agent's memory content
+    remote_path: memory
+    include:
+      scope: [meta, reference, transcripts]
+      type: [prompt, doc, refdoc, claude_code_log]
+    exclude:
+      sensitivity: [sensitive, restricted]
+    redaction: [names, health]
 
-    # Note: USER.md, IDENTITY.md, SOUL.md, MEMORY.md, BOOTSTRAP.md are NOT assembled
-    # They are managed directly by the bot and not overwritten during sync
+  <agent-id>-manager:
+    workspace: /Users/<bot-username>/agents/<agent-id>-manager
+    prompts: [agents, tools, heartbeat]
+    # Tool permissions (synced to openclaw.json)
+    # Manager uses minimal deny list; spawns helpers for research
+    tools_deny:
+      - exec
+      - browser
+      - canvas
+    # Manager uses manager-base templates
+    agents_sections:
+      - manager-base
+    tools_sections:
+      - manager-base
+    heartbeat_sections:
+      - manager-base
 
+  <agent-id>-helper:
+    workspace: null
+    prompts: []
+    # Helpers have no persistent prompts - instructions come via spawn task
+    # Helper tools defined in subagents section below
+
+# Subagent (helper) configuration
+# These settings apply to all helpers spawned by any agent
+# Helpers need explicit allow list (restricted to research tools)
+subagents:
+  max_concurrent: 2
+  archive_after_minutes: 60
+  model: anthropic/claude-opus-4-5
+  tools_allow:
+    - web_search
+    - web_fetch
+    - read
+    - write
+  tools_deny:
+    - exec
+    - browser
+    - canvas
+    - cron
+    - gateway
+    - sessions_spawn
+
+# Export profiles for non-agent destinations
+exports:
   claude:
     description: "Prompts for Claude Projects / Claude Code"
     output_dir: exports/claude
+    flatten_export: true
     include:
-      type: [prompt, doc, refdoc]
       scope: [meta, reference, transcripts]
+      type: [prompt, doc, refdoc, claude_code_log]
+    exclude:
+      sensitivity: [sensitive, restricted]
+    redaction: [names, health]
 
   tests:
     description: "Local testing profile"
     output_dir: exports/tests
+    skip_auto_export: true
     include:
       type: [prompt]
       scope: [meta, reference, transcripts]

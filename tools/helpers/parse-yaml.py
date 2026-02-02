@@ -10,6 +10,7 @@ Usage:
 Examples:
     parse-yaml.py config.yaml ssh.host
     parse-yaml.py config.yaml local --json
+    parse-yaml.py config.yaml agents.bruba-main.tools_allow
     parse-yaml.py document.md --frontmatter
 """
 
@@ -17,11 +18,31 @@ import sys
 import json
 import re
 
+# Try to use PyYAML for proper nested structure support
+try:
+    import yaml
+    HAS_PYYAML = True
+except ImportError:
+    HAS_PYYAML = False
+
+
+def parse_yaml(content):
+    """
+    Parse YAML content. Uses PyYAML if available (required for nested structures),
+    falls back to simple parser for basic configs.
+    """
+    if HAS_PYYAML:
+        return yaml.safe_load(content) or {}
+    else:
+        # Fallback to simple parser (limited - doesn't handle deep nesting)
+        return parse_yaml_simple(content)
+
 
 def parse_yaml_simple(content):
     """
     Simple YAML parser for basic key-value and nested structures.
-    Avoids PyYAML dependency.
+    WARNING: Does not properly handle deeply nested structures.
+    Use PyYAML for full support: pip install pyyaml
     """
     result = {}
     stack = [(result, -1)]  # (dict, indent_level)
@@ -117,7 +138,7 @@ def extract_frontmatter(content):
     """Extract YAML frontmatter from markdown file."""
     match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
     if match:
-        return parse_yaml_simple(match.group(1))
+        return parse_yaml(match.group(1))
     return {}
 
 
@@ -149,14 +170,14 @@ def main():
         sys.exit(1)
 
     if operation == '--json':
-        data = parse_yaml_simple(content)
+        data = parse_yaml(content)
         print(json.dumps(data, indent=2))
     elif operation == '--frontmatter':
         data = extract_frontmatter(content)
         print(json.dumps(data, indent=2))
     else:
         # Get specific key
-        data = parse_yaml_simple(content)
+        data = parse_yaml(content)
         value = get_nested_value(data, operation)
         if value is None:
             sys.exit(1)

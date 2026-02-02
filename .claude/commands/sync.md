@@ -76,6 +76,25 @@ If user chooses to update:
 ./tools/update-allowlist.sh --remove-only # Only remove orphans
 ```
 
+#### Step 5b: Validate Agent Tool Configs
+
+Check agent tool configs match config.yaml:
+
+```bash
+./tools/update-agent-tools.sh --check
+```
+
+**IF DISCREPANCIES ARE DETECTED:**
+
+Show the output to the user. Ask:
+- [A] Apply changes (sync config.yaml → bot)
+- [S] Skip
+
+If user chooses to apply:
+```bash
+./tools/update-agent-tools.sh --verbose
+```
+
 #### Step 6: Restart Daemon
 
 Restart daemon to apply synced changes (prompts, allowlist, memory index):

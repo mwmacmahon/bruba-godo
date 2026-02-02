@@ -24,6 +24,7 @@ source "$(dirname "$0")/lib.sh"
 NO_INDEX=false
 TOOLS_ONLY=false
 UPDATE_ALLOWLIST=false
+SYNC_TOOLS=false
 AGENT_FILTER=""
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -39,6 +40,10 @@ while [[ $# -gt 0 ]]; do
             UPDATE_ALLOWLIST=true
             shift
             ;;
+        --sync-tools)
+            SYNC_TOOLS=true
+            shift
+            ;;
         --agent=*)
             AGENT_FILTER="${1#*=}"
             shift
@@ -50,7 +55,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if ! parse_common_args "$@"; then
-    echo "Usage: $0 [--dry-run] [--verbose] [--no-index] [--tools-only] [--update-allowlist] [--agent=NAME]"
+    echo "Usage: $0 [--dry-run] [--verbose] [--no-index] [--tools-only] [--update-allowlist] [--sync-tools] [--agent=NAME]"
     echo ""
     echo "Push content bundles to bot memory."
     echo ""
@@ -61,6 +66,7 @@ if ! parse_common_args "$@"; then
     echo "  --no-index          Skip memory reindex after sync"
     echo "  --tools-only        Sync only component tools (skip content)"
     echo "  --update-allowlist  Update exec-approvals with component tool entries"
+    echo "  --sync-tools        Sync agent tool configs from config.yaml to openclaw.json"
     echo "  --agent=NAME        Push for specific agent only"
     exit 0
 fi
@@ -284,7 +290,20 @@ if [[ "$DRY_RUN" != "true" ]]; then
     log "  $TOOLS_COUNT tool files synced"
 fi
 
-# 5. Update allowlist if requested
+# 5. Sync agent tool configs if requested
+if [[ "$SYNC_TOOLS" == "true" ]]; then
+    log "Syncing agent tool configs..."
+    TOOLS_ARGS=""
+    [[ "$DRY_RUN" == "true" ]] && TOOLS_ARGS="--dry-run"
+    [[ "$VERBOSE" == "true" ]] && TOOLS_ARGS="$TOOLS_ARGS --verbose"
+    if "$ROOT_DIR/tools/update-agent-tools.sh" $TOOLS_ARGS; then
+        log "Agent tool configs synced"
+    else
+        log "Warning: Agent tool config sync had issues"
+    fi
+fi
+
+# 6. Update allowlist if requested
 if [[ "$UPDATE_ALLOWLIST" == "true" ]]; then
     log "Updating exec-approvals allowlist..."
     ALLOWLIST_ARGS=""

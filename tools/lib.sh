@@ -108,6 +108,38 @@ except Exception as e:
     AGENT_EXPORT_DIR="$EXPORTS_DIR/bot/$agent"
 }
 
+# Get tools_allow list for an agent from config.yaml
+# Usage: get_agent_tools_allow "bruba-main"
+# Returns: JSON array of allowed tools
+get_agent_tools_allow() {
+    local agent="$1"
+    local config_file="$ROOT_DIR/config.yaml"
+    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
+
+    "$helper" "$config_file" "agents.$agent.tools_allow" 2>/dev/null
+}
+
+# Get tools_deny list for an agent from config.yaml
+# Usage: get_agent_tools_deny "bruba-main"
+# Returns: JSON array of denied tools
+get_agent_tools_deny() {
+    local agent="$1"
+    local config_file="$ROOT_DIR/config.yaml"
+    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
+
+    "$helper" "$config_file" "agents.$agent.tools_deny" 2>/dev/null
+}
+
+# Get subagents config from config.yaml
+# Usage: get_subagents_config
+# Returns: JSON object with subagent settings
+get_subagents_config() {
+    local config_file="$ROOT_DIR/config.yaml"
+    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
+
+    "$helper" "$config_file" "subagents" 2>/dev/null
+}
+
 # Cross-platform sed in-place
 # Usage: sed_inplace 's/foo/bar/' file.txt
 sed_inplace() {
