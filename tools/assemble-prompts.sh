@@ -11,9 +11,11 @@
 # Assembly reads *_sections from config.yaml and resolves each entry:
 #   1. base         → full template file (templates/prompts/{NAME}.md)
 #   2. manager-base → manager template (templates/prompts/manager/{NAME}.md)
-#   3. bot:name     → bot-managed section from mirror (<!-- BOT-MANAGED: name -->)
-#   4. name         → component snippet (components/{name}/prompts/{NAME}.snippet.md)
-#   5. name         → template section (templates/prompts/sections/{name}.md)
+#   3. web-base     → web agent template (templates/prompts/web/{NAME}.md)
+#   4. guru-base    → guru agent template (templates/prompts/guru/{NAME}.md)
+#   5. bot:name     → bot-managed section from mirror (<!-- BOT-MANAGED: name -->)
+#   6. name         → component snippet (components/{name}/prompts/{NAME}.snippet.md)
+#   7. name         → template section (templates/prompts/sections/{name}.md)
 #
 # Logs: logs/assemble.log
 
@@ -172,6 +174,17 @@ resolve_section() {
         fi
     fi
 
+    # Handle 'guru-base' - include guru agent template
+    if [[ "$entry" == "guru-base" ]]; then
+        local template_file="$ROOT_DIR/templates/prompts/guru/${prompt_upper}.md"
+        if [[ -f "$template_file" ]]; then
+            cat "$template_file"
+            return 0
+        else
+            return 1
+        fi
+    fi
+
     # Check if bot-managed (bot:name)
     if [[ "$entry" =~ ^bot:(.+)$ ]]; then
         local bot_name="${BASH_REMATCH[1]}"
@@ -230,6 +243,12 @@ get_section_type() {
     elif [[ "$entry" == "web-base" ]]; then
         if [[ -f "$ROOT_DIR/templates/prompts/web/${prompt_upper}.md" ]]; then
             echo "web-base"
+        else
+            echo "missing"
+        fi
+    elif [[ "$entry" == "guru-base" ]]; then
+        if [[ -f "$ROOT_DIR/templates/prompts/guru/${prompt_upper}.md" ]]; then
+            echo "guru-base"
         else
             echo "missing"
         fi
@@ -336,6 +355,16 @@ assemble_prompt_file() {
                     resolve_section "$entry" "$prompt_name" >> "$output_file"
                     echo "" >> "$output_file"
                     log "  + Web-Base: templates/prompts/web/${prompt_upper}.md"
+                    base_added=1
+                fi
+                ;;
+            guru-base)
+                if [[ "$DRY_RUN" == "true" ]]; then
+                    log "  Would add guru-base template"
+                else
+                    resolve_section "$entry" "$prompt_name" >> "$output_file"
+                    echo "" >> "$output_file"
+                    log "  + Guru-Base: templates/prompts/guru/${prompt_upper}.md"
                     base_added=1
                 fi
                 ;;

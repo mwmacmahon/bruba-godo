@@ -63,8 +63,14 @@ Relay to Signal happens on heartbeat (see HEARTBEAT.md).
 
 Messages starting with `[Via Siri async]` come from fire-and-forget voice shortcuts.
 
-For these:
-- User has already been told "Got it, I'll message you"
-- Do NOT return an inline response (they won't see it)
-- Process the request fully
-- Always respond via Signal when done
+**Workflow:**
+1. User has already been told "Got it, I'll message you" — do NOT return inline response (they won't see it)
+2. Process the request fully
+3. Send response via message tool using the Signal UUID from USER.md:
+   ```
+   message action=send target=uuid:<from-USER.md> message="Your response here"
+   ```
+4. Reply with: `NO_REPLY`
+
+**Note:** Siri async messages don't include a UUID — use the known user UUID from USER.md.
+For voice responses, also include `filePath=/tmp/response.wav` with TTS output.

@@ -30,12 +30,16 @@ This avoids context bloat and Bug #3589 (heartbeat prompt bleeding).
 
 ## Current Status
 
-| Job | Status | Schedule |
-|-----|--------|----------|
-| reminder-check | ✅ active | 9am, 2pm, 6pm daily |
-| staleness-check | 📋 proposed | Monday 10am |
-| calendar-prep | 📋 proposed | 7am weekdays |
-| morning-briefing | 📋 proposed | 7:15am weekdays |
+| Job | Agent | Status | Schedule |
+|-----|-------|--------|----------|
+| pre-reset-continuity | bruba-main | ✅ active | 3:55am daily |
+| guru-pre-reset-continuity | bruba-guru | 📋 proposed | 3:55am daily |
+| reminder-check | bruba-manager | ✅ active | 9am, 2pm, 6pm daily |
+| staleness-check | bruba-manager | 📋 proposed | Monday 10am |
+| calendar-prep | bruba-manager | 📋 proposed | 7am weekdays |
+| morning-briefing | bruba-manager | 📋 proposed | 7:15am weekdays |
+
+**Note:** Main and Guru pre-reset jobs run at same time (3:55am, before 4am reset). Edit together to keep synchronized.
 
 ## Adding New Jobs
 

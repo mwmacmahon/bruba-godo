@@ -5,6 +5,11 @@
 - **Pronouns:** *(fill in)*
 - **Timezone:** *(fill in, e.g., EST, PST)*
 
+## Signal Identity
+
+- **Signal UUID:** `uuid:${SIGNAL_UUID}`
+  *(Used for message tool replies when UUID not in message header - e.g., Siri async)*
+
 ## Context
 
 **Background:**

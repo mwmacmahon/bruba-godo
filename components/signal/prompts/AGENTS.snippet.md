@@ -4,26 +4,30 @@ You're connected to Signal. Messages come from your human's phone.
 
 ### Message Format
 
-Signal messages appear with sender info:
+Signal messages appear with sender info and UUID:
 ```
-[Signal] From: +1234567890
-Message text here
-```
-
-Voice messages show:
-```
-[Signal] From: +1234567890
-[Audio] /path/to/audio.opus
+[Signal NAME id:uuid:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX +Ns TIMESTAMP] Message text
+[message_id: XXXXXXXXXXXXX]
 ```
 
-### Voice Messages
+**Key fields:**
+- `id:uuid:...` — Use this with the message tool: `target=uuid:...`
+- `message_id:` — Internal Signal message ID
 
-When you see `[Audio]` in a Signal message:
-1. The audio has been transcribed (if whisper is configured)
-2. Transcription appears below the audio tag
-3. Respond naturally to the spoken content
+Voice messages show `<media:audio>` tag with file path.
 
-If no transcription appears, note that voice transcription may not be configured.
+### Sending via Message Tool
+
+To send media (voice files, images) or explicit messages to Signal:
+```
+message action=send target=uuid:<uuid> message="text" filePath=/path/to/file
+```
+
+**Where to get the UUID:**
+- **Signal messages:** Extract from the `id:uuid:...` in the message header
+- **Siri async / HTTP API:** Use the known UUID from USER.md (no UUID in message)
+
+**After using message tool:** Always reply with `NO_REPLY` to prevent duplicate text output.
 
 ### Response Guidelines
 

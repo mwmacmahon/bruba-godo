@@ -179,6 +179,59 @@ RTF = Real-Time Factor. <1.0 is faster than real-time.
 
 **Reason:** whisper-cpp doesn't handle m4a (Signal's voice format); Python whisper does
 
+### Message Tool Not Working (Media Attachments)
+
+**Symptom:** Bot outputs `MEDIA:/tmp/response.wav` as text instead of sending the file
+
+**Cause:** The `message` tool isn't available. Most likely the global allowlist ceiling effect.
+
+**Check:**
+```bash
+# Check global tools.allow includes message
+ssh bruba 'cat ~/.openclaw/openclaw.json | jq ".tools.allow"'
+
+# Check agent-level config
+ssh bruba 'cat ~/.openclaw/openclaw.json | jq ".agents.list[] | select(.id==\"bruba-main\") | .tools"'
+```
+
+**Fix:** Add `message` to global `tools.allow`:
+```bash
+ssh bruba 'jq ".tools.allow += [\"message\"]" ~/.openclaw/openclaw.json > /tmp/oc.json && mv /tmp/oc.json ~/.openclaw/openclaw.json'
+ssh bruba 'openclaw gateway restart'
+```
+
+**Correct usage pattern:**
+```
+1. exec: tts.sh "response" /tmp/response.wav
+2. message action=send target=uuid:<from-header> filePath=/tmp/response.wav message="response"
+3. Reply: NO_REPLY
+```
+
+**Critical:** Always respond with `NO_REPLY` after using the message tool to prevent duplicate text output.
+
+### Voice Response Sends Twice
+
+**Symptom:** User receives voice file AND a separate text message with the same content
+
+**Cause:** Bot didn't use `NO_REPLY` after the message tool call
+
+**Fix:** After `message action=send ... message="text"`, the bot must respond with just `NO_REPLY`. The message tool already sends both the audio and text.
+
+### Siri Async Replies Not Working
+
+**Symptom:** Bot processes Siri async message but no Signal reply arrives
+
+**Cause:** USER.md missing Signal UUID. Siri async messages don't include UUID metadata.
+
+**Fix:** Add your Signal UUID to USER.md on the bot:
+
+```markdown
+## Signal Identity
+- **Signal UUID:** `uuid:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`
+```
+
+Get the UUID from any Signal message header (look for `id:uuid:...`).
+
 ---
 
 ## Web Search Issues
@@ -522,5 +575,7 @@ Response depends on ownership model:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.1 | 2026-02-02 | Added Siri async troubleshooting (USER.md Signal UUID requirement) |
+| 1.1.0 | 2026-02-02 | Added message tool troubleshooting (media attachments, voice responses, NO_REPLY pattern) |
 | 1.0.1 | 2026-02-01 | Fixed Tailscale serve docs — must run on bot account due to localhost isolation |
 | 1.0.0 | 2026-02-01 | Initial version (consolidated from legacy PKM docs) |

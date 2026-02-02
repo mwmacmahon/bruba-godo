@@ -1,9 +1,9 @@
 ---
-version: 1.1.0
-updated: 2026-02-02 22:30
+version: 1.2.1
+updated: 2026-02-02
 type: refdoc
 project: planning
-tags: [bruba, filesystem, data-flow, bruba-godo, operations]
+tags: [bruba, filesystem, data-flow, bruba-godo, operations, guru]
 ---
 
 # Bruba Filesystem & Data Flow Guide
@@ -119,7 +119,13 @@ Complete reference for file locations, ownership, and data flow between operator
 │       ├── prompts/
 │       └── state/
 │
-├── cronjobs/                    # Cron job definitions (7 items)
+├── cronjobs/                    # Cron job definitions
+│   ├── pre-reset-continuity.yaml    # Main's daily continuation packet
+│   ├── guru-pre-reset-continuity.yaml  # Guru's daily continuation packet
+│   ├── reminder-check.yaml
+│   ├── staleness-check.yaml
+│   ├── calendar-prep.yaml
+│   └── morning-briefing.yaml
 │
 ├── tools/                       # Shell scripts
 │   ├── assemble-prompts.sh     # Templates + components → exports
@@ -214,10 +220,23 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   └── memory/
 │   │       └── siri-log.md
 │   │
-│   └── bruba-web/
-│       ├── AGENTS.md           # Security instructions only
-│       └── results/            # Research outputs (bruba-web writes here)
-│           └── YYYY-MM-DD-topic.md
+│   ├── bruba-web/
+│   │   ├── AGENTS.md           # Security instructions only
+│   │   └── results/            # Research outputs (bruba-web writes here)
+│   │       └── YYYY-MM-DD-topic.md
+│   │
+│   ├── bruba-guru/             # Technical specialist agent
+│   │   ├── AGENTS.md           # Assembled prompt
+│   │   ├── TOOLS.md            # Assembled prompt
+│   │   ├── IDENTITY.md         # Pushed directly
+│   │   │
+│   │   ├── workspace/          # Working files, analysis artifacts
+│   │   ├── memory/             # Persistent notes
+│   │   └── results/            # Technical analysis outputs
+│   │
+│   └── bruba-shared/           # Shared handoff zone (Main + Guru)
+│       ├── packets/            # Work handoff packets
+│       └── context/            # Shared context files
 │
 └── .openclaw/
     ├── openclaw.json           # Agent configs, tool policies
@@ -226,6 +245,8 @@ Complete reference for file locations, ownership, and data flow between operator
     ├── agents/
     │   ├── bruba-main/
     │   │   └── sessions/       # Session transcripts (~90 JSONL files)
+    │   ├── bruba-guru/
+    │   │   └── sessions/
     │   ├── bruba-manager/
     │   │   └── sessions/
     │   ├── bruba-web/
@@ -826,5 +847,7 @@ With Docker sandbox, we can enable full delete permissions with a safety net:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2.1 | 2026-02-02 | Added guru cron job, expanded cronjobs listing |
+| 1.2.0 | 2026-02-02 | Added bruba-guru and bruba-shared directories |
 | 1.1.0 | 2026-02-02 | Added Part 12: Node Host + Docker Sandboxing |
 | 1.0.0 | 2026-02-02 | Initial version from CC investigation |

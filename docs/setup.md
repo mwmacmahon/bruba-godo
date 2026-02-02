@@ -733,11 +733,22 @@ ssh bruba "openclaw memory index --verbose"  # Force reindex
 | File | Purpose |
 |------|---------|
 | `~/clawd/SOUL.md` | Personality definition |
-| `~/clawd/USER.md` | Info about you |
+| `~/clawd/USER.md` | Info about you (including Signal UUID for message tool) |
 | `~/clawd/IDENTITY.md` | Who the bot is |
 | `~/clawd/AGENTS.md` | Operational instructions |
 | `~/clawd/TOOLS.md` | Local setup notes |
 | `~/clawd/MEMORY.md` | Curated long-term memory |
+
+#### USER.md Signal UUID (Required for Siri Async)
+
+If using Siri shortcuts that send async messages (no immediate response needed), add your Signal UUID to `USER.md`:
+
+```markdown
+## Signal Identity
+- **Signal UUID:** `uuid:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`
+```
+
+**Why:** Siri async messages arrive without UUID metadata. The bot needs to know where to send Signal replies. Get your UUID from any Signal message header (look for `id:uuid:...`).
 
 #### Configure Project Context
 
@@ -866,5 +877,6 @@ For troubleshooting, see [Troubleshooting Guide](troubleshooting.md).
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.1.0 | 2026-02-02 | Added Signal UUID requirement for USER.md (Siri async support) |
 | 2.0.0 | 2026-02-01 | Consolidated from 4 setup docs |
 | 1.0.0 | 2026-01-30 | Initial version (full-setup-guide.md) |

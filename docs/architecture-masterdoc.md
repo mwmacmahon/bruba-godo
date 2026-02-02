@@ -1,9 +1,9 @@
 ---
-version: 3.2.3
-updated: 2026-02-02 22:00
+version: 3.3.3
+updated: 2026-02-02
 type: refdoc
 project: planning
-tags: [bruba, openclaw, multi-agent, architecture, cron, operations]
+tags: [bruba, openclaw, multi-agent, architecture, cron, operations, guru]
 ---
 
 # Bruba Multi-Agent Architecture Reference
@@ -14,15 +14,18 @@ Comprehensive reference for the Bruba multi-agent system. Covers the peer agent 
 
 ## Executive Summary
 
-Bruba uses a **three-agent architecture** with two peer agents and one service agent:
+Bruba uses a **four-agent architecture** with three peer agents and one service agent:
 
 | Agent | Model | Role | Web Access |
 |-------|-------|------|------------|
-| **bruba-main** | Opus | Reactive — user conversations, file ops, complex reasoning | ❌ via bruba-web |
+| **bruba-main** | Opus | Reactive — user conversations, file ops, routing | ❌ via bruba-web |
+| **bruba-guru** | Opus | Specialist — technical deep-dives, debugging, architecture | ❌ via bruba-web |
 | **bruba-manager** | Sonnet/Haiku | Proactive — heartbeat, cron coordination, monitoring | ❌ via bruba-web |
 | **bruba-web** | Sonnet | Service — stateless web search, prompt injection barrier | ✅ Direct |
 
-**Key architectural insight:** OpenClaw's tool inheritance model means subagents cannot have tools their parent lacks. Web isolation requires a **separate agent** (bruba-web), not subagent spawning. Main and Manager are peers that communicate as equals; Web is a passive service both peers use.
+**Key architectural insight:** OpenClaw's tool inheritance model means subagents cannot have tools their parent lacks. Web isolation requires a **separate agent** (bruba-web), not subagent spawning. Main, Guru, and Manager are peers that communicate as equals; Web is a passive service all peers use.
+
+**Specialist pattern:** Main routes technical deep-dives to Guru (Opus) for thorough analysis. Guru has full technical capabilities (read/write/edit/exec/memory) and can reach bruba-web for research. This keeps Main's context lightweight for everyday interactions while preserving deep reasoning capability.
 
 **Proactive monitoring pattern:** Isolated cron jobs (cheap, stateless) detect conditions and write to inbox files. Manager's heartbeat (cheap, stateful) reads inbox, applies rules, delivers alerts. This separation keeps heartbeat fast while enabling rich monitoring.
 
@@ -50,29 +53,43 @@ Bruba uses a **three-agent architecture** with two peer agents and one service a
 │                   │ │             │      bruba-manager        │
 │  • Conversations  │ │             │      ──────────────       │
 │  • File ops       │ │             │  Model: Sonnet (Haiku HB) │
-│  • Complex tasks  │ │             │  Role: Proactive          │
+│  • Routing        │ │             │  Role: Proactive          │
 │  • Memory/PKM     │◄─────────────►│                           │
 │                   │ sessions_send │  • Heartbeat checks       │
 │                   │               │  • Cron job processing    │
-└─────────┬─────────┘               │  • Inbox → delivery       │
-          │                         │  • Siri sync queries      │
-          │                         └─────────────┬─────────────┘
-          │                                       │
-          │ sessions_send                         │ sessions_send
-          │                                       │
-          └───────────────┐           ┌───────────┘
-                          ▼           ▼
-                ┌─────────────────────────────────────┐
-                │          bruba-web                  │
-                │          ─────────                  │
-                │  Model: Sonnet                      │
-                │  Role: Service (passive)           │
-                │                                     │
-                │  • Stateless web search             │
-                │  • Prompt injection barrier         │
-                │  • No memory, no initiative         │
-                │  • Returns structured summary       │
-                └─────────────────────────────────────┘
+└────────┬──────────┘               │  • Inbox → delivery       │
+         │                          │  • Siri sync queries      │
+         │ sessions_send            └─────────────┬─────────────┘
+         │ (technical)                            │
+         ▼                                        │
+┌───────────────────┐                             │
+│    bruba-guru     │                             │
+│    ──────────     │                             │
+│  Model: Opus      │                             │
+│  Role: Specialist │                             │
+│                   │                             │
+│  • Technical      │                             │
+│    deep-dives     │                             │
+│  • Debugging      │                             │
+│  • Architecture   │                             │
+│  • Full file ops  │                             │
+└────────┬──────────┘                             │
+         │                                        │
+         │ sessions_send                          │ sessions_send
+         │ (research)                             │
+         └───────────────┐            ┌───────────┘
+                         ▼            ▼
+               ┌─────────────────────────────────────┐
+               │          bruba-web                  │
+               │          ─────────                  │
+               │  Model: Sonnet                      │
+               │  Role: Service (passive)            │
+               │                                     │
+               │  • Stateless web search             │
+               │  • Prompt injection barrier         │
+               │  • No memory, no initiative         │
+               │  • Returns structured summary       │
+               └─────────────────────────────────────┘
 ```
 
 ### Why Peers, Not Hierarchy
@@ -172,6 +189,7 @@ Communication happens via `sessions_send` (agent-to-agent messaging), not `sessi
 | exec | ✅ | Via allowlist only |
 | memory_search, memory_get | ✅ | PKM integration |
 | sessions_send | ✅ | Communicate with Manager and Web |
+| message | ✅ | Media attachments (voice responses, images) |
 | sessions_spawn | ❌ | Not needed — uses bruba-web instead |
 | web_search, web_fetch | ❌ | Security isolation — use bruba-web |
 | browser, canvas | ❌ | Not needed |
@@ -182,6 +200,55 @@ Communication happens via `sessions_send` (agent-to-agent messaging), not `sessi
 **Bindings:** Signal DM (user-facing channel)
 
 **Workspace:** `/Users/bruba/agents/bruba-main/`
+
+---
+
+### bruba-guru
+
+**Purpose:** Technical specialist agent. Handles deep-dive analysis, debugging sessions, architecture reviews, and complex technical questions that need thorough reasoning.
+
+**Model:** Opus
+
+**Capabilities:**
+| Tool | Status | Notes |
+|------|--------|-------|
+| read, write, edit, apply_patch | ✅ | Full file access within workspace |
+| exec | ✅ | Via allowlist only |
+| memory_search, memory_get | ✅ | PKM integration |
+| sessions_send | ✅ | Communicate with bruba-web for research |
+| sessions_list, session_status | ✅ | Monitor sessions |
+| sessions_spawn | ❌ | Not needed — uses bruba-web instead |
+| web_search, web_fetch | ❌ | Security isolation — use bruba-web |
+| browser, canvas | ❌ | Not needed |
+| cron, gateway | ❌ | Admin tools |
+| message | ❌ | No direct media (Main handles) |
+
+**Heartbeat:** Disabled (`every: "0m"`)
+
+**Session Reset:** Daily at 4am (matches Main's schedule)
+
+**Workspace:** `/Users/bruba/agents/bruba-guru/`
+
+**Directory Structure:**
+```
+bruba-guru/
+├── workspace/       # Working files, analysis artifacts
+├── memory/          # Persistent notes
+└── results/         # Technical analysis outputs
+```
+
+**Shared Directory:** `/Users/bruba/agents/bruba-shared/`
+```
+bruba-shared/
+├── packets/         # Work handoff packets between Main and Guru
+└── context/         # Shared context files
+```
+
+**Routing from Main:**
+Main routes technical questions to Guru via `sessions_send`:
+- Auto-routing: Main detects technical content (code dumps, config files, debugging)
+- Guru mode: User explicitly enters extended technical session
+- Status check: User asks what Guru is working on
 
 ---
 
@@ -325,6 +392,43 @@ Siri async ("Hey Siri, tell Bruba..."):
   Main processes, responds via Signal
   Siri gets "Got it, I'll message you" acknowledgment
 ```
+
+### Message Tool (Media Attachments)
+
+The `message` tool sends media files (voice, images) to Signal. It's separate from regular text responses.
+
+**Tool syntax:**
+```
+message action=send target=uuid:<recipient-uuid> filePath=/path/to/file message="optional text"
+```
+
+**Voice response workflow:**
+```
+1. Transcribe incoming audio:
+   exec: /Users/bruba/agents/bruba-main/tools/whisper-clean.sh "/path/to/audio.m4a"
+
+2. Generate TTS response:
+   exec: /Users/bruba/agents/bruba-main/tools/tts.sh "response text" /tmp/response.wav
+
+3. Send voice + text via message tool:
+   message action=send target=uuid:18ce66e6-... filePath=/tmp/response.wav message="response text"
+
+4. Reply with: NO_REPLY
+```
+
+**Critical:** After using the message tool, respond with `NO_REPLY` to prevent duplicate text. The message tool already delivers both the audio file and text message to Signal.
+
+**Target format:** Use `uuid:<recipient-uuid>` from the incoming message's `From:` header. Example: `target=uuid:<REDACTED-UUID>`
+
+**Setup requirement:** The user's Signal UUID must be in `USER.md` for Siri async replies (which don't include UUID in the message). Add:
+```markdown
+## Signal Identity
+- **Signal UUID:** `uuid:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`
+```
+
+**Tool permissions:** The `message` tool must be in:
+1. Global `tools.allow` (ceiling effect)
+2. Agent's `tools.allow` (bruba-main)
 
 ### Session Continuity and Context Persistence
 
@@ -494,12 +598,16 @@ OpenClaw has a built-in `isolation.postToMainPrefix` feature, but it's affected 
 
 ### Cron Jobs
 
-| Job | Schedule | Status | Purpose |
-|-----|----------|--------|---------|
-| reminder-check | 9am, 2pm, 6pm | ✅ Active | Detect overdue reminders |
-| staleness-check | Monday 10am | 📋 Proposed | Flag stale projects (14+ days) |
-| calendar-prep | 7am weekdays | 📋 Proposed | Surface prep-worthy meetings |
-| morning-briefing | 7:15am weekdays | 📋 Proposed | Daily summary to Signal |
+| Job | Agent | Schedule | Status | Purpose |
+|-----|-------|----------|--------|---------|
+| pre-reset-continuity | bruba-main | 3:55am daily | ✅ Active | Write continuation packet before reset |
+| guru-pre-reset-continuity | bruba-guru | 3:55am daily | 📋 Proposed | Write Guru continuation before reset |
+| reminder-check | bruba-manager | 9am, 2pm, 6pm | ✅ Active | Detect overdue reminders |
+| staleness-check | bruba-manager | Monday 10am | 📋 Proposed | Flag stale projects (14+ days) |
+| calendar-prep | bruba-manager | 7am weekdays | 📋 Proposed | Surface prep-worthy meetings |
+| morning-briefing | bruba-manager | 7:15am weekdays | 📋 Proposed | Daily summary to Signal |
+
+**Note:** Main and Guru have matching reset schedules (4am daily). Their pre-reset cron jobs should be edited together to keep them synchronized.
 
 ### Adding a Cron Job
 
@@ -817,6 +925,15 @@ cp /Users/bruba/.clawdbot/agents/bruba-main/auth-profiles.json \
    /Users/bruba/.clawdbot/agents/bruba-web/
 ```
 
+**Example (bruba-guru):**
+```bash
+mkdir -p /Users/bruba/.clawdbot/agents/bruba-guru
+cp /Users/bruba/.clawdbot/agents/bruba-main/auth-profiles.json \
+   /Users/bruba/.clawdbot/agents/bruba-guru/
+```
+
+**Important:** Auth profiles live in `~/.clawdbot/agents/`, NOT `~/.openclaw/agents/`. The `.openclaw/agents/` directory holds session data.
+
 ### Priming New Agent Sessions
 
 New agents have no session until they receive their first message. To initialize:
@@ -1005,7 +1122,7 @@ cp ~/.clawdbot/agents/bruba-main/auth-profiles.json \
   "tools": {
     "agentToAgent": {
       "enabled": true,
-      "allow": ["bruba-main", "bruba-manager", "bruba-web"]
+      "allow": ["bruba-main", "bruba-manager", "bruba-web", "bruba-guru"]
     }
   },
   "channels": {
@@ -1149,6 +1266,8 @@ Auto-recovery sometimes fails on context overflow.
 
 **Manager getting slow?** Context bloat. Reset session: `openclaw sessions reset --agent bruba-manager`.
 
+**Voice response not sending?** Check `message` in global `tools.allow`. Use `NO_REPLY` after message tool.
+
 ---
 
 ## Cost Estimates
@@ -1168,6 +1287,9 @@ Auto-recovery sometimes fails on context overflow.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.3.3 | 2026-02-02 | Added USER.md Signal UUID setup requirement for Siri async replies |
+| 3.3.2 | 2026-02-02 | Added message tool documentation: voice response workflow, NO_REPLY pattern, uuid target format |
+| 3.3.1 | 2026-02-02 | Phase 2 updates: added guru cron job to table, bruba-guru to agentToAgent.allow, clarified auth path is ~/.clawdbot not ~/.openclaw |
 | 3.2.3 | 2026-02-02 | Added session continuity documentation: context persistence for bruba-web vs bruba-manager |
 | 3.2.2 | 2026-02-02 | Fixed sessions_send format: use `sessionKey: "agent:bruba-web:main"` not `target` |
 | 3.2.1 | 2026-02-02 | Added new agent setup (auth, session priming), documented global allowlist ceiling issue |

@@ -203,6 +203,26 @@ for agent in "${AGENTS[@]}"; do
         fi
     fi
 
+    # Results files - for guru (technical analysis outputs)
+    if [[ "$agent" == "bruba-guru" ]]; then
+        if bot_cmd "test -d $AGENT_WORKSPACE/results" 2>/dev/null; then
+            log ""
+            log "Results ($AGENT_WORKSPACE/results/):"
+            mkdir -p "$AGENT_MIRROR_DIR/results" 2>/dev/null || true
+            while IFS= read -r remote_file; do
+                [[ -z "$remote_file" ]] && continue
+                filename=$(basename "$remote_file")
+                if [[ "$DRY_RUN" == "true" ]]; then
+                    log "  Would mirror: results/$filename"
+                else
+                    bot_scp "$remote_file" "$AGENT_MIRROR_DIR/results/$filename"
+                    log "  + results/$filename"
+                fi
+                AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
+            done < <(bot_cmd "find $AGENT_WORKSPACE/results -maxdepth 1 -name '*.md' 2>/dev/null" || true)
+        fi
+    fi
+
     echo "$agent: $AGENT_MIRRORED files"
     TOTAL_MIRRORED=$((TOTAL_MIRRORED + AGENT_MIRRORED))
 done

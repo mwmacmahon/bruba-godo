@@ -87,6 +87,7 @@ agents:
       - voice
       # - heartbeats           # Enable for heartbeat mode
       - signal
+      # - guru-routing         # Enable for technical deep-dive routing to -guru agent
       # - make-it-yours
     tools_sections:
       - base
@@ -155,6 +156,38 @@ agents:
       - gateway
     agents_sections:
       - web-base  # Uses templates/prompts/web/AGENTS.md
+
+  <agent-id>-guru:
+    workspace: /Users/<bot-username>/agents/<agent-id>-guru
+    prompts: [agents, tools]
+    # Technical specialist agent (peer)
+    # Receives deep-dive tasks via sessions_send from Main
+    # Opus model for thorough reasoning
+    # Has full file access, exec, memory - like Main
+    # Can reach -web for research via sessions_send
+    tools_allow:
+      - read
+      - write
+      - edit
+      - exec
+      - group:memory
+      - sessions_send     # Can reach -web for research
+      - sessions_list
+      - session_status
+    tools_deny:
+      - web_search        # Use -web agent via sessions_send
+      - web_fetch         # Use -web agent via sessions_send
+      - sessions_spawn    # No helper spawning
+      - browser
+      - canvas
+      - cron
+      - gateway
+      - message           # Guru doesn't send media directly
+    agents_sections:
+      - guru-base         # Uses templates/prompts/guru/AGENTS.md
+      - continuity        # Same continuation pattern as Main
+    tools_sections:
+      - guru-base         # Uses templates/prompts/guru/TOOLS.md
 
 # Subagent (helper) configuration - DEPRECATED
 # v3.2: All agents use sessions_send to -web agent for web research
