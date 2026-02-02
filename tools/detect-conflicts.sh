@@ -2,10 +2,11 @@
 # Detect conflicts between mirror and config/components for all prompt files
 #
 # Usage:
-#   ./tools/detect-conflicts.sh              # Check for conflicts
-#   ./tools/detect-conflicts.sh --verbose    # Show details
+#   ./tools/detect-conflicts.sh                         # Check all agents
+#   ./tools/detect-conflicts.sh --agent=bruba-main      # Check specific agent
+#   ./tools/detect-conflicts.sh --verbose               # Show details
 #   ./tools/detect-conflicts.sh --show-section NAME [FILE]  # Show a bot section
-#   ./tools/detect-conflicts.sh --diff NAME [FILE]  # Show diff for a component
+#   ./tools/detect-conflicts.sh --diff NAME [FILE]      # Show diff for a component
 #
 # Conflicts detected:
 #   1. New BOT-MANAGED sections in mirror not in config
@@ -25,14 +26,16 @@ source "$(dirname "$0")/lib.sh"
 SHOW_SECTION=""
 SHOW_DIFF=""
 SHOW_FILE=""
+AGENT_FILTER=""
 
 if ! parse_common_args "$@"; then
-    echo "Usage: $0 [--verbose] [--show-section NAME [FILE]] [--diff NAME [FILE]]"
+    echo "Usage: $0 [--verbose] [--agent=NAME] [--show-section NAME [FILE]] [--diff NAME [FILE]]"
     echo ""
     echo "Detect conflicts between mirror and config/components for all prompt files."
     echo ""
     echo "Options:"
     echo "  --verbose, -v            Show detailed output"
+    echo "  --agent=NAME             Check specific agent only"
     echo "  --show-section NAME      Show content of a bot section (default: AGENTS.md)"
     echo "  --diff NAME              Show diff for a component (default: AGENTS.md)"
     echo ""
@@ -40,10 +43,13 @@ if ! parse_common_args "$@"; then
     exit 0
 fi
 
-# Handle --show-section and --diff from command line
+# Handle --agent, --show-section and --diff from command line
 args=("$@")
 for ((i=0; i<${#args[@]}; i++)); do
     case "${args[$i]}" in
+        --agent=*)
+            AGENT_FILTER="${args[$i]#*=}"
+            ;;
         --show-section)
             SHOW_SECTION="${args[$((i+1))]:-}"
             SHOW_FILE="${args[$((i+2))]:-agents}"
@@ -61,48 +67,38 @@ load_config
 EXPORTS_FILE="$ROOT_DIR/config.yaml"
 
 # List of prompt files to check
-# Only managing: AGENTS.md, TOOLS.md, HEARTBEAT.md
 PROMPT_FILES=(agents tools heartbeat)
 
-# Get config sections for a specific prompt file
-# Usage: get_config_sections "agents"
+# Get config sections for a specific prompt file and agent
 get_config_sections() {
     local prompt_name="$1"
+    local agent="$2"
     local config_key="${prompt_name}_sections"
-    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
 
-    # Use Python helper
-    if [[ -f "$helper" ]]; then
-        local json
-        json=$("$helper" "$EXPORTS_FILE" "exports.bot.${config_key}" 2>/dev/null) || true
-        if [[ -n "$json" && "$json" != "null" && "$json" != "[]" ]]; then
-            echo "$json" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$'
-            return
-        fi
-    fi
+    # Use Python to reliably parse nested YAML
+    python3 -c "
+import yaml
+import sys
+try:
+    with open('$EXPORTS_FILE') as f:
+        config = yaml.safe_load(f)
 
-    # Fallback: grep-based
-    local in_sections=false
-    while IFS= read -r line; do
-        if [[ "$line" =~ ${config_key}: ]]; then
-            in_sections=true
-            continue
-        fi
-        if [[ "$in_sections" == true ]]; then
-            if [[ "$line" =~ ^[[:space:]]*[a-z_]+: ]] && [[ ! "$line" =~ ^[[:space:]]*- ]]; then
-                break
-            fi
-            if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+([a-zA-Z0-9_:-]+) ]]; then
-                echo "${BASH_REMATCH[1]}"
-            fi
-        fi
-    done < "$EXPORTS_FILE"
+    # Get sections from agents.{agent}.{prompt_name}_sections
+    agent_config = config.get('agents', {}).get('$agent', {})
+    sections = agent_config.get('${config_key}', [])
+    for s in sections:
+        print(s)
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
 }
 
 # Get bot sections from config (entries with bot: prefix)
 get_config_bot_sections() {
     local prompt_name="$1"
-    get_config_sections "$prompt_name" | grep "^bot:" | sed 's/^bot://' || true
+    local agent="$2"
+    get_config_sections "$prompt_name" "$agent" | grep "^bot:" | sed 's/^bot://' || true
 }
 
 # Get bot sections from a mirror file
@@ -199,13 +195,15 @@ get_component_content_from_mirror() {
     return 1
 }
 
-# Handle --show-section
+# Handle --show-section (uses default agent or filter)
 if [[ -n "$SHOW_SECTION" ]]; then
+    AGENT="${AGENT_FILTER:-bruba-main}"
+    load_agent_config "$AGENT"
     SHOW_FILE="${SHOW_FILE:-agents}"
     prompt_upper=$(echo "$SHOW_FILE" | tr '[:lower:]' '[:upper:]')
-    mirror_file="$MIRROR_DIR/prompts/${prompt_upper}.md"
+    mirror_file="$AGENT_MIRROR_DIR/prompts/${prompt_upper}.md"
 
-    echo "=== Bot Section: $SHOW_SECTION (${prompt_upper}.md) ==="
+    echo "=== Bot Section: $SHOW_SECTION (${prompt_upper}.md, $AGENT) ==="
     if content=$(get_mirror_section_content "$SHOW_SECTION" "$mirror_file"); then
         echo "$content"
     else
@@ -217,9 +215,11 @@ fi
 
 # Handle --diff
 if [[ -n "$SHOW_DIFF" ]]; then
+    AGENT="${AGENT_FILTER:-bruba-main}"
+    load_agent_config "$AGENT"
     SHOW_FILE="${SHOW_FILE:-agents}"
     prompt_upper=$(echo "$SHOW_FILE" | tr '[:lower:]' '[:upper:]')
-    mirror_file="$MIRROR_DIR/prompts/${prompt_upper}.md"
+    mirror_file="$AGENT_MIRROR_DIR/prompts/${prompt_upper}.md"
     component_file="$ROOT_DIR/components/$SHOW_DIFF/prompts/${prompt_upper}.snippet.md"
 
     if [[ ! -f "$component_file" ]]; then
@@ -230,7 +230,7 @@ if [[ -n "$SHOW_DIFF" ]]; then
     # Extract component content from mirror
     temp_mirror=$(mktemp)
     if get_component_content_from_mirror "$SHOW_DIFF" "$mirror_file" > "$temp_mirror"; then
-        echo "=== Diff: $SHOW_DIFF (${prompt_upper}.md) ==="
+        echo "=== Diff: $SHOW_DIFF (${prompt_upper}.md, $AGENT) ==="
         echo "--- component (source)"
         echo "+++ mirror (bot's version)"
         diff -u "$component_file" "$temp_mirror" || true
@@ -241,141 +241,168 @@ if [[ -n "$SHOW_DIFF" ]]; then
     exit 0
 fi
 
+# Build list of agents to check
+if [[ -n "$AGENT_FILTER" ]]; then
+    AGENTS=("$AGENT_FILTER")
+else
+    # Read agents into array (bash 3.x compatible)
+    AGENTS=()
+    while IFS= read -r agent; do
+        [[ -n "$agent" ]] && AGENTS+=("$agent")
+    done < <(get_agents)
+fi
+
 # Main conflict detection
 echo "Checking for conflicts..."
 echo ""
 
 TOTAL_CONFLICTS=0
 
-# Check each prompt file
-for prompt_name in "${PROMPT_FILES[@]}"; do
-    prompt_upper=$(echo "$prompt_name" | tr '[:lower:]' '[:upper:]')
-    mirror_file="$MIRROR_DIR/prompts/${prompt_upper}.md"
+# Process each agent
+for agent in "${AGENTS[@]}"; do
+    load_agent_config "$agent"
 
-    # Skip if no mirror file exists
-    if [[ ! -f "$mirror_file" ]]; then
+    # Skip agents with no workspace
+    if [[ -z "$AGENT_WORKSPACE" || "$AGENT_WORKSPACE" == "null" ]]; then
         continue
     fi
 
-    # Skip if no sections configured for this file
-    sections=$(get_config_sections "$prompt_name")
-    if [[ -z "$sections" ]]; then
-        continue
-    fi
+    AGENT_CONFLICTS=0
 
-    FILE_CONFLICTS=0
-    NEW_BOT_SECTIONS=()
-    NEW_COMPONENT_SECTIONS=()
-    EDITED_COMPONENTS=()
+    # Check each prompt file
+    for prompt_name in "${PROMPT_FILES[@]}"; do
+        prompt_upper=$(echo "$prompt_name" | tr '[:lower:]' '[:upper:]')
+        mirror_file="$AGENT_MIRROR_DIR/prompts/${prompt_upper}.md"
 
-    # 1. Find new bot sections (in mirror but not in config)
-    CONFIG_BOT_SECTIONS=$(get_config_bot_sections "$prompt_name")
-    MIRROR_BOT_SECTIONS=$(get_mirror_bot_sections "$mirror_file")
-
-    for section in $MIRROR_BOT_SECTIONS; do
-        if ! echo "$CONFIG_BOT_SECTIONS" | grep -q "^${section}$"; then
-            NEW_BOT_SECTIONS+=("$section")
-            FILE_CONFLICTS=$((FILE_CONFLICTS + 1))
-        fi
-    done
-
-    # 2. Find new COMPONENT sections (in mirror but not in config)
-    CONFIG_ALL_SECTIONS=$(get_config_sections "$prompt_name" | sed 's/^bot://')
-    MIRROR_COMPONENT_SECTIONS=$(get_mirror_component_sections "$mirror_file")
-
-    for section in $MIRROR_COMPONENT_SECTIONS; do
-        if ! echo "$CONFIG_ALL_SECTIONS" | grep -q "^${section}$"; then
-            NEW_COMPONENT_SECTIONS+=("$section")
-            FILE_CONFLICTS=$((FILE_CONFLICTS + 1))
-        fi
-    done
-
-    # 3. Check if components were edited by bot
-    for component in $(get_config_sections "$prompt_name" | grep -v "^bot:" | grep -v "^base$"); do
-        component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.snippet.md"
-
-        if [[ ! -f "$component_file" ]]; then
+        # Skip if no mirror file exists
+        if [[ ! -f "$mirror_file" ]]; then
             continue
         fi
 
-        # Get content from mirror
-        mirror_content=$(get_component_content_from_mirror "$component" "$mirror_file" 2>/dev/null) || continue
+        # Skip if no sections configured for this file
+        sections=$(get_config_sections "$prompt_name" "$agent")
+        if [[ -z "$sections" ]]; then
+            continue
+        fi
 
-        # Get source content
-        source_content=$(cat "$component_file")
+        FILE_CONFLICTS=0
+        NEW_BOT_SECTIONS=()
+        NEW_COMPONENT_SECTIONS=()
+        EDITED_COMPONENTS=()
 
-        # Compare
-        if ! diff -q <(printf '%s\n' "$mirror_content") <(printf '%s\n' "$source_content") >/dev/null 2>&1; then
-            EDITED_COMPONENTS+=("$component")
-            FILE_CONFLICTS=$((FILE_CONFLICTS + 1))
+        # 1. Find new bot sections (in mirror but not in config)
+        CONFIG_BOT_SECTIONS=$(get_config_bot_sections "$prompt_name" "$agent")
+        MIRROR_BOT_SECTIONS=$(get_mirror_bot_sections "$mirror_file")
+
+        for section in $MIRROR_BOT_SECTIONS; do
+            if ! echo "$CONFIG_BOT_SECTIONS" | grep -q "^${section}$"; then
+                NEW_BOT_SECTIONS+=("$section")
+                FILE_CONFLICTS=$((FILE_CONFLICTS + 1))
+            fi
+        done
+
+        # 2. Find new COMPONENT sections (in mirror but not in config)
+        CONFIG_ALL_SECTIONS=$(get_config_sections "$prompt_name" "$agent" | sed 's/^bot://')
+        MIRROR_COMPONENT_SECTIONS=$(get_mirror_component_sections "$mirror_file")
+
+        for section in $MIRROR_COMPONENT_SECTIONS; do
+            if ! echo "$CONFIG_ALL_SECTIONS" | grep -q "^${section}$"; then
+                NEW_COMPONENT_SECTIONS+=("$section")
+                FILE_CONFLICTS=$((FILE_CONFLICTS + 1))
+            fi
+        done
+
+        # 3. Check if components were edited by bot (only for agents using components)
+        if [[ "$agent" == "bruba-main" ]]; then
+            for component in $(get_config_sections "$prompt_name" "$agent" | grep -v "^bot:" | grep -v "^base$" | grep -v "^manager-base$"); do
+                component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.snippet.md"
+
+                if [[ ! -f "$component_file" ]]; then
+                    continue
+                fi
+
+                # Get content from mirror
+                mirror_content=$(get_component_content_from_mirror "$component" "$mirror_file" 2>/dev/null) || continue
+
+                # Get source content
+                source_content=$(cat "$component_file")
+
+                # Compare
+                if ! diff -q <(printf '%s\n' "$mirror_content") <(printf '%s\n' "$source_content") >/dev/null 2>&1; then
+                    EDITED_COMPONENTS+=("$component")
+                    FILE_CONFLICTS=$((FILE_CONFLICTS + 1))
+                fi
+            done
+        fi
+
+        # Report conflicts for this file
+        if [[ $FILE_CONFLICTS -gt 0 ]]; then
+            echo "=== $agent: ${prompt_upper}.md: $FILE_CONFLICTS conflicts ==="
+            echo ""
+
+            # Report new bot sections
+            if [[ ${#NEW_BOT_SECTIONS[@]} -gt 0 ]]; then
+                echo "NEW BOT SECTIONS:"
+                for section in "${NEW_BOT_SECTIONS[@]}"; do
+                    position=$(find_section_position "$section" "$mirror_file")
+                    echo ""
+                    echo "  Section: $section"
+                    echo "  Position: after '$position'"
+                    echo "  Preview:"
+                    if content=$(get_mirror_section_content "$section" "$mirror_file"); then
+                        echo "$content" | head -5 | sed 's/^/    /'
+                        lines=$(echo "$content" | wc -l)
+                        if [[ $lines -gt 5 ]]; then
+                            echo "    ... ($((lines - 5)) more lines)"
+                        fi
+                    fi
+                    echo ""
+                    echo "  To keep: Add 'bot:$section' to ${prompt_name}_sections in config.yaml"
+                    echo "  To discard: Section will be removed on next push"
+                done
+                echo ""
+            fi
+
+            # Report new component sections
+            if [[ ${#NEW_COMPONENT_SECTIONS[@]} -gt 0 ]]; then
+                echo "NEW COMPONENT SECTIONS:"
+                for section in "${NEW_COMPONENT_SECTIONS[@]}"; do
+                    position=$(find_section_position "$section" "$mirror_file")
+                    echo ""
+                    echo "  Component: $section"
+                    echo "  Position: after '$position'"
+                    echo ""
+                    echo "  To keep as component: Create components/$section/prompts/${prompt_upper}.snippet.md"
+                    echo "                        Add '$section' to ${prompt_name}_sections in config.yaml"
+                    echo "  To keep as bot-managed: Add 'bot:$section' to ${prompt_name}_sections"
+                    echo "  To discard: Section will be removed on next push"
+                done
+                echo ""
+            fi
+
+            # Report edited components
+            if [[ ${#EDITED_COMPONENTS[@]} -gt 0 ]]; then
+                echo "EDITED COMPONENTS:"
+                for component in "${EDITED_COMPONENTS[@]}"; do
+                    echo ""
+                    echo "  Component: $component"
+                    echo "  Source: components/$component/prompts/${prompt_upper}.snippet.md"
+                    echo ""
+                    echo "  Options:"
+                    echo "    1. Keep bot's version: copy changes to source component"
+                    echo "    2. Discard bot's changes: next push will overwrite"
+                    echo "    3. Convert to bot-managed: rename to BOT-MANAGED section"
+                    echo ""
+                    echo "  Run: ./tools/detect-conflicts.sh --agent=$agent --diff $component $prompt_name"
+                done
+                echo ""
+            fi
+
+            AGENT_CONFLICTS=$((AGENT_CONFLICTS + FILE_CONFLICTS))
         fi
     done
 
-    # Report conflicts for this file
-    if [[ $FILE_CONFLICTS -gt 0 ]]; then
-        echo "=== ${prompt_upper}.md: $FILE_CONFLICTS conflicts ==="
-        echo ""
-
-        # Report new bot sections
-        if [[ ${#NEW_BOT_SECTIONS[@]} -gt 0 ]]; then
-            echo "NEW BOT SECTIONS:"
-            for section in "${NEW_BOT_SECTIONS[@]}"; do
-                position=$(find_section_position "$section" "$mirror_file")
-                echo ""
-                echo "  Section: $section"
-                echo "  Position: after '$position'"
-                echo "  Preview:"
-                if content=$(get_mirror_section_content "$section" "$mirror_file"); then
-                    echo "$content" | head -5 | sed 's/^/    /'
-                    lines=$(echo "$content" | wc -l)
-                    if [[ $lines -gt 5 ]]; then
-                        echo "    ... ($((lines - 5)) more lines)"
-                    fi
-                fi
-                echo ""
-                echo "  To keep: Add 'bot:$section' to ${prompt_name}_sections in config.yaml"
-                echo "  To discard: Section will be removed on next push"
-            done
-            echo ""
-        fi
-
-        # Report new component sections
-        if [[ ${#NEW_COMPONENT_SECTIONS[@]} -gt 0 ]]; then
-            echo "NEW COMPONENT SECTIONS:"
-            for section in "${NEW_COMPONENT_SECTIONS[@]}"; do
-                position=$(find_section_position "$section" "$mirror_file")
-                echo ""
-                echo "  Component: $section"
-                echo "  Position: after '$position'"
-                echo ""
-                echo "  To keep as component: Create components/$section/prompts/${prompt_upper}.snippet.md"
-                echo "                        Add '$section' to ${prompt_name}_sections in config.yaml"
-                echo "  To keep as bot-managed: Add 'bot:$section' to ${prompt_name}_sections"
-                echo "  To discard: Section will be removed on next push"
-            done
-            echo ""
-        fi
-
-        # Report edited components
-        if [[ ${#EDITED_COMPONENTS[@]} -gt 0 ]]; then
-            echo "EDITED COMPONENTS:"
-            for component in "${EDITED_COMPONENTS[@]}"; do
-                echo ""
-                echo "  Component: $component"
-                echo "  Source: components/$component/prompts/${prompt_upper}.snippet.md"
-                echo ""
-                echo "  Options:"
-                echo "    1. Keep bot's version: copy changes to source component"
-                echo "    2. Discard bot's changes: next push will overwrite"
-                echo "    3. Convert to bot-managed: rename to BOT-MANAGED section"
-                echo ""
-                echo "  Run: ./tools/detect-conflicts.sh --diff $component $prompt_name"
-            done
-            echo ""
-        fi
-
-        TOTAL_CONFLICTS=$((TOTAL_CONFLICTS + FILE_CONFLICTS))
-    fi
+    TOTAL_CONFLICTS=$((TOTAL_CONFLICTS + AGENT_CONFLICTS))
 done
 
 # Final summary
@@ -389,5 +416,6 @@ echo "Total conflicts: $TOTAL_CONFLICTS"
 echo ""
 echo "Run with --show-section NAME [FILE] to see full content"
 echo "Run with --diff NAME [FILE] to compare component to mirror"
+echo "Use --agent=NAME to filter by agent"
 
 exit 1

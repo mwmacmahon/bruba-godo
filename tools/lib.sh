@@ -51,6 +51,63 @@ load_config() {
     REMOTE_SESSIONS="$REMOTE_OPENCLAW/agents/$REMOTE_AGENT_ID/sessions"
 }
 
+# Get list of configured agents (excludes agents with null workspace or empty prompts)
+# Usage: mapfile -t AGENTS < <(get_agents)
+get_agents() {
+    local config_file="$ROOT_DIR/config.yaml"
+
+    python3 -c "
+import yaml
+import sys
+try:
+    with open('$config_file') as f:
+        config = yaml.safe_load(f)
+    agents = config.get('agents', {})
+    for name in agents.keys():
+        print(name)
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
+}
+
+# Load config for a specific agent
+# Usage: load_agent_config "bruba-main"
+# Sets: AGENT_NAME, AGENT_WORKSPACE, AGENT_PROMPTS, AGENT_REMOTE_PATH, AGENT_MIRROR_DIR, AGENT_EXPORT_DIR
+load_agent_config() {
+    local agent="${1:-bruba-main}"
+    local config_file="$ROOT_DIR/config.yaml"
+
+    AGENT_NAME="$agent"
+
+    # Use Python to reliably parse nested YAML
+    local agent_data
+    agent_data=$(python3 -c "
+import yaml
+import json
+import sys
+try:
+    with open('$config_file') as f:
+        config = yaml.safe_load(f)
+    agent = config.get('agents', {}).get('$agent', {})
+    print(json.dumps({
+        'workspace': agent.get('workspace'),
+        'prompts': agent.get('prompts', []),
+        'remote_path': agent.get('remote_path', 'memory')
+    }))
+except Exception as e:
+    print(json.dumps({'workspace': None, 'prompts': [], 'remote_path': 'memory'}))
+" 2>/dev/null)
+
+    AGENT_WORKSPACE=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('workspace') or '')" 2>/dev/null)
+    AGENT_PROMPTS=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d.get('prompts', [])))" 2>/dev/null)
+    AGENT_REMOTE_PATH=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('remote_path') or 'memory')" 2>/dev/null)
+
+    # Derived paths
+    AGENT_MIRROR_DIR="$MIRROR_DIR/$agent"
+    AGENT_EXPORT_DIR="$EXPORTS_DIR/bot/$agent"
+}
+
 # Cross-platform sed in-place
 # Usage: sed_inplace 's/foo/bar/' file.txt
 sed_inplace() {

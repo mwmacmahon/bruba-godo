@@ -1,21 +1,14 @@
 ## Web Search
 
-Web search uses a **sandboxed sub-agent** for security. You don't have direct web tools - instead:
+Main does not have direct web tools. For web research:
 
-**To search the web:**
-```bash
-/Users/bruba/agents/bruba-main/tools/web-search.sh "your search query"
-```
+**Option 1: Forward to Manager**
+Use `sessions_send` to bruba-manager with the research request. Manager spawns an ephemeral helper with web_search + web_fetch.
 
-**How it works:**
-1. Script invokes `web-reader` agent (runs in Docker sandbox)
-2. Reader has web_fetch + web_search only (no exec/write/edit)
-3. Returns JSON with search results
+**Option 2: Ask the user**
+For urgent needs, ask the user to search and paste results.
 
-**When to use:**
-- Current events, recent information
-- Documentation lookups
-- Fact-checking when memory doesn't have it
-- Research for <REDACTED-NAME>'s questions
-
-**Note:** First search may be slow if Docker container is starting.
+**Why no direct web access:**
+- Security isolation (web content is untrusted)
+- Manager coordinates helpers with automatic cleanup
+- Helpers have limited tools (no exec, no memory access)

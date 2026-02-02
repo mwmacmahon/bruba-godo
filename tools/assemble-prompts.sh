@@ -2,16 +2,18 @@
 # Assemble prompts from config-driven section order
 #
 # Usage:
-#   ./tools/assemble-prompts.sh              # Assemble all prompt files
-#   ./tools/assemble-prompts.sh --verbose    # Show detailed output
-#   ./tools/assemble-prompts.sh --dry-run    # Show what would be assembled
-#   ./tools/assemble-prompts.sh --force      # Skip conflict check
+#   ./tools/assemble-prompts.sh                     # Assemble for all agents
+#   ./tools/assemble-prompts.sh --agent=bruba-main  # Single agent
+#   ./tools/assemble-prompts.sh --verbose           # Show detailed output
+#   ./tools/assemble-prompts.sh --dry-run           # Show what would be assembled
+#   ./tools/assemble-prompts.sh --force             # Skip conflict check
 #
-# Assembly reads *_sections from config.yaml (bot profile) and resolves each entry:
-#   1. base      → full template file (templates/prompts/{NAME}.md)
-#   2. bot:name  → bot-managed section from mirror (<!-- BOT-MANAGED: name -->)
-#   3. name      → component snippet (components/{name}/prompts/{NAME}.snippet.md)
-#   4. name      → template section (templates/prompts/sections/{name}.md)
+# Assembly reads *_sections from config.yaml and resolves each entry:
+#   1. base         → full template file (templates/prompts/{NAME}.md)
+#   2. manager-base → manager template (templates/prompts/manager/{NAME}.md)
+#   3. bot:name     → bot-managed section from mirror (<!-- BOT-MANAGED: name -->)
+#   4. name         → component snippet (components/{name}/prompts/{NAME}.snippet.md)
+#   5. name         → template section (templates/prompts/sections/{name}.md)
 #
 # Logs: logs/assemble.log
 
@@ -22,24 +24,29 @@ source "$(dirname "$0")/lib.sh"
 
 # Parse arguments
 FORCE=false
+AGENT_FILTER=""
 for arg in "$@"; do
     case $arg in
         --force|-f)
             FORCE=true
             ;;
+        --agent=*)
+            AGENT_FILTER="${arg#*=}"
+            ;;
     esac
 done
 
 if ! parse_common_args "$@"; then
-    echo "Usage: $0 [--dry-run] [--verbose] [--force]"
+    echo "Usage: $0 [--dry-run] [--verbose] [--force] [--agent=NAME]"
     echo ""
     echo "Assemble all prompt files from config-driven section order."
     echo ""
     echo "Options:"
-    echo "  --dry-run, -n   Show what would be assembled without doing it"
-    echo "  --verbose, -v   Show detailed output"
-    echo "  --quiet, -q     Summary output only (default)"
-    echo "  --force, -f     Skip conflict check (overwrites bot changes)"
+    echo "  --dry-run, -n      Show what would be assembled without doing it"
+    echo "  --verbose, -v      Show detailed output"
+    echo "  --quiet, -q        Summary output only (default)"
+    echo "  --force, -f        Skip conflict check (overwrites bot changes)"
+    echo "  --agent=NAME       Assemble for specific agent only"
     exit 0
 fi
 
@@ -51,38 +58,9 @@ LOG_FILE="$LOG_DIR/assemble.log"
 mkdir -p "$LOG_DIR"
 rotate_log "$LOG_FILE"
 
-# Check for conflicts (unless --force or --dry-run)
-if [[ "$FORCE" != "true" && "$DRY_RUN" != "true" ]]; then
-    SCRIPT_DIR="$(dirname "$0")"
-    if [[ -d "$MIRROR_DIR/prompts" ]]; then
-        if ! "$SCRIPT_DIR/detect-conflicts.sh" --quiet >/dev/null 2>&1; then
-            echo ""
-            echo "CONFLICTS DETECTED - Assembly blocked"
-            echo ""
-            echo "Bot has made changes that would be overwritten."
-            echo "Run './tools/detect-conflicts.sh' to see details."
-            echo ""
-            echo "Options:"
-            echo "  1. Resolve conflicts (see /prompt-sync skill)"
-            echo "  2. Use --force to overwrite bot changes"
-            echo ""
-            exit 1
-        fi
-    fi
-fi
-
-log "=== Assembling Prompts ==="
-
-# Create output directory
-# Output goes to exports/bot/core-prompts/ which syncs to ~/clawd/ (not memory/)
-PROMPTS_OUTPUT="$EXPORTS_DIR/bot/core-prompts"
-if [[ "$DRY_RUN" != "true" ]]; then
-    mkdir -p "$PROMPTS_OUTPUT"
-fi
-
 # List of prompt files to assemble (lowercase name -> uppercase filename)
 # Only managing: AGENTS.md, TOOLS.md, HEARTBEAT.md
-# Other files (USER, IDENTITY, SOUL, MEMORY, BOOTSTRAP) are bot-managed directly
+# Other files (USER, IDENTITY, SOUL, MEMORY, BOOTSTRAP) are managed directly on bot
 PROMPT_FILES=(agents tools heartbeat)
 
 # Global counters
@@ -90,59 +68,38 @@ TOTAL_FILES=0
 TOTAL_SECTIONS=0
 TOTAL_MISSING=0
 
-# Parse sections list from config.yaml for a given prompt file
+# Parse sections list from config.yaml for a given prompt file and agent
 # Usage: get_sections "agents" -> outputs section names one per line
 get_sections() {
     local prompt_name="$1"
     local config_key="${prompt_name}_sections"
-    local exports_file="$ROOT_DIR/config.yaml"
-    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
+    local config_file="$ROOT_DIR/config.yaml"
 
-    if [[ ! -f "$exports_file" ]]; then
+    if [[ ! -f "$config_file" ]]; then
         echo "ERROR: config.yaml not found" >&2
         return 1
     fi
 
-    # Use Python helper to get JSON array from exports.bot.{prompt_name}_sections
-    if [[ -f "$helper" ]]; then
-        local json
-        json=$("$helper" "$exports_file" "exports.bot.${config_key}" 2>/dev/null) || true
-        if [[ -n "$json" && "$json" != "null" && "$json" != "[]" ]]; then
-            echo "$json" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$'
-            return
-        fi
-    fi
+    # Use Python to reliably parse nested YAML
+    python3 -c "
+import yaml
+import sys
+try:
+    with open('$config_file') as f:
+        config = yaml.safe_load(f)
 
-    # Fallback: grep-based parsing
-    local in_bot=false
-    local in_sections=false
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^[[:space:]]*bot: ]]; then
-            in_bot=true
-            continue
-        fi
-        if [[ "$in_bot" == true ]]; then
-            # Exit bot section if we hit another top-level profile
-            if [[ "$line" =~ ^[[:space:]]{2}[a-z]+: && ! "$line" =~ ^[[:space:]]{4} ]]; then
-                if [[ ! "$line" =~ ${config_key} ]]; then
-                    in_sections=false
-                fi
-            fi
-            if [[ "$line" =~ ${config_key}: ]]; then
-                in_sections=true
-                continue
-            fi
-            if [[ "$in_sections" == true ]]; then
-                # Exit if we hit a non-list line at same or lower indent
-                if [[ "$line" =~ ^[[:space:]]{4}[a-z] && ! "$line" =~ ^[[:space:]]*- ]]; then
-                    break
-                fi
-                if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+([a-zA-Z0-9_:-]+) ]]; then
-                    echo "${BASH_REMATCH[1]}"
-                fi
-            fi
-        fi
-    done < "$exports_file"
+    agent_name = '$AGENT_NAME'
+    sections_key = '${config_key}'
+
+    # Get sections from agents.{agent_name}.{prompt_name}_sections
+    agent_config = config.get('agents', {}).get(agent_name, {})
+    sections = agent_config.get(sections_key, [])
+    for s in sections:
+        print(s)
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
 }
 
 # Extract a specific BOT-MANAGED section from mirror
@@ -180,11 +137,22 @@ resolve_section() {
     local prompt_name="$2"
     local prompt_upper
     prompt_upper=$(echo "$prompt_name" | tr '[:lower:]' '[:upper:]')
-    local mirror_file="$MIRROR_DIR/prompts/${prompt_upper}.md"
+    local mirror_file="$AGENT_MIRROR_DIR/prompts/${prompt_upper}.md"
 
     # Handle 'base' - include full template
     if [[ "$entry" == "base" ]]; then
         local template_file="$ROOT_DIR/templates/prompts/${prompt_upper}.md"
+        if [[ -f "$template_file" ]]; then
+            cat "$template_file"
+            return 0
+        else
+            return 1
+        fi
+    fi
+
+    # Handle 'manager-base' - include manager-specific template
+    if [[ "$entry" == "manager-base" ]]; then
+        local template_file="$ROOT_DIR/templates/prompts/manager/${prompt_upper}.md"
         if [[ -f "$template_file" ]]; then
             cat "$template_file"
             return 0
@@ -242,6 +210,12 @@ get_section_type() {
         else
             echo "missing"
         fi
+    elif [[ "$entry" == "manager-base" ]]; then
+        if [[ -f "$ROOT_DIR/templates/prompts/manager/${prompt_upper}.md" ]]; then
+            echo "manager-base"
+        else
+            echo "missing"
+        fi
     elif [[ "$entry" =~ ^bot: ]]; then
         echo "bot"
     elif [[ -f "$ROOT_DIR/components/$entry/prompts/${prompt_upper}.snippet.md" ]]; then
@@ -253,13 +227,38 @@ get_section_type() {
     fi
 }
 
-# Assemble a single prompt file
+# Check for conflicts for a specific agent (unless --force or --dry-run)
+check_conflicts() {
+    local agent="$1"
+    if [[ "$FORCE" != "true" && "$DRY_RUN" != "true" ]]; then
+        local mirror_prompts="$MIRROR_DIR/$agent/prompts"
+        if [[ -d "$mirror_prompts" ]]; then
+            SCRIPT_DIR="$(dirname "$0")"
+            if ! "$SCRIPT_DIR/detect-conflicts.sh" --agent="$agent" --quiet >/dev/null 2>&1; then
+                echo ""
+                echo "CONFLICTS DETECTED for $agent - Assembly blocked"
+                echo ""
+                echo "Bot has made changes that would be overwritten."
+                echo "Run './tools/detect-conflicts.sh --agent=$agent' to see details."
+                echo ""
+                echo "Options:"
+                echo "  1. Resolve conflicts (see /prompt-sync skill)"
+                echo "  2. Use --force to overwrite bot changes"
+                echo ""
+                return 1
+            fi
+        fi
+    fi
+    return 0
+}
+
+# Assemble a single prompt file for current agent
 # Usage: assemble_prompt_file "agents"
 assemble_prompt_file() {
     local prompt_name="$1"
     local prompt_upper
     prompt_upper=$(echo "$prompt_name" | tr '[:lower:]' '[:upper:]')
-    local output_file="$PROMPTS_OUTPUT/${prompt_upper}.md"
+    local output_file="$AGENT_EXPORT_DIR/core-prompts/${prompt_upper}.md"
 
     # Get sections for this prompt file
     local sections=()
@@ -300,6 +299,16 @@ assemble_prompt_file() {
                     resolve_section "$entry" "$prompt_name" >> "$output_file"
                     echo "" >> "$output_file"
                     log "  + Base: templates/prompts/${prompt_upper}.md"
+                    base_added=1
+                fi
+                ;;
+            manager-base)
+                if [[ "$DRY_RUN" == "true" ]]; then
+                    log "  Would add manager-base template"
+                else
+                    resolve_section "$entry" "$prompt_name" >> "$output_file"
+                    echo "" >> "$output_file"
+                    log "  + Manager-Base: templates/prompts/manager/${prompt_upper}.md"
                     base_added=1
                 fi
                 ;;
@@ -369,10 +378,55 @@ assemble_prompt_file() {
     fi
 }
 
-# Assemble all prompt files
+# Build list of agents to process
+if [[ -n "$AGENT_FILTER" ]]; then
+    AGENTS=("$AGENT_FILTER")
+else
+    # Read agents into array (bash 3.x compatible)
+    AGENTS=()
+    while IFS= read -r agent; do
+        [[ -n "$agent" ]] && AGENTS+=("$agent")
+    done < <(get_agents)
+fi
+
+log "=== Assembling Prompts ==="
 echo "Assembling prompts..."
-for prompt_name in "${PROMPT_FILES[@]}"; do
-    assemble_prompt_file "$prompt_name"
+
+# Process each agent
+for agent in "${AGENTS[@]}"; do
+    load_agent_config "$agent"
+
+    # Skip agents with no prompts configured
+    if [[ "$AGENT_PROMPTS" == "[]" || -z "$AGENT_PROMPTS" ]]; then
+        log "Skipping $agent (no prompts configured)"
+        continue
+    fi
+
+    # Skip agents with null workspace (like helpers)
+    if [[ -z "$AGENT_WORKSPACE" || "$AGENT_WORKSPACE" == "null" ]]; then
+        log "Skipping $agent (no workspace)"
+        continue
+    fi
+
+    # Check for conflicts
+    if ! check_conflicts "$agent"; then
+        exit 1
+    fi
+
+    log ""
+    log "=== Agent: $agent ==="
+    echo ""
+    echo "Agent: $agent"
+
+    # Create output directory
+    if [[ "$DRY_RUN" != "true" ]]; then
+        mkdir -p "$AGENT_EXPORT_DIR/core-prompts"
+    fi
+
+    # Assemble each prompt file
+    for prompt_name in "${PROMPT_FILES[@]}"; do
+        assemble_prompt_file "$prompt_name"
+    done
 done
 
 # Summary
@@ -382,7 +436,6 @@ if [[ "$DRY_RUN" == "true" ]]; then
     log "Dry run complete"
 else
     log "Assembled: $TOTAL_FILES files, $TOTAL_SECTIONS total sections"
-    log "Output: $PROMPTS_OUTPUT/"
 fi
 
 echo ""

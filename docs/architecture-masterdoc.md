@@ -1,6 +1,6 @@
 ---
-version: 2.0.0
-updated: 2026-02-01 23:45
+version: 2.1.0
+updated: 2026-02-02
 type: packet
 project: planning
 tags: [bruba, openclaw, multi-agent, architecture, claude-code]
@@ -9,8 +9,9 @@ tags: [bruba, openclaw, multi-agent, architecture, claude-code]
 # Bruba Architecture 2.0: Complete Implementation Packet
 
 **Created:** 2026-02-01
+**Updated:** 2026-02-02
 **For:** Claude Code on dadmini
-**Status:** Phases 1-3 Complete, Phase 4+ Ready
+**Status:** Phases 1-4, 6 Complete + bruba-godo multi-agent tooling
 
 ---
 
@@ -29,15 +30,16 @@ This packet contains everything needed to complete Bruba's multi-agent architect
 | Manager Agent | ✅ | Configured with heartbeat |
 | Agent-to-Agent | ✅ | agentToAgent enabled |
 
-### What Remains (Phase 4+)
+### What Remains
 
 | Phase | Task | Priority |
 |-------|------|----------|
-| 4a | Delete web-reader, configure helper spawning | **HIGH** |
-| 4b | Update Manager prompts for spawn pattern | **HIGH** |
-| 4c | Add Manager state tracking | MEDIUM |
-| 5 | Isolated cron for morning briefing | OPTIONAL |
-| 6 | Siri integration | OPTIONAL |
+| 4a | Delete web-reader, configure helper spawning | ✅ Complete |
+| 4b | Update Manager prompts for spawn pattern | ✅ Complete |
+| 4c | Add Manager state tracking | ✅ Complete |
+| 5 | Isolated cron for morning briefing | OPTIONAL (skipped) |
+| 6 | Siri integration | ✅ Complete (via tailscale serve) |
+| - | bruba-godo multi-agent tooling | ✅ Complete |
 
 ---
 
@@ -927,31 +929,64 @@ openclaw cron status --id morning-briefing
 
 ### Architecture
 
+Two shortcuts, two paths:
+
+| Shortcut | Target Agent | Behavior |
+|----------|--------------|----------|
+| "Ask Bruba" | Manager (Sonnet) | Sync — wait for response, speak it |
+| "Tell Bruba" | Main (Opus) | Async — fire-and-forget, respond via Signal |
+
 ```
-Siri → Shortcut → HTTP API → Manager → Response → Siri
-                     │
-                     └─(if complex)─→ sessions_send → Main
-                                           │
-                                           └─→ Signal
+"Ask Bruba" (sync):
+Siri → Shortcut → HTTPS → Manager → Response → Siri speaks
+
+"Tell Bruba" (async):
+Siri → Shortcut → HTTPS → Main → Siri says "Got it"
+                           │
+                           └─→ Main processes, responds via Signal
 ```
 
-### HTTP API Targeting (Verified)
+**Network stack:**
+- OpenClaw gateway binds to `loopback` (localhost only)
+- `tailscale serve --bg 18789` on admin account proxies HTTPS traffic
+- iOS reaches `https://dadmini.ts.net/v1/chat/completions` (no port needed)
+
+### Prerequisites
+
+On the admin account (not bruba), ensure tailscale serve is running:
 
 ```bash
-curl -X POST http://dadmini.ts.net:18789/v1/chat/completions \
-  -H 'Authorization: Bearer YOUR_GATEWAY_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -H 'x-openclaw-agent-id: bruba-manager' \
-  -d '{
-    "model": "openclaw",
-    "messages": [{"role":"user","content":"What meetings do I have today?"}]
-  }'
+# Check status
+tailscale serve status
+
+# Start if needed (runs in background, persists across reboots)
+tailscale serve --bg 18789
 ```
 
-### iOS Shortcut: "Ask Bruba"
+### HTTP API Targeting
+
+Agent selection via `x-openclaw-agent-id` header:
+
+```bash
+# To Manager (sync queries)
+curl -X POST https://dadmini.ts.net/v1/chat/completions \
+  -H 'Authorization: Bearer YOUR_GATEWAY_TOKEN' \
+  -H 'x-openclaw-agent-id: bruba-manager' \
+  -d '{"model":"openclaw","messages":[{"role":"user","content":"[Via Siri] What time is it?"}]}'
+
+# To Main (async tasks)
+curl -X POST https://dadmini.ts.net/v1/chat/completions \
+  -H 'Authorization: Bearer YOUR_GATEWAY_TOKEN' \
+  -H 'x-openclaw-agent-id: bruba-main' \
+  -d '{"model":"openclaw","messages":[{"role":"user","content":"[Via Siri async] Remember to buy milk"}]}'
+```
+
+### iOS Shortcut 1: "Ask Bruba" (Sync)
+
+Quick queries — wait for response, Siri speaks it.
 
 1. **Get Contents of URL**
-   - URL: `http://dadmini.ts.net:18789/v1/chat/completions`
+   - URL: `https://dadmini.ts.net/v1/chat/completions`
    - Method: POST
    - Headers:
      - `Authorization`: `Bearer YOUR_TOKEN`
@@ -961,7 +996,7 @@ curl -X POST http://dadmini.ts.net:18789/v1/chat/completions \
      ```json
      {
        "model": "openclaw",
-       "messages": [{"role":"user","content":"VIA SIRI: [Shortcut Input]"}]
+       "messages": [{"role":"user","content":"[Via Siri] [Shortcut Input]"}]
      }
      ```
 
@@ -970,14 +1005,37 @@ curl -X POST http://dadmini.ts.net:18789/v1/chat/completions \
 
 3. **Speak Text** (result)
 
-### Manager Prompt Addition for Siri
+### iOS Shortcut 2: "Tell Bruba" (Async)
 
-Add to IDENTITY.md:
+Complex tasks — fire-and-forget, Main responds via Signal.
+
+1. **Get Contents of URL** (don't wait for response)
+   - URL: `https://dadmini.ts.net/v1/chat/completions`
+   - Method: POST
+   - Headers:
+     - `Authorization`: `Bearer YOUR_TOKEN`
+     - `Content-Type`: `application/json`
+     - `x-openclaw-agent-id`: `bruba-main`
+   - Request Body (JSON):
+     ```json
+     {
+       "model": "openclaw",
+       "messages": [{"role":"user","content":"[Via Siri async] [Shortcut Input]"}]
+     }
+     ```
+
+2. **Speak Text**: "Got it, I'll message you"
+
+Note: iOS Shortcuts fires the request but doesn't wait — Main processes in background.
+
+### Agent Prompts for Siri
+
+**Manager IDENTITY.md** — sync queries:
 
 ```markdown
 ## Siri Requests
 
-Messages starting with "VIA SIRI:" come from voice shortcuts.
+Messages starting with "[Via Siri]" come from voice shortcuts.
 
 For these:
 - Respond concisely (Siri will speak it)
@@ -985,6 +1043,20 @@ For these:
 - For complex tasks: Acknowledge briefly, then forward to Main
   - "On it. I'll message you on Signal when done."
   - Then use sessions_send to Main
+```
+
+**Main AGENTS.md** — async fire-and-forget:
+
+```markdown
+## Siri Async Requests
+
+Messages starting with "[Via Siri async]" come from fire-and-forget voice shortcuts.
+
+For these:
+- User has already been told "Got it, I'll message you"
+- Do NOT return an inline response (they won't see it)
+- Process the request fully
+- Always respond via Signal when done
 ```
 
 ---
@@ -1083,16 +1155,175 @@ openclaw gateway logs --tail 50
 
 | What | Status | Action |
 |------|--------|--------|
-| bruba-main | ✅ Done | No changes |
-| bruba-manager | ✅ Done | Update prompts (4b) |
-| web-reader | ❌ Delete | Phase 4a |
-| Helper spawning | 🔲 Configure | Phase 4a |
-| Manager prompts | 🔲 Update | Phase 4b |
-| State tracking | 🔲 Create | Phase 4c |
-| Morning cron | 🔲 Optional | Phase 5 |
-| Siri | 🔲 Optional | Phase 6 |
+| bruba-main | ✅ Done | No changes needed |
+| bruba-manager | ✅ Done | Prompts updated (4b) |
+| web-reader | ✅ Archived | `~/agents/.archive/bruba-reader/` |
+| Helper spawning | ✅ Configured | `subagents` defaults + `tools.subagents` |
+| Manager prompts | ✅ Updated | TOOLS.md, HEARTBEAT.md, IDENTITY.md |
+| State tracking | ✅ Created | `state/active-helpers.json`, `results/` |
+| Morning cron | 🔲 Skipped | Phase 5 (optional) |
+| Siri | ✅ Ready | Via `tailscale serve` on admin account |
+| bruba-godo snippets | ✅ Updated | http-api + web-search components |
+| bruba-godo multi-agent | ✅ Done | Config + scripts updated for bruba-main/manager |
 
-**Total estimated time:** 30-45 minutes for required phases
+**Implementation complete.** Only Phase 5 (isolated cron) remains optional.
+
+---
+
+## Part 12: bruba-godo Multi-Agent Tooling
+
+The operator workspace (bruba-godo) has been updated to support multi-agent prompt assembly and sync.
+
+### Config Schema Changes
+
+**Before:** Single agent config under `exports.bot.*_sections`
+**After:** Per-agent config under `agents.{name}.*_sections`
+
+```yaml
+# config.yaml
+agents:
+  bruba-main:
+    workspace: /Users/bruba/agents/bruba-main
+    prompts: [agents, tools, heartbeat]
+    remote_path: memory
+    agents_sections:
+      - header
+      - http-api
+      - first-run
+      - session
+      # ... 20+ sections
+    tools_sections:
+      - base
+      - reminders
+    heartbeat_sections:
+      - base
+
+  bruba-manager:
+    workspace: /Users/bruba/agents/bruba-manager
+    prompts: [agents, tools, heartbeat]
+    agents_sections:
+      - manager-base       # templates/prompts/manager/AGENTS.md
+    tools_sections:
+      - manager-base       # templates/prompts/manager/TOOLS.md
+    heartbeat_sections:
+      - manager-base       # templates/prompts/manager/HEARTBEAT.md
+
+  bruba-helper:
+    workspace: null        # Ephemeral, no persistent workspace
+    prompts: []            # No prompt files
+```
+
+### Section Types
+
+Assembly resolves section entries in order:
+
+| Type | Pattern | Source |
+|------|---------|--------|
+| base | `base` | `templates/prompts/{NAME}.md` |
+| manager-base | `manager-base` | `templates/prompts/manager/{NAME}.md` |
+| component | `{name}` | `components/{name}/prompts/{NAME}.snippet.md` |
+| section | `{name}` | `templates/prompts/sections/{name}.md` |
+| bot-managed | `bot:{name}` | Mirror file `<!-- BOT-MANAGED: {name} -->` |
+
+### New Manager Templates
+
+Created `templates/prompts/manager/` with:
+
+| File | Purpose |
+|------|---------|
+| `AGENTS.md` | Manager identity, relationships, Siri handling |
+| `TOOLS.md` | Helper spawning, forwarding patterns |
+| `HEARTBEAT.md` | 15m heartbeat protocol, HEARTBEAT_OK suppression |
+| `IDENTITY.md` | Coordinator role (pushed directly via SSH) |
+| `SOUL.md` | Router philosophy (pushed directly via SSH) |
+
+### Script Updates
+
+All scripts now support `--agent=NAME` flag:
+
+```bash
+# Assemble for specific agent
+./tools/assemble-prompts.sh --agent=bruba-main
+
+# Assemble all agents
+./tools/assemble-prompts.sh
+
+# Push to specific agent
+./tools/push.sh --agent=bruba-manager
+
+# Mirror from specific agent
+./tools/mirror.sh --agent=bruba-main
+
+# Check conflicts for specific agent
+./tools/detect-conflicts.sh --agent=bruba-main
+```
+
+### Directory Structure
+
+```
+bruba-godo/
+├── config.yaml                          # Multi-agent config
+├── templates/prompts/
+│   ├── AGENTS.md                        # Base template for bruba-main
+│   ├── TOOLS.md
+│   ├── manager/                         # Manager-specific templates
+│   │   ├── AGENTS.md
+│   │   ├── TOOLS.md
+│   │   ├── HEARTBEAT.md
+│   │   ├── IDENTITY.md
+│   │   └── SOUL.md
+│   └── helper/
+│       └── README.md                    # Documentation (helpers have no prompts)
+├── exports/bot/
+│   ├── bruba-main/
+│   │   └── core-prompts/
+│   │       ├── AGENTS.md
+│   │       ├── TOOLS.md
+│   │       └── HEARTBEAT.md
+│   └── bruba-manager/
+│       └── core-prompts/
+│           ├── AGENTS.md
+│           ├── TOOLS.md
+│           └── HEARTBEAT.md
+└── mirror/
+    ├── bruba-main/
+    │   └── prompts/
+    └── bruba-manager/
+        └── prompts/
+```
+
+### Helper Functions (lib.sh)
+
+New functions for agent iteration:
+
+```bash
+# Get list of configured agents
+get_agents()
+# Returns: bruba-main, bruba-manager, bruba-helper
+
+# Load config for specific agent
+load_agent_config "bruba-main"
+# Sets: AGENT_NAME, AGENT_WORKSPACE, AGENT_PROMPTS,
+#       AGENT_REMOTE_PATH, AGENT_MIRROR_DIR, AGENT_EXPORT_DIR
+```
+
+### Verification
+
+```bash
+# Test assembly for all agents
+./tools/assemble-prompts.sh --verbose
+
+# Check outputs
+ls exports/bot/bruba-main/core-prompts/
+ls exports/bot/bruba-manager/core-prompts/
+
+# Run test suite
+./tests/test-prompt-assembly.sh --quick
+
+# Push to bot (dry-run first)
+./tools/push.sh --dry-run
+./tools/push.sh
+```
 
 ---
 

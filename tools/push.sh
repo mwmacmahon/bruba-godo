@@ -2,12 +2,13 @@
 # Push content exports to bot memory
 #
 # Usage:
-#   ./tools/push.sh              # Push default export (bot)
-#   ./tools/push.sh --dry-run    # Show what would be synced
-#   ./tools/push.sh --verbose    # Detailed output
-#   ./tools/push.sh --no-index   # Skip memory reindex
+#   ./tools/push.sh                     # Push for all agents
+#   ./tools/push.sh --agent=bruba-main  # Push for specific agent
+#   ./tools/push.sh --dry-run           # Show what would be synced
+#   ./tools/push.sh --verbose           # Detailed output
+#   ./tools/push.sh --no-index          # Skip memory reindex
 #
-# Reads config.yaml for filter configuration, syncs exports/bot/ to bot's memory/
+# Reads config.yaml for filter configuration, syncs exports/bot/{agent}/ to bot workspaces
 #
 # IMPORTANT: This script ADDS files to bot memory. It does NOT delete existing files.
 # To sync with deletion, use rsync --delete manually with the full content set.
@@ -23,6 +24,7 @@ source "$(dirname "$0")/lib.sh"
 NO_INDEX=false
 TOOLS_ONLY=false
 UPDATE_ALLOWLIST=false
+AGENT_FILTER=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         --no-index)
@@ -37,6 +39,10 @@ while [[ $# -gt 0 ]]; do
             UPDATE_ALLOWLIST=true
             shift
             ;;
+        --agent=*)
+            AGENT_FILTER="${1#*=}"
+            shift
+            ;;
         *)
             break
             ;;
@@ -44,7 +50,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if ! parse_common_args "$@"; then
-    echo "Usage: $0 [--dry-run] [--verbose] [--no-index] [--tools-only] [--update-allowlist]"
+    echo "Usage: $0 [--dry-run] [--verbose] [--no-index] [--tools-only] [--update-allowlist] [--agent=NAME]"
     echo ""
     echo "Push content bundles to bot memory."
     echo ""
@@ -55,6 +61,7 @@ if ! parse_common_args "$@"; then
     echo "  --no-index          Skip memory reindex after sync"
     echo "  --tools-only        Sync only component tools (skip content)"
     echo "  --update-allowlist  Update exec-approvals with component tool entries"
+    echo "  --agent=NAME        Push for specific agent only"
     exit 0
 fi
 
@@ -71,8 +78,7 @@ rotate_log "$LOG_FILE"
 
 log "=== Pushing Content to Bot ==="
 
-# Sync component tools function
-# Syncs components/*/tools/ to bot's ~/clawd/tools/ with executable permissions
+# Sync component tools function (to main agent only - they share tools)
 sync_component_tools() {
     local tools_synced=0
     local tool_rsync_opts="-avz --chmod=+x"
@@ -120,40 +126,19 @@ if [[ "$TOOLS_ONLY" == "true" ]]; then
     exit 0
 fi
 
-# Read remote_path from config.yaml for bot profile
-REMOTE_PATH=$(python3 -c "
-import yaml
-with open('$ROOT_DIR/config.yaml') as f:
-    config = yaml.safe_load(f)
-    path = config.get('exports', {}).get('bot', {}).get('remote_path', 'memory')
-    print(path if path else 'memory')
-" 2>/dev/null || echo "memory")
-if [[ -z "$REMOTE_PATH" ]]; then
-    REMOTE_PATH="memory"
-fi
-log "Remote path: $REMOTE_PATH"
-
-# Check if exports directory exists
-if [[ ! -d "$EXPORTS_DIR/bot" ]]; then
-    log "No export found at $EXPORTS_DIR/bot"
-    log "Run /export first to generate filtered exports from reference/"
-    echo "No export found. Run /export first."
-    exit 1
+# Build list of agents to process
+if [[ -n "$AGENT_FILTER" ]]; then
+    AGENTS=("$AGENT_FILTER")
+else
+    # Read agents into array (bash 3.x compatible)
+    AGENTS=()
+    while IFS= read -r agent; do
+        [[ -n "$agent" ]] && AGENTS+=("$agent")
+    done < <(get_agents)
 fi
 
-# Generate inventory files (Transcript Inventory.md, Document Inventory.md)
-log "Generating inventories..."
-"$ROOT_DIR/tools/generate-inventory.sh" | while read -r line; do log "$line"; done
-
-# Count files to sync
-FILE_COUNT=$(find "$EXPORTS_DIR/bot" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-log "Files to sync: $FILE_COUNT"
-
-if [[ "$FILE_COUNT" -eq 0 ]]; then
-    log "No files to sync"
-    echo "No files to sync"
-    exit 0
-fi
+# Default remote path for content (can be overridden per-agent)
+DEFAULT_REMOTE_PATH="memory"
 
 # Rsync options (no --delete to preserve existing content)
 RSYNC_OPTS="-avz"
@@ -166,62 +151,92 @@ else
     RSYNC_OPTS="$RSYNC_OPTS --quiet"
 fi
 
-# Sync subdirectories to appropriate remote targets
-# core-prompts/ → ~/clawd/ (workspace root, for AGENTS.md etc.)
-# Everything else → ~/clawd/memory/
-
 TOTAL_SYNCED=0
 
-# 1. Sync core-prompts to workspace root
-if [[ -d "$EXPORTS_DIR/bot/core-prompts" ]]; then
-    CORE_COUNT=$(find "$EXPORTS_DIR/bot/core-prompts" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "$CORE_COUNT" -gt 0 ]]; then
-        log "Syncing core-prompts/ to $SSH_HOST:$REMOTE_WORKSPACE/ ($CORE_COUNT files)"
-        if [[ "$DRY_RUN" == "true" ]]; then
-            log "[DRY RUN] Would sync $CORE_COUNT core prompt files"
-            rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/core-prompts/" "$SSH_HOST:$REMOTE_WORKSPACE/"
-        else
-            rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/core-prompts/" "$SSH_HOST:$REMOTE_WORKSPACE/"
-            log "  Synced $CORE_COUNT core prompt files"
-        fi
-        TOTAL_SYNCED=$((TOTAL_SYNCED + CORE_COUNT))
-    fi
-fi
+# Process each agent
+for agent in "${AGENTS[@]}"; do
+    load_agent_config "$agent"
 
-# 2. Sync all content subdirectories FLAT to memory/
-# Files have prefixes (Transcript -, Doc -, etc.) so they go flat, not in subdirs
-for subdir in prompts transcripts refdocs docs artifacts cc_logs summaries; do
-    if [[ -d "$EXPORTS_DIR/bot/$subdir" ]]; then
-        SUBDIR_COUNT=$(find "$EXPORTS_DIR/bot/$subdir" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-        if [[ "$SUBDIR_COUNT" -gt 0 ]]; then
-            log "Syncing $subdir/ flat to $SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/ ($SUBDIR_COUNT files)"
+    # Skip agents with no workspace
+    if [[ -z "$AGENT_WORKSPACE" || "$AGENT_WORKSPACE" == "null" ]]; then
+        log "Skipping $agent (no workspace)"
+        continue
+    fi
+
+    # Skip if no export directory exists
+    if [[ ! -d "$AGENT_EXPORT_DIR" ]]; then
+        log "Skipping $agent (no exports at $AGENT_EXPORT_DIR)"
+        continue
+    fi
+
+    log ""
+    log "=== Syncing $agent ==="
+    echo "Agent: $agent"
+
+    # 1. Sync core-prompts to workspace root (AGENTS.md, TOOLS.md, HEARTBEAT.md)
+    if [[ -d "$AGENT_EXPORT_DIR/core-prompts" ]]; then
+        CORE_COUNT=$(find "$AGENT_EXPORT_DIR/core-prompts" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+        if [[ "$CORE_COUNT" -gt 0 ]]; then
+            log "Syncing core-prompts/ to $SSH_HOST:$AGENT_WORKSPACE/ ($CORE_COUNT files)"
             if [[ "$DRY_RUN" == "true" ]]; then
-                log "[DRY RUN] Would sync $SUBDIR_COUNT $subdir files"
-                rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/$subdir/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
+                log "[DRY RUN] Would sync $CORE_COUNT core prompt files"
+                rsync $RSYNC_OPTS "$AGENT_EXPORT_DIR/core-prompts/" "$SSH_HOST:$AGENT_WORKSPACE/"
             else
-                rsync $RSYNC_OPTS "$EXPORTS_DIR/bot/$subdir/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
-                log "  Synced $SUBDIR_COUNT $subdir files"
+                rsync $RSYNC_OPTS "$AGENT_EXPORT_DIR/core-prompts/" "$SSH_HOST:$AGENT_WORKSPACE/"
+                log "  Synced $CORE_COUNT core prompt files"
+                echo "  core-prompts: $CORE_COUNT files"
             fi
-            TOTAL_SYNCED=$((TOTAL_SYNCED + SUBDIR_COUNT))
+            TOTAL_SYNCED=$((TOTAL_SYNCED + CORE_COUNT))
+        fi
+    fi
+
+    # 2. Only sync content directories for main agent (bruba-main has memory)
+    if [[ "$agent" == "bruba-main" ]]; then
+        # Generate inventory files
+        if [[ -f "$ROOT_DIR/tools/generate-inventory.sh" ]]; then
+            log "Generating inventories..."
+            "$ROOT_DIR/tools/generate-inventory.sh" | while read -r line; do log "$line"; done
+        fi
+
+        # Use agent's remote_path (defaults to 'memory')
+        remote_path="${AGENT_REMOTE_PATH:-memory}"
+
+        # Sync content subdirectories FLAT to memory/
+        for subdir in prompts transcripts refdocs docs artifacts cc_logs summaries; do
+            if [[ -d "$AGENT_EXPORT_DIR/$subdir" ]]; then
+                SUBDIR_COUNT=$(find "$AGENT_EXPORT_DIR/$subdir" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+                if [[ "$SUBDIR_COUNT" -gt 0 ]]; then
+                    log "Syncing $subdir/ flat to $SSH_HOST:$AGENT_WORKSPACE/$remote_path/ ($SUBDIR_COUNT files)"
+                    if [[ "$DRY_RUN" == "true" ]]; then
+                        log "[DRY RUN] Would sync $SUBDIR_COUNT $subdir files"
+                        rsync $RSYNC_OPTS "$AGENT_EXPORT_DIR/$subdir/" "$SSH_HOST:$AGENT_WORKSPACE/$remote_path/"
+                    else
+                        rsync $RSYNC_OPTS "$AGENT_EXPORT_DIR/$subdir/" "$SSH_HOST:$AGENT_WORKSPACE/$remote_path/"
+                        log "  Synced $SUBDIR_COUNT $subdir files"
+                        echo "  $subdir: $SUBDIR_COUNT files"
+                    fi
+                    TOTAL_SYNCED=$((TOTAL_SYNCED + SUBDIR_COUNT))
+                fi
+            fi
+        done
+
+        # Sync root-level inventory files
+        ROOT_FILES=$(find "$AGENT_EXPORT_DIR" -maxdepth 1 -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+        if [[ "$ROOT_FILES" -gt 0 ]]; then
+            log "Syncing root-level files to $SSH_HOST:$AGENT_WORKSPACE/$remote_path/ ($ROOT_FILES files)"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log "[DRY RUN] Would sync $ROOT_FILES root files"
+                rsync $RSYNC_OPTS --include='*.md' --exclude='*/' "$AGENT_EXPORT_DIR/" "$SSH_HOST:$AGENT_WORKSPACE/$remote_path/"
+            else
+                rsync $RSYNC_OPTS --include='*.md' --exclude='*/' "$AGENT_EXPORT_DIR/" "$SSH_HOST:$AGENT_WORKSPACE/$remote_path/"
+                log "  Synced $ROOT_FILES root files"
+            fi
+            TOTAL_SYNCED=$((TOTAL_SYNCED + ROOT_FILES))
         fi
     fi
 done
 
-# 3. Sync any remaining files at root level (legacy compatibility)
-ROOT_FILES=$(find "$EXPORTS_DIR/bot" -maxdepth 1 -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-if [[ "$ROOT_FILES" -gt 0 ]]; then
-    log "Syncing root-level files to $SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/ ($ROOT_FILES files)"
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "[DRY RUN] Would sync $ROOT_FILES root files"
-        rsync $RSYNC_OPTS --include='*.md' --exclude='*/' "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
-    else
-        rsync $RSYNC_OPTS --include='*.md' --exclude='*/' "$EXPORTS_DIR/bot/" "$SSH_HOST:$REMOTE_WORKSPACE/$REMOTE_PATH/"
-        log "  Synced $ROOT_FILES root files"
-    fi
-    TOTAL_SYNCED=$((TOTAL_SYNCED + ROOT_FILES))
-fi
-
-# 4. Sync repo code if enabled
+# 3. Sync repo code if enabled (to main agent only)
 if [[ "$CLONE_REPO_CODE" == "true" ]]; then
     log "Syncing repo code to $SSH_HOST:$REMOTE_WORKSPACE/workspace/repo/"
 
@@ -257,19 +272,19 @@ if [[ "$CLONE_REPO_CODE" == "true" ]]; then
         "$ROOT_DIR/" "$SSH_HOST:$REMOTE_WORKSPACE/workspace/repo/"
 
     if [[ "$DRY_RUN" != "true" ]]; then
-        CODE_COUNT=$(find "$ROOT_DIR/scripts" "$ROOT_DIR/docs" "$ROOT_DIR/tools" -type f 2>/dev/null | wc -l | tr -d ' ')
+        CODE_COUNT=$(find "$ROOT_DIR/docs" "$ROOT_DIR/tools" -type f 2>/dev/null | wc -l | tr -d ' ')
         log "  Synced ~$CODE_COUNT repo files"
     fi
 fi
 
-# 5. Sync component tools
+# 4. Sync component tools (to main agent only)
 log "Syncing component tools..."
 TOOLS_COUNT=$(sync_component_tools)
 if [[ "$DRY_RUN" != "true" ]]; then
     log "  $TOOLS_COUNT tool files synced"
 fi
 
-# 6. Update allowlist if requested
+# 5. Update allowlist if requested
 if [[ "$UPDATE_ALLOWLIST" == "true" ]]; then
     log "Updating exec-approvals allowlist..."
     ALLOWLIST_ARGS=""
@@ -278,10 +293,10 @@ if [[ "$UPDATE_ALLOWLIST" == "true" ]]; then
     "$ROOT_DIR/tools/update-allowlist.sh" $ALLOWLIST_ARGS
 fi
 
-# Trigger reindex if not dry run
+# Trigger reindex for main agent if not dry run
 if [[ "$DRY_RUN" != "true" && "$NO_INDEX" != "true" ]]; then
     log "Triggering memory reindex..."
-    if bot_cmd "clawdbot memory index" 2>/dev/null; then
+    if bot_cmd "openclaw memory index" 2>/dev/null; then
         log "Memory indexed"
     else
         log "Warning: Memory index failed (may need manual reindex)"
@@ -289,4 +304,5 @@ if [[ "$DRY_RUN" != "true" && "$NO_INDEX" != "true" ]]; then
 fi
 
 log "=== Push Complete ==="
+echo ""
 echo "Push: $TOTAL_SYNCED files synced"

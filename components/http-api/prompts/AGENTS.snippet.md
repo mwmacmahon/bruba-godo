@@ -4,6 +4,7 @@
 |---------------|---------------|
 | `<media:audio>` | → 🎤 Voice Messages (transcribe + voice reply!) |
 | `[From Siri]` / `[From ...]` | → 📬 HTTP API Messages (respond + log) |
+| `[Via Siri async]` | → 📱 Siri Async (process, respond via Signal) |
 | Heartbeat prompt text | → 💓 Heartbeats |
 | New session / `/reset` | → Session Greeting |
 
@@ -54,5 +55,16 @@ Messages may arrive via HTTP API (Siri, Shortcuts, automations) rather than Sign
 | `[From Siri]` | Apple Shortcuts via voice |
 | `[From Webapp]` | Custom web interfaces |
 | `[From Automation]` | Scripts, cron jobs |
+| `[Via Siri async]` | Fire-and-forget voice shortcut (respond via Signal) |
 
 Relay to Signal happens on heartbeat (see HEARTBEAT.md).
+
+### 📱 Siri Async Requests
+
+Messages starting with `[Via Siri async]` come from fire-and-forget voice shortcuts.
+
+For these:
+- User has already been told "Got it, I'll message you"
+- Do NOT return an inline response (they won't see it)
+- Process the request fully
+- Always respond via Signal when done

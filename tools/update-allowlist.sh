@@ -102,7 +102,7 @@ collect_required_entries() {
 # Get current allowlist from bot
 get_current_allowlist() {
     local current
-    current=$(bot_cmd "cat $REMOTE_CLAWDBOT/exec-approvals.json" 2>/dev/null) || {
+    current=$(bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json" 2>/dev/null) || {
         log "Warning: Could not read exec-approvals.json from bot"
         echo "[]"
         return
@@ -205,9 +205,9 @@ if [[ "$DRY_RUN" == "true" ]]; then
 fi
 
 # Backup before any changes
-BACKUP_FILE="$REMOTE_CLAWDBOT/exec-approvals.json.backup"
+BACKUP_FILE="$REMOTE_OPENCLAW/exec-approvals.json.backup"
 log "Backing up to $BACKUP_FILE..."
-bot_cmd "cp $REMOTE_CLAWDBOT/exec-approvals.json $BACKUP_FILE"
+bot_cmd "cp $REMOTE_OPENCLAW/exec-approvals.json $BACKUP_FILE"
 
 CHANGES_MADE=0
 
@@ -215,7 +215,7 @@ CHANGES_MADE=0
 if [[ "$MISSING_COUNT" -gt 0 && "$REMOVE_ONLY" != "true" ]]; then
     log "Adding missing entries to exec-approvals.json..."
     MISSING_JSON=$(echo "$MISSING" | jq -c '.')
-    bot_cmd "cat $REMOTE_CLAWDBOT/exec-approvals.json | jq --argjson new '$MISSING_JSON' '.agents[\"$REMOTE_AGENT_ID\"].allowlist += \$new' > /tmp/exec-approvals.json && mv /tmp/exec-approvals.json $REMOTE_CLAWDBOT/exec-approvals.json"
+    bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json | jq --argjson new '$MISSING_JSON' '.agents[\"$REMOTE_AGENT_ID\"].allowlist += \$new' > /tmp/exec-approvals.json && mv /tmp/exec-approvals.json $REMOTE_OPENCLAW/exec-approvals.json"
     log "Added $MISSING_COUNT entries"
     CHANGES_MADE=1
 fi
@@ -225,7 +225,7 @@ if [[ "$ORPHAN_COUNT" -gt 0 && "$ADD_ONLY" != "true" ]]; then
     log "Removing orphan entries from exec-approvals.json..."
     # Get patterns to remove
     ORPHAN_PATTERNS=$(echo "$ORPHANS" | jq -c '[.[].pattern]')
-    bot_cmd "cat $REMOTE_CLAWDBOT/exec-approvals.json | jq --argjson remove '$ORPHAN_PATTERNS' '.agents[\"$REMOTE_AGENT_ID\"].allowlist |= map(select(.pattern as \$p | (\$remove | index(\$p)) == null))' > /tmp/exec-approvals.json && mv /tmp/exec-approvals.json $REMOTE_CLAWDBOT/exec-approvals.json"
+    bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json | jq --argjson remove '$ORPHAN_PATTERNS' '.agents[\"$REMOTE_AGENT_ID\"].allowlist |= map(select(.pattern as \$p | (\$remove | index(\$p)) == null))' > /tmp/exec-approvals.json && mv /tmp/exec-approvals.json $REMOTE_OPENCLAW/exec-approvals.json"
     log "Removed $ORPHAN_COUNT entries"
     CHANGES_MADE=1
 fi
