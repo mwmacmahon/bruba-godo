@@ -1,217 +1,280 @@
 ---
 version: 2.0.0
-updated: 2026-02-01 23:30
+updated: 2026-02-01 23:45
 type: packet
 project: planning
-tags: [packet, bruba, openclaw, multi-agent, claude-code, architecture]
+tags: [bruba, openclaw, multi-agent, architecture, claude-code]
 ---
 
-# Bruba Architecture 2.0: Multi-Agent Implementation Packet
+# Bruba Architecture 2.0: Complete Implementation Packet
 
 **Created:** 2026-02-01
-**For:** Claude Code session on dadmini
-**Scope:** Complete multi-agent architecture with ephemeral helpers
-**Prerequisites:** OpenClaw migration complete, Phases 1-3 done
+**For:** Claude Code on dadmini
+**Status:** Phases 1-3 Complete, Phase 4+ Ready
 
 ---
 
 ## Executive Summary
 
-This packet finalizes the Bruba multi-agent architecture by:
-1. Deleting `web-reader` (replaced by ephemeral helpers)
-2. Configuring Manager to spawn helpers via `sessions_spawn`
-3. Adding state tracking for helper lifecycle
-4. Updating Manager prompts with spawn patterns
-5. (Optional) Adding isolated cron for morning briefing
+This packet contains everything needed to complete Bruba's multi-agent architecture. It's self-contained — no need to reference other research docs.
 
-**Key architectural insight:** Helpers are ephemeral subagents spawned by Manager, not persistent agents. The old `web-reader` pattern was pre-multi-agent thinking.
+### What's Done (Phases 1-3)
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| OpenClaw Migration | ✅ | v2026.1.30 installed |
+| Directory Restructure | ✅ | ~/agents/bruba-main/, ~/agents/bruba-manager/ |
+| exec-approvals | ✅ | Paths updated |
+| bruba-godo sync | ✅ | ~30 files updated |
+| Manager Agent | ✅ | Configured with heartbeat |
+| Agent-to-Agent | ✅ | agentToAgent enabled |
+
+### What Remains (Phase 4+)
+
+| Phase | Task | Priority |
+|-------|------|----------|
+| 4a | Delete web-reader, configure helper spawning | **HIGH** |
+| 4b | Update Manager prompts for spawn pattern | **HIGH** |
+| 4c | Add Manager state tracking | MEDIUM |
+| 5 | Isolated cron for morning briefing | OPTIONAL |
+| 6 | Siri integration | OPTIONAL |
 
 ---
 
-## Current State (Post Phases 1-3)
+## Part 1: Architecture Overview
 
-### Agents Configured
+### The Three-Tier Pattern
 
-| Agent | Model | Purpose | Status |
-|-------|-------|---------|--------|
-| bruba-main | Opus | Primary conversational agent | ✅ Working |
-| bruba-manager | Sonnet (Haiku for heartbeat) | Coordinator, 15m heartbeat | ✅ Working |
-| web-reader | Opus | Sandboxed web access | ❌ **DELETE** |
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  INPUT LAYER                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                              │
+│  │  Signal  │  │   Siri   │  │ Heartbeat│                              │
+│  │  (user)  │  │  (HTTP)  │  │  (timer) │                              │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘                              │
+└───────┼─────────────┼─────────────┼────────────────────────────────────┘
+        │             │             │
+        ▼             │             │
+┌───────────────────┐ │             │
+│  bruba-main       │ │             │
+│  ────────────     │ │             │
+│  Model: Opus      │ │             │
+│  Role: Primary    │ │             │
+│  Heartbeat: OFF   │ │             │
+│                   │ │             │
+│  Handles:         │ │             │
+│  • Conversations  │ │             │
+│  • File ops       │ │             │
+│  • Complex tasks  │ │             │
+│                   │ │             │
+│  For research:    │ │             │
+│  sessions_send────┼─┼─────┐      │
+│  to Manager       │ │     │      │
+└───────────────────┘ │     │      │
+                      │     │      │
+                      ▼     ▼      ▼
+              ┌─────────────────────────┐
+              │  bruba-manager          │
+              │  ──────────────         │
+              │  Model: Sonnet/Haiku    │
+              │  Role: Coordinator      │
+              │  Heartbeat: 15m         │
+              │                         │
+              │  Handles:               │
+              │  • Siri quick queries   │
+              │  • Heartbeat checks     │
+              │  • Spawning helpers     │
+              │  • Tracking helper state│
+              │                         │
+              │  Tools: READ-ONLY       │
+              │  + sessions_*           │
+              └───────────┬─────────────┘
+                          │
+                          │ sessions_spawn
+                          ▼
+              ┌─────────────────────────┐
+              │  Helper (ephemeral)     │
+              │  ──────────────         │
+              │  Model: Sonnet          │
+              │  Lifetime: ~5-10 min    │
+              │  Auto-archive: 60m      │
+              │                         │
+              │  Has:                   │
+              │  • web_search           │
+              │  • web_fetch            │
+              │  • read (workspace)     │
+              │  • write (results only) │
+              │                         │
+              │  On complete:           │
+              │  • Write to file        │
+              │  • Announce to Manager  │
+              │  • Deliver to Signal    │
+              └─────────────────────────┘
+```
+
+### Why This Architecture
+
+| Problem | Solution |
+|---------|----------|
+| Opus heartbeats burn $$$  | Manager uses Haiku for heartbeats |
+| Main can't see subagents it didn't spawn | Manager is sole spawner |
+| web-reader is permanent overhead | Ephemeral helpers spawn on-demand |
+| Helper results can be lost (gateway restart) | Helpers write to files first |
+| Siri times out on Opus | Manager (fast) handles Siri, hands off to Main |
+
+### Key Constraints (Verified)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| HTTP API agent targeting | ✅ Works | `model: "openclaw:bruba-manager"` |
+| Webhook agent targeting | ❌ Not supported | Use HTTP API instead |
+| sessions_send | ✅ Works | Fire-and-forget with `timeoutSeconds: 0` |
+| sessions_spawn | ✅ Works | Non-blocking, auto-archive |
+| Subagent nesting | ❌ Not allowed | Helpers cannot spawn helpers |
+| Cross-agent visibility | ❌ Not allowed | Each agent sees only its own subagents |
+
+### Tool Group Shorthand
+
+OpenClaw supports `group:*` entries that expand to multiple tools:
+
+| Group | Expands To |
+|-------|------------|
+| `group:fs` | read, write, edit, apply_patch |
+| `group:runtime` | exec, bash, process |
+| `group:sessions` | sessions_list, sessions_history, sessions_send, sessions_spawn, session_status |
+| `group:memory` | memory_search, memory_get |
+| `group:ui` | browser, canvas |
+| `group:automation` | cron, gateway |
+
+### Known Bugs to Work Around
+
+| Bug | Impact | Workaround |
+|-----|--------|------------|
+| #3589 Heartbeat prompt bleeding | Cron jobs get HEARTBEAT_OK prompt | Use isolated cron for non-heartbeat tasks |
+| #4355 Session lock contention | Concurrent helpers block each other | Cap `maxConcurrent: 2` |
+| #5433 Compaction overflow | Auto-recovery sometimes fails | Monitor, restart gateway if stuck |
+| #6295 Subagent model override | Model param in sessions_spawn ignored | Helpers inherit spawner's model (Sonnet) — OK for us |
+
+---
+
+## Part 2: Current Configuration
+
+This is what's deployed after Phases 1-3:
+
+### Agent List (in openclaw.json)
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "workspace": "/Users/bruba/.openclaw/workspace",
+      "compaction": { "mode": "safeguard" },
+      "maxConcurrent": 4
+    },
+    "list": [
+      {
+        "id": "bruba-main",
+        "name": "Bruba",
+        "default": true,
+        "workspace": "/Users/bruba/agents/bruba-main",
+        "model": {
+          "primary": "anthropic/claude-opus-4-5",
+          "fallbacks": ["anthropic/claude-sonnet-4-5"]
+        },
+        "heartbeat": { "every": "0m" },
+        "sandbox": { "mode": "off" },
+        "tools": {
+          "allow": ["read", "write", "edit", "apply_patch", "exec", 
+                    "memory_search", "memory_get", "sessions_list", 
+                    "sessions_send", "sessions_spawn", "session_status"],
+          "deny": ["cron", "gateway"]
+        }
+      },
+      {
+        "id": "bruba-manager",
+        "name": "Manager",
+        "workspace": "/Users/bruba/agents/bruba-manager",
+        "model": {
+          "primary": "anthropic/claude-sonnet-4-5",
+          "fallbacks": ["anthropic/claude-haiku-4-5"]
+        },
+        "heartbeat": {
+          "every": "15m",
+          "model": "anthropic/claude-haiku-4-5",
+          "target": "signal",
+          "activeHours": { "start": "07:00", "end": "22:00" }
+        },
+        "sandbox": { "mode": "off" },
+        "tools": {
+          "allow": ["read", "sessions_list", "sessions_send", "sessions_spawn",
+                    "session_status", "exec", "memory_search", "memory_get"],
+          "deny": ["write", "edit", "apply_patch", "browser", "canvas",
+                   "gateway", "cron", "nodes", "process"]
+        }
+      },
+      {
+        "id": "web-reader",
+        "name": "Web Reader",
+        "workspace": "/Users/bruba/agents/bruba-reader",
+        "model": { "primary": "anthropic/claude-opus-4-5" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": {
+          "allow": ["web_fetch", "web_search", "read"],
+          "deny": ["exec", "write", "edit", "apply_patch", "memory_search"]
+        }
+      }
+    ]
+  },
+  "tools": {
+    "agentToAgent": {
+      "enabled": true,
+      "allow": ["bruba-main", "bruba-manager", "web-reader"]
+    }
+  },
+  "bindings": [
+    { "agentId": "bruba-main", "match": { "channel": "signal" } }
+  ]
+}
+```
 
 ### Directory Structure
 
 ```
 /Users/bruba/
-├── .openclaw/
-│   ├── openclaw.json           # Main config
-│   ├── exec-approvals.json     # Allowlist
-│   └── agents/
-│       ├── bruba-main/
-│       └── bruba-manager/
-└── agents/
-    ├── bruba-main/             # Main workspace
-    │   ├── IDENTITY.md
-    │   ├── SOUL.md
-    │   ├── TOOLS.md
-    │   └── MEMORY.md
-    ├── bruba-manager/          # Manager workspace
-    │   ├── IDENTITY.md
-    │   ├── SOUL.md
-    │   ├── TOOLS.md
-    │   └── HEARTBEAT.md
-    └── bruba-reader/           # ❌ DELETE THIS
+├── agents/
+│   ├── bruba-main/           # Main agent workspace
+│   │   ├── IDENTITY.md
+│   │   ├── SOUL.md
+│   │   ├── TOOLS.md
+│   │   ├── MEMORY.md
+│   │   └── memory/
+│   ├── bruba-manager/        # Manager workspace
+│   │   ├── IDENTITY.md
+│   │   ├── SOUL.md
+│   │   ├── TOOLS.md
+│   │   └── HEARTBEAT.md
+│   └── bruba-reader/         # TO BE DELETED
+│       └── SOUL.md
+└── .openclaw/
+    ├── openclaw.json
+    ├── exec-approvals.json
+    └── agents/
+        ├── bruba-main/
+        │   └── sessions/
+        └── bruba-manager/
+            └── sessions/
 ```
 
 ---
 
-## Target Architecture
+## Part 3: Phase 4a — Delete web-reader, Configure Helpers
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  User via Signal                                                     │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  bruba-main (Opus)                                                   │
-│  • Handles conversations directly                                    │
-│  • Full tools: read/write/edit/exec/memory/web                      │
-│  • No heartbeat (saves tokens)                                       │
-│  • For complex async tasks: sessions_send → Manager                  │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            │ sessions_send (async, timeoutSeconds: 0)
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  bruba-manager (Sonnet, Haiku for heartbeat)                         │
-│  • Heartbeat every 15m (07:00-22:00)                                │
-│  • Spawns helpers for research/tasks                                 │
-│  • Tracks active helpers in state file                               │
-│  • Read-only + session tools (no write/edit)                        │
-│  • Forwards results to Signal or Main                                │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            │ sessions_spawn (non-blocking)
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  Helper (ephemeral, inherits Sonnet from Manager)                    │
-│  • Fresh context per task                                            │
-│  • Default tools: read, write, exec, web_search, web_fetch          │
-│  • Writes results to workspace file (announce is best-effort)       │
-│  • Announces completion → Manager                                    │
-│  • Auto-archives after 60 minutes                                    │
-│  • CANNOT spawn sub-helpers (no nesting)                            │
-└─────────────────────────────────────────────────────────────────────┘
-```
+### Step 1: Remove web-reader from config
 
-### Why Manager Spawns (Not Main)
+Edit `/Users/bruba/.openclaw/openclaw.json`:
 
-OpenClaw's visibility is per-agent scoped:
-- `sessions_list` only shows that agent's subagents
-- If Main spawned helpers, Manager couldn't monitor them
-- Single coordination point simplifies lifecycle management
-
-**Pattern:** Main → sessions_send → Manager → sessions_spawn → Helper
-
----
-
-## Known Bugs and Workarounds
-
-### Bug #6295: Subagent Model Override Broken (OPEN, 14 hours old)
-
-**Impact:** `sessions_spawn` model parameter is ignored. Helpers inherit spawner's model.
-
-**Workaround:** Since Manager uses Sonnet, helpers will use Sonnet. This is actually fine for our use case (Sonnet is good for research). If you need Haiku helpers, spawn from a Haiku-configured agent.
-
-**Status:** Monitor for fix.
-
-### Bug #4355: Session Lock Contention (OPEN)
-
-**Impact:** Default 10-second session write lock causes concurrent subagents to block and terminate.
-
-**Workaround:** Cap `maxConcurrent` at 2-3 until fixed.
-
+**DELETE this entire agent entry:**
 ```json
-"subagents": {
-  "maxConcurrent": 2
-}
-```
-
-### Bug #3589: Heartbeat Prompt Bleeding (OPEN)
-
-**Impact:** Cron events get heartbeat prompt appended, causing them to respond `HEARTBEAT_OK`.
-
-**Workaround:** Use isolated cron for non-heartbeat scheduled tasks (morning briefing, daily digest).
-
-### Bug #5433: Compaction Overflow Recovery (OPEN, 2 days old)
-
-**Impact:** Auto-compaction may not trigger correctly on context overflow.
-
-**Workaround:** Monitor for context issues; consider lower `contextTokens` limit for long-running agents.
-
----
-
-## Verified Configuration Patterns
-
-### HTTP API Agent Targeting ✓
-
-```bash
-# Method 1: Model field encoding
-curl -X POST http://dadmini.ts.net:18789/v1/chat/completions \
-  -H 'Authorization: Bearer $TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{"model": "openclaw:bruba-manager", "messages": [...]}'
-
-# Method 2: Header
-curl -X POST http://dadmini.ts.net:18789/v1/chat/completions \
-  -H 'x-openclaw-agent-id: bruba-manager' \
-  -d '{"model": "openclaw", "messages": [...]}'
-```
-
-### sessions_send (Main → Manager) ✓
-
-```json
-{
-  "tool": "sessions_send",
-  "sessionKey": "agent:bruba-manager:main",
-  "message": "Spawn a helper to research X and deliver to Signal",
-  "timeoutSeconds": 0
-}
-```
-
-- `timeoutSeconds: 0` = fire-and-forget
-- Target doesn't need to be "awake" — message queues
-
-### sessions_spawn (Manager → Helper) ✓
-
-```json
-{
-  "tool": "sessions_spawn",
-  "task": "Research X. Write results to workspace/results/YYYY-MM-DD-task.md",
-  "label": "research-x",
-  "runTimeoutSeconds": 300,
-  "cleanup": "delete",
-  "deliver": true,
-  "channel": "signal"
-}
-```
-
-- Non-blocking: returns `{ status: "accepted", runId, childSessionKey }`
-- Results announced to requester chat
-- `cleanup: "delete"` = archive immediately after announce
-- Subagents CANNOT spawn sub-subagents
-
-### Webhook Targeting ✗
-
-Webhooks (`/hooks/agent`) do NOT support agent targeting.
-**For Siri:** Use HTTP API with `x-openclaw-agent-id` header instead.
-
----
-
-## Phase 4: Implementation Tasks
-
-### 4a. Delete web-reader Agent
-
-**Remove from openclaw.json agents.list:**
-```json
-// DELETE THIS ENTRY:
 {
   "id": "web-reader",
   "name": "Web Reader",
@@ -220,140 +283,207 @@ Webhooks (`/hooks/agent`) do NOT support agent targeting.
 }
 ```
 
-**Remove from agentToAgent.allow:**
+**UPDATE agentToAgent.allow:**
 ```json
-// BEFORE:
-"allow": ["bruba-main", "bruba-manager", "web-reader"]
-
-// AFTER:
-"allow": ["bruba-main", "bruba-manager"]
+"agentToAgent": {
+  "enabled": true,
+  "allow": ["bruba-main", "bruba-manager"]  // REMOVED "web-reader"
+}
 ```
 
-**Archive the directory:**
-```bash
-mv /Users/bruba/agents/bruba-reader /Users/bruba/agents/.archived-bruba-reader
-```
+### Step 2: Add subagents configuration
 
-### 4b. Configure Subagents Defaults
-
-**Add to openclaw.json:**
-
+**ADD to agents.defaults:**
 ```json
 {
   "agents": {
     "defaults": {
+      "workspace": "/Users/bruba/.openclaw/workspace",
+      "compaction": { "mode": "safeguard" },
+      "maxConcurrent": 4,
       "subagents": {
         "maxConcurrent": 2,
         "archiveAfterMinutes": 60,
         "model": "anthropic/claude-sonnet-4-5"
       }
-    }
+    },
+    ...
+  }
+}
+```
+
+**ADD to bruba-manager specifically:**
+```json
+{
+  "id": "bruba-manager",
+  ...
+  "subagents": {
+    "maxConcurrent": 2,
+    "archiveAfterMinutes": 60,
+    "model": "anthropic/claude-sonnet-4-5"
   },
+  ...
+}
+```
+
+### Step 3: Configure subagent tool restrictions
+
+**ADD to tools section:**
+```json
+{
   "tools": {
+    "agentToAgent": {
+      "enabled": true,
+      "allow": ["bruba-main", "bruba-manager"]
+    },
     "subagents": {
       "tools": {
-        "allow": ["read", "write", "exec", "web_search", "web_fetch", "memory_search", "memory_get"],
-        "deny": ["gateway", "cron", "sessions_spawn", "browser", "canvas", "nodes"]
+        "allow": ["web_search", "web_fetch", "read", "write"],
+        "deny": ["exec", "edit", "apply_patch", "gateway", "cron", 
+                 "sessions_spawn", "browser", "canvas", "nodes"]
       }
     }
   }
 }
 ```
 
-**Note:** Due to Bug #6295, the `model` setting may be ignored. Helpers will inherit Manager's model (Sonnet), which is fine.
-
-### 4c. Create Manager State Directory
+### Step 4: Archive web-reader directory
 
 ```bash
-mkdir -p /Users/bruba/agents/bruba-manager/state
+# Archive, don't delete (in case we need to reference)
+mv /Users/bruba/agents/bruba-reader /Users/bruba/agents/.archived-bruba-reader
+```
+
+### Step 5: Create helper results directory
+
+```bash
 mkdir -p /Users/bruba/agents/bruba-manager/results
 ```
 
-**Create active-helpers.json:**
-```json
-{
-  "helpers": [],
-  "lastUpdated": null
-}
+### Verification
+
+```bash
+# Restart gateway
+openclaw gateway restart
+
+# Check agents
+openclaw agents
+# Should show: bruba-main, bruba-manager (NO web-reader)
+
+# Check health
+openclaw gateway health
 ```
 
-### 4d. Update Manager TOOLS.md
+---
 
-**Replace /Users/bruba/agents/bruba-manager/TOOLS.md with:**
+## Part 4: Phase 4b — Update Manager Prompts
+
+### File: /Users/bruba/agents/bruba-manager/TOOLS.md
+
+**REPLACE entire file with:**
 
 ```markdown
-# Manager Tools
+# Manager Tools Reference
 
-You are the Manager agent. Your primary job is coordination, not execution.
+You are the Manager agent. You have LIMITED tools by design.
 
-## Available Tools
+## Your Tools
 
-| Tool | Purpose | Use When |
-|------|---------|----------|
-| read | Read files | Checking state, reading results |
-| exec | Run commands | remindctl, calendar checks |
-| sessions_list | List sessions | Checking helper status |
-| sessions_send | Message another agent | Forwarding to Main |
-| sessions_spawn | Spawn helper | Research, complex tasks |
-| session_status | Check session state | Debugging |
-| memory_search | Search memory | Finding context |
-| memory_get | Get memory entry | Retrieving specific info |
+### Reading (YES)
+- `read` — Read files in your workspace
+- `memory_search` / `memory_get` — Search indexed memory
 
-## Tools You DON'T Have
+### Sessions (YES)
+- `sessions_list` — See active sessions and your subagents
+- `sessions_send` — Send message to another agent's session
+- `sessions_spawn` — Spawn a helper subagent
+- `session_status` — Check session info
 
-- write, edit, apply_patch (read-only for safety)
-- browser, canvas (not needed for coordination)
-- gateway, cron (dangerous)
+### Execution (LIMITED)
+- `exec` — Run allowlisted commands only (remindctl, etc.)
+
+### DENIED (by design)
+- `write`, `edit`, `apply_patch` — You're read-only
+- `browser`, `canvas`, `nodes` — Not your job
+- `gateway`, `cron` — Admin tools
 
 ---
 
 ## Spawning Helpers
 
-For web research, analysis, or time-consuming tasks:
+For web research, analysis, or time-consuming tasks, spawn a helper:
 
-```json
+\`\`\`json
 {
   "tool": "sessions_spawn",
-  "task": "Research [TOPIC]. Write detailed results to workspace/results/[DATE]-[SLUG].md before completing. Summarize key findings in your announce message.",
-  "label": "[SHORT-LABEL]",
+  "task": "Research [TOPIC]. Write a summary to workspace file results/YYYY-MM-DD-[topic].md. Include sources.",
+  "label": "[short-label]",
+  "model": "anthropic/claude-sonnet-4-5",
   "runTimeoutSeconds": 300,
-  "cleanup": "delete",
-  "deliver": true,
-  "channel": "signal"
+  "cleanup": "delete"
 }
-```
+\`\`\`
 
-### Helper Behavior
-- Helpers get: read, write, exec, web_search, web_fetch
-- Helpers DON'T get: sessions_spawn (no nesting), gateway, cron
-- Helpers auto-archive after 60 minutes
-- Announce is best-effort — always require file output
+### Helper Capabilities
+- `web_search` — Search the web
+- `web_fetch` — Fetch full page content
+- `read` — Read files
+- `write` — Write results to workspace
 
-### After Spawning
-1. Update state/active-helpers.json with new helper
-2. On next heartbeat, check sessions_list for status
-3. Read results from workspace/results/ when complete
-4. Forward relevant results to Signal or Main
+### Helper Restrictions
+- NO `exec` (can't run commands)
+- NO `sessions_spawn` (can't spawn more helpers)
+- Auto-archives after 60 minutes
+- Results announced to your session
+
+### When to Spawn vs Handle Directly
+
+**Spawn a helper for:**
+- Web research requiring multiple searches
+- Summarizing long documents
+- Tasks taking > 30 seconds
+- Anything needing web access
+
+**Handle directly:**
+- Quick calendar/reminder checks (use exec + remindctl)
+- Status queries
+- Forwarding to Main
 
 ---
 
 ## Forwarding to Main
 
-For tasks requiring Main's full context or capabilities:
+For tasks requiring Main's full capabilities (file editing, complex conversations):
 
-```json
+\`\`\`json
 {
   "tool": "sessions_send",
   "sessionKey": "agent:bruba-main:main",
   "message": "User requested: [FULL DESCRIPTION]. Please handle and message user on Signal when done.",
   "timeoutSeconds": 0
 }
-```
+\`\`\`
 
-Use this when:
-- Task needs Main's conversation history
-- Task needs Main's write access
-- Task is conversational, not research
+`timeoutSeconds: 0` = fire-and-forget (don't wait for response)
+
+---
+
+## Checking Helper Status
+
+On heartbeat, check your helpers:
+
+\`\`\`json
+{
+  "tool": "sessions_list",
+  "kinds": ["subagent"],
+  "activeMinutes": 60
+}
+\`\`\`
+
+Look for:
+- Helpers running > 10 minutes (may be stuck)
+- New results in `results/` directory
+- Completed helpers to report on
 
 ---
 
@@ -361,6 +491,184 @@ Use this when:
 
 Track active helpers in `state/active-helpers.json`:
 
+\`\`\`json
+{
+  "helpers": [
+    {
+      "runId": "abc123",
+      "childSessionKey": "agent:bruba-manager:subagent:xyz",
+      "label": "research-quantum",
+      "task": "Research quantum computing trends",
+      "spawnedAt": "2026-02-01T22:00:00Z",
+      "status": "running",
+      "expectedFile": "results/2026-02-01-quantum.md"
+    }
+  ],
+  "lastUpdated": "2026-02-01T22:00:00Z"
+}
+\`\`\`
+
+Update this file when you spawn or complete helpers.
+```
+
+### File: /Users/bruba/agents/bruba-manager/HEARTBEAT.md
+
+**REPLACE entire file with:**
+
+```markdown
+# Manager Heartbeat
+
+You are the Manager agent for Bruba. Your job is lightweight coordination.
+
+## On Each Heartbeat
+
+### 1. Check Calendar (if morning)
+- Any events in next 2 hours?
+- Only alert if action needed
+
+### 2. Check Reminders
+\`\`\`bash
+remindctl list --due-within 2h
+remindctl list --overdue
+\`\`\`
+- Alert on overdue items (max 3)
+- Escalate if item overdue > 3 days
+
+### 3. Check Helper Status
+\`\`\`json
+{"tool": "sessions_list", "kinds": ["subagent"], "activeMinutes": 60}
+\`\`\`
+- Any helpers running > 10 minutes? May be stuck
+- Any completed results to forward?
+
+### 4. Check State File
+Read `state/active-helpers.json` for tracked tasks.
+
+---
+
+## Response Rules
+
+### If nothing needs attention:
+Reply exactly: `HEARTBEAT_OK`
+
+This suppresses output — no message sent.
+
+### If something needs user attention:
+Send brief Signal message via your normal response.
+Keep it under 3 items. Be concise.
+
+### If something needs Main's capabilities:
+\`\`\`json
+{
+  "tool": "sessions_send",
+  "sessionKey": "agent:bruba-main:main",
+  "message": "[description of what Main should do]",
+  "timeoutSeconds": 0
+}
+\`\`\`
+
+---
+
+## DO NOT
+
+- Do deep research (spawn a helper instead)
+- Write files (you're read-only except state/)
+- Engage in long conversations (that's Main's job)
+- Spam the user (max 1 proactive message per heartbeat)
+
+---
+
+## Spawning Helpers from Heartbeat
+
+If heartbeat reveals a task needing research:
+
+\`\`\`json
+{
+  "tool": "sessions_spawn",
+  "task": "Research [TOPIC]. Write summary to results/YYYY-MM-DD-[topic].md",
+  "model": "anthropic/claude-sonnet-4-5",
+  "runTimeoutSeconds": 300,
+  "cleanup": "delete"
+}
+\`\`\`
+
+Then respond `HEARTBEAT_OK` — you'll see results next heartbeat.
+```
+
+### File: /Users/bruba/agents/bruba-manager/IDENTITY.md
+
+**REPLACE entire file with:**
+
+```markdown
+# Manager Identity
+
+You are the **Manager** agent in Bruba's multi-agent system.
+
+## Your Role
+
+You are the **coordinator** — fast, lightweight, always watching.
+
+- **Model:** Sonnet (Haiku for heartbeats)
+- **Heartbeat:** Every 15 minutes, 7am-10pm
+- **Purpose:** Triage, dispatch, monitor
+
+## Your Relationship to Other Agents
+
+### bruba-main (Opus)
+- The primary conversational agent
+- Has full file access, memory, tools
+- You forward complex tasks to Main
+- You spawn helpers on Main's behalf
+
+### Helpers (ephemeral, Sonnet)
+- You spawn them for research/analysis
+- They auto-archive after completion
+- You track their status
+- You forward their results
+
+## Your Capabilities
+
+✅ Read files and memory
+✅ Check calendar and reminders (via exec)
+✅ Spawn helper subagents
+✅ Send messages to Main
+✅ Track helper state
+
+❌ Write/edit files (except state tracking)
+❌ Long conversations
+❌ Deep research (spawn helper instead)
+❌ Admin operations
+
+## Your Personality
+
+- Efficient, not chatty
+- Proactive but not spammy
+- Helpful coordinator, not the star
+- "Fast. Light. Effective."
+```
+
+---
+
+## Part 5: Phase 4c — Manager State Tracking
+
+### Create state directory and file
+
+```bash
+mkdir -p /Users/bruba/agents/bruba-manager/state
+mkdir -p /Users/bruba/agents/bruba-manager/results
+```
+
+### File: /Users/bruba/agents/bruba-manager/state/active-helpers.json
+
+**Initial (empty):**
+```json
+{
+  "helpers": [],
+  "lastUpdated": null
+}
+```
+
+**Schema (when populated):**
 ```json
 {
   "helpers": [
@@ -378,273 +686,56 @@ Track active helpers in `state/active-helpers.json`:
 }
 ```
 
-On each heartbeat:
-1. Read state/active-helpers.json
-2. Check sessions_list for each helper
-3. If completed: read result file, update state, optionally forward
-4. If stuck (>10min): consider stopping via /subagents stop
+**Fields:**
+- `runId` — From sessions_spawn response
+- `childSessionKey` — For checking status via sessions_list
+- `label` — Short identifier (matches sessions_spawn label)
+- `task` — Full task description
+- `spawnedAt` — ISO timestamp
+- `status` — "running" | "completed" | "failed" | "stuck"
+- `expectedFile` — Where helper should write results
 
----
+### Update Manager tools.allow to include write for state/
 
-## Slash Commands (in Signal)
+**In openclaw.json, update bruba-manager:**
 
-- `/subagents list` — Show active helpers
-- `/subagents info <id>` — Details on specific helper
-- `/subagents stop <id|all>` — Kill stuck helpers
-- `/subagents log <id>` — View helper transcript
-```
-
-### 4e. Update Manager HEARTBEAT.md
-
-**Replace /Users/bruba/agents/bruba-manager/HEARTBEAT.md with:**
-
-```markdown
-# Manager Heartbeat
-
-You are the Manager agent. On each heartbeat, perform a quick coordination check.
-
-## Heartbeat Checklist
-
-### 1. Check Calendar (Quick)
-- Any events in next 2 hours?
-- If yes: Brief reminder to Signal
-
-### 2. Check Reminders (Quick)
-- Run: `remindctl list --due-today`
-- Any overdue or due soon?
-- If yes: Brief nag to Signal
-
-### 3. Check Helpers (Important)
-Read `state/active-helpers.json`:
-- Any helpers listed?
-- Use `sessions_list` to check their status
-- If completed: 
-  - Read their result file from `results/`
-  - Forward summary to Signal if noteworthy
-  - Update state file (remove from helpers array)
-- If stuck (>10 minutes running):
-  - Send warning to Signal
-  - Consider `/subagents stop`
-
-### 4. Check Result Files (Quick)
-- Any new files in `results/` not yet forwarded?
-- Forward summaries to Signal
-
-## Response Rules
-
-**If nothing needs attention:**
-```
-HEARTBEAT_OK
-```
-This suppresses output. Use it liberally — most heartbeats should be silent.
-
-**If something needs user attention:**
-Send a brief, actionable message to Signal. Examples:
-- "📅 Meeting with X in 90 minutes"
-- "⏰ Overdue: [reminder title] (3 days)"
-- "✅ Research complete: [summary]. Full results in results/[file].md"
-
-**If something needs Main's capabilities:**
-Use sessions_send to forward to Main with context.
-
-## DO NOT
-
-- Do deep research yourself (spawn a helper)
-- Write files (you're read-only)
-- Engage in long conversations (that's Main's job)
-- Spam the user with non-actionable info
-
-## Token Budget
-
-You run on Haiku during heartbeat. Be concise:
-- Read only what you need
-- Don't load full result files unless summarizing
-- HEARTBEAT_OK early if nothing needs attention
-```
-
-### 4f. Verify Configuration
-
-After all changes, restart and verify:
-
-```bash
-# Restart gateway
-openclaw gateway restart
-
-# Check health
-openclaw gateway health
-
-# List agents (should show 2: bruba-main, bruba-manager)
-openclaw agents
-
-# Check status
-openclaw status
-```
-
----
-
-## Phase 5 (Optional): Isolated Cron for Morning Briefing
-
-### Why Isolated Cron?
-
-Bug #3589 causes heartbeat prompt to bleed into cron events. Morning briefing works better as isolated cron:
-- Fresh context each run (no accumulated history)
-- Exact timing (8 AM sharp)
-- No HEARTBEAT_OK interference
-
-### Configuration
-
-```bash
-openclaw cron add \
-  --name "morning-briefing" \
-  --cron "0 8 * * 1-5" \
-  --tz "America/New_York" \
-  --session isolated \
-  --model "anthropic/claude-sonnet-4-5" \
-  --thinking medium \
-  --message "Create morning briefing:
-1. Today's calendar events with any prep notes needed
-2. Overdue reminders from remindctl --overdue
-3. Any stale helpers or failed tasks from yesterday
-4. Weather if severe conditions (skip if normal)
-
-Be concise — aim for 3-5 bullet points max. Start with the most actionable item." \
-  --deliver \
-  --channel signal
-```
-
-### Verify
-
-```bash
-# List cron jobs
-openclaw cron list
-
-# Check job details
-openclaw cron runs --id morning-briefing --limit 5
-```
-
----
-
-## Testing Checklist
-
-### After Phase 4a (Delete web-reader)
-
-- [ ] `openclaw agents` shows only bruba-main and bruba-manager
-- [ ] No errors in gateway logs about missing agent
-- [ ] Signal messages still route to bruba-main
-
-### After Phase 4b (Subagents config)
-
-- [ ] `openclaw config get agents.defaults.subagents` shows config
-- [ ] `openclaw config get tools.subagents` shows tool restrictions
-
-### After Phase 4c-e (Manager updates)
-
-- [ ] Manager heartbeat still fires (check `openclaw status`)
-- [ ] state/active-helpers.json exists and is valid JSON
-- [ ] results/ directory exists
-
-### Spawn Test
-
-1. Send to Manager (via HTTP API or sessions_send):
-   ```
-   Spawn a helper to search the web for "OpenClaw multi-agent patterns" and summarize top 3 results.
-   ```
-
-2. Verify:
-   - [ ] Helper spawns (check `/subagents list`)
-   - [ ] Result file appears in `results/`
-   - [ ] Announce delivers to Signal
-   - [ ] Helper archives after completion
-
-### End-to-End Test
-
-1. Send to Main via Signal:
-   ```
-   Research the latest developments in quantum computing and message me a summary.
-   ```
-
-2. Main should:
-   - [ ] Recognize this as async research task
-   - [ ] Forward to Manager via sessions_send
-   - [ ] Ack to user ("On it")
-
-3. Manager should:
-   - [ ] Spawn helper for research
-   - [ ] Track in state file
-
-4. Helper should:
-   - [ ] Do web research
-   - [ ] Write results to file
-   - [ ] Announce completion
-
-5. Manager (next heartbeat) should:
-   - [ ] Detect completed helper
-   - [ ] Forward summary to Signal
-   - [ ] Clean up state
-
----
-
-## Rollback Plan
-
-### If Helper Spawning Breaks
-
-```bash
-# Disable subagents
-openclaw config set agents.defaults.subagents.maxConcurrent 0
-openclaw gateway restart
-```
-
-### If Manager Breaks
-
-```bash
-# Remove Manager from config entirely
-ssh bruba 'cat ~/.openclaw/openclaw.json | jq "del(.agents.list[] | select(.id == \"bruba-manager\"))" > /tmp/oc.json && mv /tmp/oc.json ~/.openclaw/openclaw.json'
-openclaw gateway restart
-```
-
-### If Agent-to-Agent Breaks
-
-```bash
-openclaw config set tools.agentToAgent.enabled false
-openclaw gateway restart
-```
-
-### Full Rollback to Single Agent
-
-```bash
-# Reset to minimal config
-cat > /tmp/minimal.json << 'EOF'
+```json
 {
-  "agents": {
-    "list": [
-      {
-        "id": "bruba-main",
-        "name": "Bruba",
-        "default": true,
-        "workspace": "/Users/bruba/agents/bruba-main",
-        "model": { "primary": "anthropic/claude-opus-4-5" }
-      }
-    ]
+  "id": "bruba-manager",
+  ...
+  "tools": {
+    "allow": ["read", "sessions_list", "sessions_send", "sessions_spawn",
+              "session_status", "exec", "memory_search", "memory_get",
+              "write"],  // ADD write
+    "deny": ["edit", "apply_patch", "browser", "canvas",
+             "gateway", "cron", "nodes", "process"]
   }
 }
-EOF
+```
 
-# Merge with existing config
-ssh bruba 'jq -s ".[0] * .[1]" ~/.openclaw/openclaw.json /tmp/minimal.json > /tmp/merged.json && mv /tmp/merged.json ~/.openclaw/openclaw.json'
-openclaw gateway restart
+**Add workspace restriction in SOUL.md:**
+
+```markdown
+## File Access
+
+You can ONLY write to these locations:
+- `state/` — For tracking helper status
+- `results/` — For storing helper outputs (helpers write here)
+
+All other locations are READ-ONLY for you.
 ```
 
 ---
 
-## Final Configuration Reference
+## Part 6: Complete Configuration (Final State)
 
-After all changes, openclaw.json should include:
+After Phase 4, your `openclaw.json` should look like:
 
 ```json
 {
   "agents": {
     "defaults": {
-      "workspace": "~/.openclaw/workspace",
+      "workspace": "/Users/bruba/.openclaw/workspace",
       "compaction": { "mode": "safeguard" },
       "maxConcurrent": 4,
       "subagents": {
@@ -685,9 +776,17 @@ After all changes, openclaw.json should include:
           "activeHours": { "start": "07:00", "end": "22:00" }
         },
         "sandbox": { "mode": "off" },
+        "subagents": {
+          "maxConcurrent": 2,
+          "archiveAfterMinutes": 60,
+          "model": "anthropic/claude-sonnet-4-5"
+        },
         "tools": {
-          "allow": ["read", "exec", "sessions_list", "sessions_send", "sessions_spawn", "session_status", "memory_search", "memory_get"],
-          "deny": ["write", "edit", "apply_patch", "browser", "canvas", "gateway", "cron", "nodes"]
+          "allow": ["read", "write", "sessions_list", "sessions_send",
+                    "sessions_spawn", "session_status", "exec",
+                    "memory_search", "memory_get"],
+          "deny": ["edit", "apply_patch", "browser", "canvas",
+                   "gateway", "cron", "nodes", "process"]
         }
       }
     ]
@@ -702,8 +801,9 @@ After all changes, openclaw.json should include:
     },
     "subagents": {
       "tools": {
-        "allow": ["read", "write", "exec", "web_search", "web_fetch", "memory_search", "memory_get"],
-        "deny": ["gateway", "cron", "sessions_spawn", "browser", "canvas", "nodes"]
+        "allow": ["web_search", "web_fetch", "read", "write"],
+        "deny": ["exec", "edit", "apply_patch", "gateway", "cron",
+                 "sessions_spawn", "browser", "canvas", "nodes"]
       }
     }
   },
@@ -719,7 +819,7 @@ After all changes, openclaw.json should include:
   },
   "gateway": {
     "port": 18789,
-    "bind": "tailnet",
+    "bind": "loopback",
     "auth": {
       "mode": "token",
       "token": "YOUR_GATEWAY_TOKEN"
@@ -730,27 +830,274 @@ After all changes, openclaw.json should include:
 
 ---
 
-## Summary
+## Part 7: Testing Checklist
 
-| Phase | Task | Effort |
-|-------|------|--------|
-| 4a | Delete web-reader | 5 min |
-| 4b | Configure subagents | 5 min |
-| 4c | Create state directories | 2 min |
-| 4d | Update TOOLS.md | 5 min |
-| 4e | Update HEARTBEAT.md | 5 min |
-| 4f | Verify and test | 15 min |
-| 5 | Morning briefing cron (optional) | 10 min |
+### Phase 4a Verification
 
-**Total estimated time:** 45-60 minutes
+```bash
+# 1. Restart gateway
+openclaw gateway restart
 
-**This packet is self-contained.** You should not need to reference the research documents during implementation.
+# 2. Check agents (should be 2, not 3)
+openclaw agents
+# Expected: bruba-main, bruba-manager
+
+# 3. Check gateway health
+openclaw gateway health
+# Expected: healthy, <100ms
+
+# 4. Check Signal probe
+openclaw channels status
+# Expected: signal: connected
+```
+
+### Phase 4b Verification (Manager Prompts)
+
+```bash
+# 1. Trigger a heartbeat manually
+openclaw system heartbeat
+
+# 2. Check Manager responds with HEARTBEAT_OK or alert
+# (watch Signal or check sessions)
+
+# 3. Test helper spawn via Signal
+# Message Main: "Research the latest OpenClaw release notes"
+# Main should forward to Manager, Manager should spawn helper
+```
+
+### Phase 4c Verification (State Tracking)
+
+```bash
+# 1. Check state file exists
+cat /Users/bruba/agents/bruba-manager/state/active-helpers.json
+
+# 2. After spawning a helper, verify state updated
+# (Manager should write to state file)
+
+# 3. Check results directory
+ls /Users/bruba/agents/bruba-manager/results/
+```
+
+### Full Flow Test
+
+1. **Message Main via Signal:** "Can you research what's new in OpenClaw this week?"
+2. **Main should:** Forward to Manager via sessions_send
+3. **Manager should:** Spawn a helper with sessions_spawn
+4. **Helper should:** Research, write to results/, announce completion
+5. **Manager should:** See results on next heartbeat, forward to Signal
+6. **User receives:** Research summary on Signal
 
 ---
 
-## Version History
+## Part 8: Phase 5 — Isolated Cron (Optional)
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 2.0.0 | 2026-02-01 | Complete rewrite: ephemeral helpers, state tracking, verified patterns |
-| 1.0.0 | 2026-02-01 | Initial packet (migration + manager setup) |
+Morning briefing as isolated cron avoids Bug #3589 (heartbeat prompt bleeding).
+
+### Add Cron Job
+
+```bash
+openclaw cron add \
+  --name "morning-briefing" \
+  --cron "0 7 * * 1-5" \
+  --tz "America/New_York" \
+  --session isolated \
+  --model "anthropic/claude-sonnet-4-5" \
+  --message "Create morning briefing:
+1. Today's calendar events (check via remindctl or system)
+2. Overdue reminders (remindctl list --overdue)
+3. Weather if severe conditions
+Keep it to 5 bullet points max." \
+  --deliver \
+  --channel signal
+```
+
+### Verify
+
+```bash
+# List cron jobs
+openclaw cron list
+
+# Check next run
+openclaw cron status --id morning-briefing
+```
+
+---
+
+## Part 9: Phase 6 — Siri Integration (Optional)
+
+### Architecture
+
+```
+Siri → Shortcut → HTTP API → Manager → Response → Siri
+                     │
+                     └─(if complex)─→ sessions_send → Main
+                                           │
+                                           └─→ Signal
+```
+
+### HTTP API Targeting (Verified)
+
+```bash
+curl -X POST http://dadmini.ts.net:18789/v1/chat/completions \
+  -H 'Authorization: Bearer YOUR_GATEWAY_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -H 'x-openclaw-agent-id: bruba-manager' \
+  -d '{
+    "model": "openclaw",
+    "messages": [{"role":"user","content":"What meetings do I have today?"}]
+  }'
+```
+
+### iOS Shortcut: "Ask Bruba"
+
+1. **Get Contents of URL**
+   - URL: `http://dadmini.ts.net:18789/v1/chat/completions`
+   - Method: POST
+   - Headers:
+     - `Authorization`: `Bearer YOUR_TOKEN`
+     - `Content-Type`: `application/json`
+     - `x-openclaw-agent-id`: `bruba-manager`
+   - Request Body (JSON):
+     ```json
+     {
+       "model": "openclaw",
+       "messages": [{"role":"user","content":"VIA SIRI: [Shortcut Input]"}]
+     }
+     ```
+
+2. **Get Dictionary Value**
+   - Key: `choices[0].message.content`
+
+3. **Speak Text** (result)
+
+### Manager Prompt Addition for Siri
+
+Add to IDENTITY.md:
+
+```markdown
+## Siri Requests
+
+Messages starting with "VIA SIRI:" come from voice shortcuts.
+
+For these:
+- Respond concisely (Siri will speak it)
+- Handle quick queries directly (time, calendar, reminders)
+- For complex tasks: Acknowledge briefly, then forward to Main
+  - "On it. I'll message you on Signal when done."
+  - Then use sessions_send to Main
+```
+
+---
+
+## Part 10: Rollback Plan
+
+### If Phase 4 Breaks Things
+
+```bash
+# Revert to Phase 3 state (before helper changes)
+
+# 1. Restore web-reader
+mv /Users/bruba/agents/.archived-bruba-reader /Users/bruba/agents/bruba-reader
+
+# 2. Remove subagents config from openclaw.json
+# (manual edit - remove agents.defaults.subagents and tools.subagents)
+
+# 3. Restore agentToAgent
+# "allow": ["bruba-main", "bruba-manager", "web-reader"]
+
+# 4. Restart
+openclaw gateway restart
+```
+
+### If Everything Breaks
+
+```bash
+# Full rollback to single-agent
+openclaw config set agents.list '[{"id":"bruba-main","default":true,"workspace":"/Users/bruba/agents/bruba-main"}]'
+openclaw config set tools.agentToAgent.enabled false
+openclaw gateway restart
+```
+
+### If Gateway Won't Start
+
+```bash
+# Check logs
+openclaw gateway logs --tail 50
+
+# Common fixes:
+# - Port conflict: lsof -i :18789
+# - Config syntax: jq . ~/.openclaw/openclaw.json
+# - Service conflict: launchctl list | grep -i openclaw
+```
+
+---
+
+## Part 11: Implementation Order
+
+### Recommended Sequence
+
+```
+┌─────────────────────────────────────────┐
+│ Phase 4a: Delete web-reader (10 min)    │
+│ • Edit config                           │
+│ • Archive directory                     │
+│ • Restart gateway                       │
+│ • Verify 2 agents                       │
+└─────────────────┬───────────────────────┘
+                  ▼
+┌─────────────────────────────────────────┐
+│ Phase 4b: Update Manager prompts (5 min)│
+│ • Replace TOOLS.md                      │
+│ • Replace HEARTBEAT.md                  │
+│ • Replace IDENTITY.md                   │
+└─────────────────┬───────────────────────┘
+                  ▼
+┌─────────────────────────────────────────┐
+│ Phase 4c: State tracking (5 min)        │
+│ • Create state/ and results/ dirs       │
+│ • Create active-helpers.json            │
+│ • Update tools.allow for write          │
+└─────────────────┬───────────────────────┘
+                  ▼
+┌─────────────────────────────────────────┐
+│ Test: Full flow verification (10 min)   │
+│ • Trigger heartbeat                     │
+│ • Test helper spawn                     │
+│ • Verify Signal delivery                │
+└─────────────────┬───────────────────────┘
+                  ▼
+┌─────────────────────────────────────────┐
+│ Phase 5: Morning cron (optional, 5 min) │
+└─────────────────┬───────────────────────┘
+                  ▼
+┌─────────────────────────────────────────┐
+│ Phase 6: Siri integration (optional)    │
+│ • Requires iOS Shortcut setup           │
+│ • Test on phone                         │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## Summary
+
+| What | Status | Action |
+|------|--------|--------|
+| bruba-main | ✅ Done | No changes |
+| bruba-manager | ✅ Done | Update prompts (4b) |
+| web-reader | ❌ Delete | Phase 4a |
+| Helper spawning | 🔲 Configure | Phase 4a |
+| Manager prompts | 🔲 Update | Phase 4b |
+| State tracking | 🔲 Create | Phase 4c |
+| Morning cron | 🔲 Optional | Phase 5 |
+| Siri | 🔲 Optional | Phase 6 |
+
+**Total estimated time:** 30-45 minutes for required phases
+
+---
+
+## End of Packet
+
+This packet is self-contained. All configuration, file contents, commands, and verification steps are included. No external references needed.
+
+**Start with Phase 4a** — delete web-reader, configure helpers.
