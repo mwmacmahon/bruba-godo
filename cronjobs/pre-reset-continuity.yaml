@@ -1,0 +1,32 @@
+name: pre-reset-continuity
+description: Write continuation packet 5 min before daily reset
+status: active
+
+schedule:
+  cron: "55 3 * * *"
+  timezone: America/New_York
+
+execution:
+  session: main
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-main
+
+message: |
+  Session reset in 5 minutes. Write continuation packet to memory/CONTINUATION.md:
+
+  ## Session Summary
+  [What we discussed/accomplished today]
+
+  ## In Progress
+  [Tasks with status and blockers]
+
+  ## Open Questions
+  [Unresolved items]
+
+  ## Next Steps
+  [Action items for tomorrow]
+
+  ## Relevant Files
+  [Paths and descriptions]
+
+  Reply NO_REPLY when done.

@@ -9,11 +9,13 @@ Send a request to bruba-web and wait for results:
 ```json
 {
   "tool": "sessions_send",
-  "target": "bruba-web",
+  "sessionKey": "agent:bruba-web:main",
   "message": "Search for [TOPIC]. Summarize findings with source URLs.",
   "wait": true
 }
 ```
+
+**Note:** Use `sessionKey: "agent:bruba-web:main"` (not `target: "bruba-web"`). The sessionKey format is `agent:<agent-id>:<session-name>`.
 
 bruba-web will:
 1. Search the web

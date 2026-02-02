@@ -48,11 +48,13 @@ To request web research:
 ```json
 {
   "tool": "sessions_send",
-  "target": "bruba-web",
+  "sessionKey": "agent:bruba-web:main",
   "message": "Research [TOPIC]. Write summary to results/[filename].md",
   "wait": false
 }
 ```
+
+**Note:** Use `sessionKey: "agent:bruba-web:main"` (not `target`). The sessionKey format is `agent:<agent-id>:<session-name>`.
 
 Track in `state/pending-tasks.json`:
 ```json

@@ -1,6 +1,6 @@
 ---
-version: 3.2.0
-updated: 2026-02-02 21:00
+version: 3.2.3
+updated: 2026-02-02 22:00
 type: refdoc
 project: planning
 tags: [bruba, openclaw, multi-agent, architecture, cron, operations]
@@ -288,6 +288,21 @@ Manager (next heartbeat) → checks bruba-web/results/, forwards summary to Sign
 
 **Note:** bruba-web writes to its own `results/` directory. Manager reads from there on subsequent heartbeats. The `pending-tasks.json` tracks expected file paths.
 
+### sessions_send Format
+
+When using `sessions_send` to reach another agent, use the `sessionKey` parameter (not `target`):
+
+```json
+{
+  "tool": "sessions_send",
+  "sessionKey": "agent:bruba-web:main",
+  "message": "Search for X. Summarize findings.",
+  "wait": true
+}
+```
+
+The sessionKey format is `agent:<agent-id>:<session-name>`. For the default session, use `main`.
+
 ### Manager Pokes Main
 
 ```
@@ -310,6 +325,55 @@ Siri async ("Hey Siri, tell Bruba..."):
   Main processes, responds via Signal
   Siri gets "Got it, I'll message you" acknowledgment
 ```
+
+### Session Continuity and Context Persistence
+
+Understanding how context persists (or doesn't) across agents is critical for proper use.
+
+#### bruba-web: Session Context Only
+
+| Aspect | Behavior |
+|--------|----------|
+| **Session** | Persists — conversation history within `agent:bruba-web:main` |
+| **Memory** | Disabled — `memorySearch.enabled: false` |
+| **PKM access** | None — cannot search or retrieve from memory/ |
+| **Cross-session** | None — each new session starts fresh |
+
+**What "stateless" means:** bruba-web has no long-term memory or PKM integration. However, within a single session, conversation context DOES persist. If you send multiple searches to the same session, bruba-web remembers previous exchanges.
+
+**Implications:**
+- Related searches can reference prior results ("search for more details on the second point")
+- Context accumulates within the session (watch for bloat on heavy use)
+- To clear context: `openclaw sessions reset --agent bruba-web`
+
+**Design rationale:** Web content is untrusted. By disabling memory, we prevent prompt injection from persisting to other sessions or corrupting the knowledge base.
+
+#### bruba-manager: Full Persistence
+
+| Aspect | Behavior |
+|--------|----------|
+| **Session** | Persists — heartbeat runs in the same session |
+| **Memory** | Enabled — `memory_search`, `memory_get` available |
+| **State files** | Persists — `state/pending-tasks.json`, `state/nag-history.json` |
+| **Cross-session** | Yes — session context carries forward |
+
+**Implications:**
+- Heartbeat context accumulates over time (context bloat risk)
+- Manager can reference previous heartbeat findings
+- State files provide persistence even if session is reset
+- To clear context: `openclaw sessions reset --agent bruba-manager` (state files preserved)
+
+**When to reset:** If Manager responses get slow or heartbeat exceeds time limits, reset the session. State files (nag history, pending tasks) survive the reset.
+
+#### bruba-main: Full Persistence
+
+| Aspect | Behavior |
+|--------|----------|
+| **Session** | Persists per conversation thread |
+| **Memory** | Enabled — full PKM access |
+| **Cross-session** | Via memory system |
+
+Main uses standard OpenClaw conversation persistence. Long conversations may trigger compaction (safeguard mode).
 
 ---
 
@@ -731,6 +795,48 @@ echo '{"tasks": [], "lastUpdated": null}' > /Users/bruba/agents/bruba-manager/st
 mkdir -p /Users/bruba/agents/bruba-web/results
 ```
 
+### New Agent Auth Setup
+
+When adding a new agent, you must copy the auth profile from an existing agent:
+
+```bash
+# Create the agent's clawdbot directory
+mkdir -p ~/.clawdbot/agents/<new-agent-id>
+
+# Copy auth from existing agent
+cp ~/.clawdbot/agents/bruba-main/auth-profiles.json \
+   ~/.clawdbot/agents/<new-agent-id>/
+```
+
+**Why:** Each agent has its own `agentDir` where OpenClaw looks for `auth-profiles.json`. Without this file, the agent can't authenticate with model providers.
+
+**Example (bruba-web):**
+```bash
+mkdir -p /Users/bruba/.clawdbot/agents/bruba-web
+cp /Users/bruba/.clawdbot/agents/bruba-main/auth-profiles.json \
+   /Users/bruba/.clawdbot/agents/bruba-web/
+```
+
+### Priming New Agent Sessions
+
+New agents have no session until they receive their first message. To initialize:
+
+```bash
+# Send a test message to create the session
+openclaw agent --agent <agent-id> --message "Test initialization. Confirm you're operational."
+```
+
+**Why:** Some agent features (like tool availability reporting) only work after a session exists. Priming ensures the agent is ready before production use.
+
+**Example (bruba-web):**
+```bash
+openclaw agent --agent bruba-web \
+  --message "Test: Search for 'OpenClaw documentation'. Return a 2-sentence summary." \
+  --timeout 120
+```
+
+Expected response should show web_search working and return structured results.
+
 ---
 
 ## Part 9: Troubleshooting
@@ -787,6 +893,36 @@ mkdir -p /Users/bruba/agents/bruba-web/results
 1. Is bruba-web's Docker network configured? (needs `bridge` for internet)
 2. Is bruba-web sandbox too restrictive?
 3. Check bruba-web logs
+
+### New Agent Has No API Key
+
+**Symptom:** `No API key found for provider "anthropic". Auth store: ~/.clawdbot/agents/<id>/auth-profiles.json`
+
+**Cause:** New agent doesn't have auth-profiles.json in its agentDir.
+
+**Fix:**
+```bash
+cp ~/.clawdbot/agents/bruba-main/auth-profiles.json \
+   ~/.clawdbot/agents/<new-agent-id>/
+```
+
+### Agent Tools Not Available
+
+**Symptom:** Agent claims it doesn't have tools that are in its config (e.g., bruba-web says "I don't have web_search").
+
+**Possible causes:**
+
+1. **No session yet** — Agent hasn't been initialized. Send a test message:
+   ```bash
+   openclaw agent --agent <id> --message "Test initialization"
+   ```
+
+2. **Global allowlist ceiling** — See "Global tools.allow Ceiling Effect" in Known Issues. Tools must be in global `tools.allow` for any agent to use them.
+
+3. **Config not reloaded** — Restart gateway after config changes:
+   ```bash
+   openclaw gateway restart
+   ```
 
 ---
 
@@ -915,6 +1051,43 @@ Auto-recovery sometimes fails on context overflow.
 
 **Impact:** Not relevant for our architecture — we use separate agents instead of subagents for capability isolation.
 
+### Global tools.allow Ceiling Effect (Needs Confirmation)
+
+**Status:** Observed behavior — needs confirmation from OpenClaw docs/community
+
+**Observed:** When `tools.allow` is set at the global level (`tools.allow` in openclaw.json root), it appears to create a **ceiling** for all agents. Even if an agent has a tool in its own `tools.allow`, it won't work unless the tool is also in the global list.
+
+**Example:** bruba-web had `web_search` in its agent-level `tools.allow`, but the tool wasn't available until `web_search` was added to the global `tools.allow`.
+
+**Current workaround:** Include all tools that ANY agent needs in global `tools.allow`. Use agent-level `tools.deny` to restrict specific agents.
+
+```json
+{
+  "tools": {
+    "allow": ["read", "write", "web_search", "web_fetch", ...],  // Global ceiling
+    ...
+  },
+  "agents": {
+    "list": [
+      {
+        "id": "bruba-main",
+        "tools": {
+          "deny": ["web_search", "web_fetch"]  // Main can't use these
+        }
+      },
+      {
+        "id": "bruba-web",
+        "tools": {
+          "allow": ["web_search", "web_fetch", "read", "write"]  // Web can
+        }
+      }
+    ]
+  }
+}
+```
+
+**TODO:** Confirm this behavior with OpenClaw documentation or community. The expected behavior (agent-level allow should work independently) may be a bug or may require different config structure.
+
 ---
 
 ## Part 12: Implementation Status
@@ -930,13 +1103,14 @@ Auto-recovery sometimes fails on context overflow.
 | Directory structure | ✅ | Workspaces created |
 | Siri integration | ✅ | Via tailscale serve |
 | bruba-godo tooling | ✅ | Multi-agent prompt assembly |
+| bruba-web agent | ✅ | Configured, auth setup, session primed |
+| Tool restriction cleanup | ✅ | Main/Manager deny web tools, use bruba-web |
 
 ### In Progress
 
 | Item | Status | Notes |
 |------|--------|-------|
-| bruba-web agent | 🔄 | Needs configuration |
-| Tool restriction cleanup | 🔄 | Remove broken subagent patterns |
+| Global allowlist investigation | 🔄 | Confirm ceiling behavior with OpenClaw docs |
 
 ### Planned
 
@@ -951,9 +1125,9 @@ Auto-recovery sometimes fails on context overflow.
 
 ## Quick Reference
 
-**Main can't search?** By design. Use `sessions_send` to bruba-web.
+**Main can't search?** By design. Use `sessions_send` with `sessionKey: "agent:bruba-web:main"`.
 
-**Manager can't search?** Same pattern. Use `sessions_send` to bruba-web.
+**Manager can't search?** Same pattern. Use `sessions_send` with `sessionKey: "agent:bruba-web:main"`.
 
 **Subagent has no web tools?** Parent's restrictions propagate. Use separate agent.
 
@@ -966,6 +1140,14 @@ Auto-recovery sometimes fails on context overflow.
 **Cross-context denied?** Use `sessions_send` between agents, not `message` tool.
 
 **Agent can edit allowlist?** Known gap. Node host migration fixes this.
+
+**New agent has no API key?** Copy auth-profiles.json from existing agent's agentDir.
+
+**Agent tools not working?** Check global tools.allow ceiling, prime session, restart gateway.
+
+**Does bruba-web remember previous searches?** Yes, within the same session. No long-term memory though.
+
+**Manager getting slow?** Context bloat. Reset session: `openclaw sessions reset --agent bruba-manager`.
 
 ---
 
@@ -986,6 +1168,9 @@ Auto-recovery sometimes fails on context overflow.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.2.3 | 2026-02-02 | Added session continuity documentation: context persistence for bruba-web vs bruba-manager |
+| 3.2.2 | 2026-02-02 | Fixed sessions_send format: use `sessionKey: "agent:bruba-web:main"` not `target` |
+| 3.2.1 | 2026-02-02 | Added new agent setup (auth, session priming), documented global allowlist ceiling issue |
 | 3.2.0 | 2026-02-02 | Fixed bruba-web tools: added write to allow (needed to write results/) |
 | 3.1.0 | 2026-02-02 | Added heartbeat vs cron explanation, operations guide, troubleshooting, cost estimates, full cron integration |
 | 3.0.0 | 2026-02-02 | Major rewrite: peer model, tool inheritance fix, cron integration, node host |
