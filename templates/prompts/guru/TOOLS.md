@@ -158,3 +158,65 @@ packets/work-context-{topic}.md
 | Share with Main | Write to bruba-shared/packets/ |
 
 You have the tools for deep technical work. Use them thoroughly.
+
+---
+
+## Direct Response Tools
+
+### message
+
+Send messages directly to Signal, bypassing Main.
+
+**Text only:**
+```
+message action=send target=uuid:<REDACTED-UUID> message="Your message"
+```
+
+**With audio/media:**
+```
+message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="Caption"
+```
+
+**<REDACTED-NAME>'s UUID:** `uuid:<REDACTED-UUID>`
+
+**When to use:**
+- Substantial technical responses (>500 words)
+- Debugging walkthroughs
+- Code-heavy explanations
+- Voice responses
+
+**After sending:** Return only a summary to Main, not the full content.
+
+**You don't need NO_REPLY** because you're not bound to Signal. Your return goes to Main via the sessions_send callback, not to Signal.
+
+---
+
+### TTS (Text-to-Speech)
+
+Generate audio from text for voice responses.
+
+```
+exec /Users/bruba/agents/bruba-main/tools/tts.sh "Text to speak" /tmp/response.wav
+```
+
+**Arguments:**
+1. Text to convert to speech (quote it)
+2. Output file path (usually /tmp/response.wav)
+
+**Use with message tool:**
+```
+exec /Users/bruba/agents/bruba-main/tools/tts.sh "Here's what I found..." /tmp/response.wav
+message action=send target=uuid:18ce66e6-... filePath=/tmp/response.wav message="Here's what I found..."
+```
+
+---
+
+### sessions_send (to bruba-web)
+
+Delegate web research to bruba-web.
+
+```
+sessions_send sessionKey="agent:bruba-web:main" message="Search for OpenClaw message tool documentation"
+```
+
+bruba-web will search, summarize, and return results. You can incorporate them into your analysis.

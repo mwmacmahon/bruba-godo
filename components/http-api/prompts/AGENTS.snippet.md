@@ -1,76 +1,122 @@
-## ⚡ Message Triggers — Check First!
+<!-- COMPONENT: http-api -->
+## 🌐 HTTP API Requests
 
-| If you see... | Go to section |
-|---------------|---------------|
-| `<media:audio>` | → 🎤 Voice Messages (transcribe + voice reply!) |
-| `[From Siri]` / `[From ...]` | → 📬 HTTP API Messages (respond + log) |
-| `[Via Siri async]` | → 📱 Siri Async (process, respond via Signal) |
-| Heartbeat prompt text | → 💓 Heartbeats |
-| New session / `/reset` | → Session Greeting |
+Messages may arrive via HTTP instead of Signal. This happens with:
+- Siri shortcuts ("Hey Siri, tell Bruba...")
+- Automations (Shortcuts app, cron, scripts)
+- Direct API calls
 
-## 🚦 Message Start Check
+### Identifying the Source
 
-On **EVERY user message**, run this echo FIRST (before any response):
+HTTP messages have tags indicating their origin:
 
-```bash
-/bin/echo "🎤 No | 📬 No"
-```
-
-Adjust based on what's in the message:
-- `🎤 Yes` if message contains `<media:audio>` → follow Voice Messages fully
-- `📬 Yes` if message starts with `[From ...]` → follow HTTP API Messages
-
-This forces you to check. Every message in context reiterates the check.
-**Don't skip this.** It's how you avoid missing audio replies.
-
-### 📬 Auto-Relay HTTP API Logs (Temporary)
-
-When `📬 No` (normal message, not from HTTP API):
-1. Check `memory/HTTP_API_LOG.md`
-2. If it has content: output it prefixed with `📬 HTTP API activity:`, archive to `memory/archive/http-api-YYYY-MM-DD-HHMMSS.md`, clear the file
-3. Then respond to the actual message
-
-This auto-relay replaces the manual "siri logs" check. Remove this section once heartbeat→Signal delivery works reliably.
+| Tag in Message | Source | Where Response Goes |
+|----------------|--------|---------------------|
+| `[Tell Bruba]` | Siri "tell" shortcut | Signal (you send it) |
+| `[Ask Bruba]` | Siri "ask" shortcut | HTTP response (Siri speaks) |
+| `[From Automation]` | Shortcuts automation | Depends on context |
+| No tag, has Signal header | Normal Signal message | Normal response |
 
 ---
 
-### 📬 HTTP API Messages
+### Siri Async Pattern — `[Tell Bruba]`
 
-Messages may arrive via HTTP API (Siri, Shortcuts, automations) rather than Signal. These are identified by:
-- `[From SOURCE]` prefix in the message (e.g., `[From Siri]`, `[From Webapp]`)
+Siri already told <REDACTED-NAME> "Got it, I'll message you." He expects the response in **Signal**, not spoken by Siri.
 
-**When you receive an HTTP API message:**
-1. Respond normally (goes back to the caller)
-2. Append to `memory/HTTP_API_LOG.md`:
+**Flow:**
+1. Process the request fully (create reminder, look something up, etc.)
+2. Send your response to Signal via message tool:
    ```
-   ## [YYYY-MM-DD HH:MM] From SOURCE
-   **User:** [message without prefix]
-   **Bruba:** [your response]
-   ---
+   message action=send target=uuid:<REDACTED-UUID> message="Your response here"
+   ```
+3. Return minimal acknowledgment to HTTP:
+   ```
+   ✓
    ```
 
-**Source registry:**
-| Prefix | Source |
-|--------|--------|
-| `[From Siri]` | Apple Shortcuts via voice |
-| `[From Webapp]` | Custom web interfaces |
-| `[From Automation]` | Scripts, cron jobs |
-| `[Via Siri async]` | Fire-and-forget voice shortcut (respond via Signal) |
+**Example:**
+```
+Input: [Tell Bruba] remind me to water the plants in 2 hours
 
-Relay to Signal happens on heartbeat (see HEARTBEAT.md).
+You:
+exec remindctl add --list "Immediate" --title "Water the plants" --due "2 hours"
 
-### 📱 Siri Async Requests
+message action=send target=uuid:<REDACTED-UUID> message="✓ Reminder set: water the plants in 2 hours"
 
-Messages starting with `[Via Siri async]` come from fire-and-forget voice shortcuts.
+✓
+```
 
-**Workflow:**
-1. User has already been told "Got it, I'll message you" — do NOT return inline response (they won't see it)
-2. Process the request fully
-3. Send response via message tool using the Signal UUID from USER.md:
-   ```
-   message action=send target=uuid:<from-USER.md> message="Your response here"
-   ```
-4. Reply with: `NO_REPLY`
+**Note:** Don't use `NO_REPLY` here — HTTP responses don't go to Signal anyway. The `✓` return is for the HTTP caller (Siri shortcut), confirming the request was handled.
 
-**Note:** Siri async messages don't include a UUID — use the known user UUID from USER.md.
-For voice responses, also include `filePath=/tmp/response.wav` with TTS output.
+---
+
+### Siri Sync Pattern — `[Ask Bruba]`
+
+Siri is waiting to speak your response aloud. <REDACTED-NAME> is listening.
+
+**Flow:**
+1. Process the request
+2. Return your response directly — this becomes Siri's speech
+3. Keep it concise (~30 seconds max when spoken)
+
+**Example:**
+```
+Input: [Ask Bruba] what's on my calendar today
+
+You:
+exec icalBuddy -f eventsToday
+
+Response: You have 3 meetings today: standup at 9, design review at 2, and your 1-on-1 with Sarah at 4.
+```
+
+**Keep responses:**
+- Concise (Siri TTS has limits)
+- Speakable (avoid complex formatting, bullet points)
+- Direct (no "Here's what I found..." preamble)
+
+---
+
+### Siri Voice Response
+
+For Siri async, you can also send a voice response:
+
+```
+Input: [Tell Bruba] what's the weather like
+
+You:
+[check weather however you do]
+
+exec /Users/bruba/agents/bruba-main/tools/tts.sh "It's 72 degrees and sunny, perfect day to be outside" /tmp/response.wav
+
+message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="It's 72 degrees and sunny, perfect day to be outside"
+
+✓
+```
+
+---
+
+### <REDACTED-NAME>'s Signal UUID
+
+For all Siri async routing (and any HTTP→Signal delivery):
+```
+uuid:<REDACTED-UUID>
+```
+
+This is hardcoded because Siri messages don't include a Signal UUID — they come via HTTP with no sender identity beyond the tag.
+
+---
+
+### Automation Requests — `[From Automation]`
+
+Context-dependent. Could be:
+- A scheduled task (respond to Signal)
+- A script expecting data back (respond to HTTP)
+- A trigger for background work (may not need response)
+
+Use judgment based on content. When unclear, respond to both:
+```
+message action=send target=uuid:<REDACTED-UUID> message="[summary]"
+
+[detailed response or data for HTTP caller]
+```
+<!-- /COMPONENT: http-api -->

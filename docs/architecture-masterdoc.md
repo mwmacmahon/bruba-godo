@@ -1,9 +1,9 @@
 ---
-version: 3.3.3
-updated: 2026-02-02
+version: 3.4.0
+updated: 2026-02-03
 type: refdoc
 project: planning
-tags: [bruba, openclaw, multi-agent, architecture, cron, operations, guru]
+tags: [bruba, openclaw, multi-agent, architecture, cron, operations, guru, direct-message]
 ---
 
 # Bruba Multi-Agent Architecture Reference
@@ -25,7 +25,7 @@ Bruba uses a **four-agent architecture** with three peer agents and one service 
 
 **Key architectural insight:** OpenClaw's tool inheritance model means subagents cannot have tools their parent lacks. Web isolation requires a **separate agent** (bruba-web), not subagent spawning. Main, Guru, and Manager are peers that communicate as equals; Web is a passive service all peers use.
 
-**Specialist pattern:** Main routes technical deep-dives to Guru (Opus) for thorough analysis. Guru has full technical capabilities (read/write/edit/exec/memory) and can reach bruba-web for research. This keeps Main's context lightweight for everyday interactions while preserving deep reasoning capability.
+**Specialist pattern:** Main routes technical deep-dives to Guru (Opus) for thorough analysis. Guru has full technical capabilities (read/write/edit/exec/memory) and can reach bruba-web for research. **Guru messages users directly via Signal** — returning only a one-sentence summary to Main. This keeps Main's context lightweight for everyday interactions while preserving deep reasoning capability.
 
 **Proactive monitoring pattern:** Isolated cron jobs (cheap, stateless) detect conditions and write to inbox files. Manager's heartbeat (cheap, stateful) reads inbox, applies rules, delivers alerts. This separation keeps heartbeat fast while enabling rich monitoring.
 
@@ -217,11 +217,11 @@ Communication happens via `sessions_send` (agent-to-agent messaging), not `sessi
 | memory_search, memory_get | ✅ | PKM integration |
 | sessions_send | ✅ | Communicate with bruba-web for research |
 | sessions_list, session_status | ✅ | Monitor sessions |
+| message | ✅ | Direct Signal delivery (bypasses Main relay) |
 | sessions_spawn | ❌ | Not needed — uses bruba-web instead |
 | web_search, web_fetch | ❌ | Security isolation — use bruba-web |
 | browser, canvas | ❌ | Not needed |
 | cron, gateway | ❌ | Admin tools |
-| message | ❌ | No direct media (Main handles) |
 
 **Heartbeat:** Disabled (`every: "0m"`)
 
@@ -428,7 +428,40 @@ message action=send target=uuid:<recipient-uuid> filePath=/path/to/file message=
 
 **Tool permissions:** The `message` tool must be in:
 1. Global `tools.allow` (ceiling effect)
-2. Agent's `tools.allow` (bruba-main)
+2. Agent's `tools.allow` (bruba-main, bruba-guru)
+
+### Guru Direct Response Pattern
+
+Unlike bruba-web (which returns results to the caller), bruba-guru messages the user directly via the `message` tool:
+
+```
+User → Signal → bruba-main
+Main: "Routing to Guru"
+Main → sessions_send("Debug this config: [...]") → bruba-guru
+bruba-guru: [deep analysis - potentially 40K tokens]
+bruba-guru → message tool → Signal (direct to user)
+bruba-guru → returns to Main: "Summary: missing message tool in config"
+Main tracks: "Guru: missing message tool in config"
+```
+
+**Why direct messaging:**
+- Technical deep-dives generate 10-40K tokens of analysis
+- If Main relayed these, Main's context would bloat rapidly
+- Direct messaging keeps Main lightweight for everyday interactions
+- Transcripts naturally separate (Guru's = technical, Main's = coordination)
+
+**Guru returns summary only:** A one-liner helps Main track what Guru is working on without carrying the payload.
+
+**Who has message tool:**
+
+| Agent | Has message? | Use case |
+|-------|--------------|----------|
+| bruba-main | ✅ | Voice replies, Siri async |
+| bruba-guru | ✅ | Direct technical responses |
+| bruba-manager | ❌ | Uses sessions_send to Main |
+| bruba-web | ❌ | Passive service |
+
+**Note:** Guru doesn't need `NO_REPLY` because Guru isn't bound to Signal. Guru's return goes to Main (via sessions_send callback), not to Signal.
 
 ### Session Continuity and Context Persistence
 
@@ -1268,6 +1301,10 @@ Auto-recovery sometimes fails on context overflow.
 
 **Voice response not sending?** Check `message` in global `tools.allow`. Use `NO_REPLY` after message tool.
 
+**Guru response too long for Main?** Guru should message directly via message tool, return summary only.
+
+**Technical question routing?** Auto-route to Guru → Guru messages user directly → Main gets one-liner summary.
+
 ---
 
 ## Cost Estimates
@@ -1287,6 +1324,7 @@ Auto-recovery sometimes fails on context overflow.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.4.0 | 2026-02-03 | **Guru direct response pattern:** Guru messages users directly via message tool, returns only summary to Main. Added message tool to bruba-guru. Updated topology notes, communication patterns, Quick Reference. |
 | 3.3.3 | 2026-02-02 | Added USER.md Signal UUID setup requirement for Siri async replies |
 | 3.3.2 | 2026-02-02 | Added message tool documentation: voice response workflow, NO_REPLY pattern, uuid target format |
 | 3.3.1 | 2026-02-02 | Phase 2 updates: added guru cron job to table, bruba-guru to agentToAgent.allow, clarified auth path is ~/.clawdbot not ~/.openclaw |
