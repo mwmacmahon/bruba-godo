@@ -31,7 +31,7 @@ agents:
     workspace: /Users/<bot-username>/agents/<agent-id>-main
     prompts: [agents, tools]  # Which prompt files to assemble
     # Tool permissions (synced to openclaw.json via update-agent-tools.sh)
-    # Using allow-list: main gets these tools explicitly
+    # Main agent: full capabilities except web (delegated to -web agent)
     tools_allow:
       - read
       - write
@@ -40,12 +40,17 @@ agents:
       - group:memory
       - group:sessions
       - image
-    # Admin/UI tools denied; web tools NOT listed (neutral for helper spawning)
+      - message           # For media attachments (voice, images)
+    # Web tools denied - use <agent-id>-web via sessions_send
+    # sessions_spawn denied - no helper spawning (use peer agents)
     tools_deny:
       - browser
       - canvas
       - cron
       - gateway
+      - web_search        # Use -web agent via sessions_send
+      - web_fetch         # Use -web agent via sessions_send
+      - sessions_spawn    # No helper spawning
     # OpenClaw built-in tool groups:
     #   group:sessions   - sessions_list, sessions_history, sessions_send, sessions_spawn, session_status
     #   group:memory     - memory_search, memory_get
@@ -99,11 +104,18 @@ agents:
     workspace: /Users/<bot-username>/agents/<agent-id>-manager
     prompts: [agents, tools, heartbeat]
     # Tool permissions (synced to openclaw.json)
-    # Manager uses minimal deny list; spawns helpers for research
+    # Manager: coordinator agent, needs exec for CLI tools (remindctl, icalBuddy)
+    # Note: exec NOT denied - manager needs it for heartbeat checks
     tools_deny:
-      - exec
+      - web_search        # Use -web agent via sessions_send
+      - web_fetch         # Use -web agent via sessions_send
+      - edit              # Read-only for manager
+      - apply_patch       # Read-only for manager
       - browser
       - canvas
+      - cron
+      - gateway
+      - sessions_spawn    # No helper spawning
     # Manager uses manager-base templates
     agents_sections:
       - manager-base
@@ -123,7 +135,7 @@ agents:
     prompts: [agents]  # Uses agents assembly path with web-base template
     # Web research service agent (peer, not helper)
     # Receives tasks via sessions_send from Main or Manager
-    # Note: Manager can't spawn web-capable helpers due to tool inheritance ceiling
+    # Stateless, passive, write-only - security isolation for web content
     tools_allow:
       - web_search
       - web_fetch
@@ -131,24 +143,28 @@ agents:
       - write
     tools_deny:
       - exec
+      - edit              # Write-only, no modifications
+      - apply_patch       # Write-only, no modifications
+      - memory_search     # Stateless - no PKM access
+      - memory_get        # Stateless - no PKM access
+      - sessions_spawn    # No nested spawning
+      - sessions_send     # Passive - cannot initiate comms
       - browser
       - canvas
       - cron
       - gateway
-      - sessions_spawn  # No nested spawning
     agents_sections:
       - web-base  # Uses templates/prompts/web/AGENTS.md
 
-# Subagent (helper) configuration
-# These settings apply to all helpers spawned by any agent
-# Helpers need explicit allow list (restricted to research tools)
+# Subagent (helper) configuration - DEPRECATED
+# v3.2: All agents use sessions_send to -web agent for web research
+# No agents spawn helpers for web tasks (tool inheritance ceiling prevents it)
+# Keeping minimal config for any remaining subagent use cases
 subagents:
   max_concurrent: 2
   archive_after_minutes: 60
-  model: anthropic/claude-opus-4-5
+  model: anthropic/claude-sonnet-4-5
   tools_allow:
-    - web_search
-    - web_fetch
     - read
     - write
   tools_deny:
@@ -158,6 +174,8 @@ subagents:
     - cron
     - gateway
     - sessions_spawn
+    - web_search          # Cannot have tools parent doesn't have
+    - web_fetch           # Cannot have tools parent doesn't have
 
 # Export profiles for non-agent destinations
 exports:
