@@ -1,0 +1,39 @@
+name: calendar-prep
+description: Morning check for calendar events that might need preparation
+status: proposed
+
+schedule:
+  cron: "0 7 * * 1-5"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-manager
+
+message: |
+  Check calendar for today's events that might need preparation.
+
+  Run: icalBuddy eventsToday
+
+  An event "needs prep" if:
+  - It is a meeting (not an all-day event or reminder)
+  - It starts within the next 4 hours
+  - Title suggests preparation might help (contains: review, discuss, present, demo, interview, 1:1)
+
+  If there are events needing prep, write JSON to inbox/calendar-prep.json:
+  {
+    "timestamp": "[current ISO8601 timestamp]",
+    "source": "calendar-prep",
+    "events": [
+      {"title": "[event-title]", "start": "[ISO8601]", "hours_until": [number], "prep_hint": "[why it might need prep]"}
+    ]
+  }
+
+  If no events need prep, do NOT create the file.
+
+  Keep prep_hint brief (under 10 words).
+
+output:
+  file: inbox/calendar-prep.json
+  cleanup: manager-heartbeat

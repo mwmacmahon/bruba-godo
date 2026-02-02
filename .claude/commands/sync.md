@@ -2,6 +2,10 @@
 
 Runs full sync: prompts + content pipeline.
 
+## Arguments
+
+- `--no-convert` — Skip the triage & convert step (2a/2b). Use when you just want to pull, canonicalize existing CONFIG'd files, export, and push without being prompted about new intake files.
+
 ## Instructions
 
 ### 1. Prompt Sync
@@ -116,6 +120,8 @@ Restart daemon to apply synced changes (prompts, allowlist, memory index):
 Report: new sessions pulled, converted to intake/
 
 #### Step 2: Triage & Convert
+
+**Skip this step if `--no-convert` was passed.**
 
 **2a. Identify trivial files for deletion**
 

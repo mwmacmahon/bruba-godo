@@ -1,0 +1,39 @@
+name: staleness-check
+description: Weekly check for stale projects (14+ days without modification)
+status: proposed
+
+schedule:
+  cron: "0 10 * * 1"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-manager
+
+message: |
+  Check for stale projects in ~/projects directory.
+
+  A project is "stale" if:
+  - It is a directory (not a file)
+  - No files inside have been modified in 14+ days
+  - It does NOT contain a .paused file (explicit pause marker)
+
+  Use find or stat to check modification times.
+
+  If there are stale projects, write JSON to inbox/staleness-check.json:
+  {
+    "timestamp": "[current ISO8601 timestamp]",
+    "source": "staleness-check",
+    "stale": [
+      {"path": "[relative-path]", "name": "[project-name]", "days_stale": [number]}
+    ]
+  }
+
+  If nothing is stale, do NOT create the file.
+
+  Sort by days_stale descending (oldest first).
+
+output:
+  file: inbox/staleness-check.json
+  cleanup: manager-heartbeat

@@ -1,38 +1,46 @@
 ## Web Search
 
-You don't have direct web tools. Instead, spawn a helper and **wait for the result**.
+You don't have direct web tools. Use **bruba-web** for all web searches.
 
-### Quick Search (Synchronous)
+### How to Search
 
-When user asks something requiring web lookup:
+Send a request to bruba-web and wait for results:
 
 ```json
 {
-  "tool": "sessions_spawn",
-  "task": "Search for [TOPIC]. Provide a concise summary with key facts and source URLs.",
-  "model": "anthropic/claude-opus-4-5",
-  "timeoutSeconds": 90
+  "tool": "sessions_send",
+  "target": "bruba-web",
+  "message": "Search for [TOPIC]. Summarize findings with source URLs.",
+  "wait": true
 }
 ```
 
-**Key:** Do NOT set `timeoutSeconds: 0`. Wait for the result so you can discuss it with the user.
+bruba-web will:
+1. Search the web
+2. Fetch and read relevant pages
+3. Summarize findings
+4. Return structured results with sources
 
-The helper has `web_search` and `web_fetch`. Results return to you directly. Continue the conversation with the findings.
+### Sync vs Async
 
-### When to Spawn vs Delegate to Manager
-
-| Scenario | Action |
-|----------|--------|
-| User asks question needing web lookup | Spawn helper, wait, discuss results |
-| User wants current info mid-conversation | Spawn helper, wait |
-| "Look into X and get back to me later" | `sessions_send` to Manager |
-| "Research X thoroughly, no rush" | `sessions_send` to Manager |
-| User explicitly says async/background | `sessions_send` to Manager |
-
-**Rule of thumb:** If you need the answer to continue the conversation, spawn and wait. If user is fine getting results later via Signal, delegate to Manager.
+| Scenario | Pattern |
+|----------|---------|
+| Need answer to continue conversation | `"wait": true` — get results immediately |
+| "Research X, no rush" | `"wait": false` — results written to Manager's results/ |
+| Background research for later | Send to Manager, who coordinates with bruba-web |
 
 ### Why No Direct Web Access
 
-- Security isolation (web content is untrusted)
-- Helpers have limited tools (no exec, no memory access)
-- Helpers auto-archive after 60 minutes
+- **Security isolation** — web content is untrusted, could contain prompt injection
+- **Structured barrier** — bruba-web filters and summarizes, you get clean results
+- **Async pattern** — bruba-web writes to files, fits the cron/inbox architecture
+
+### What bruba-web Can Do
+
+| Capability | Status |
+|------------|--------|
+| web_search | Allowed |
+| web_fetch | Allowed |
+| read | Allowed |
+| write | Allowed (writes results) |
+| exec, edit, memory, sessions | Blocked |

@@ -1,0 +1,34 @@
+name: reminder-check
+description: Check for overdue reminders and write to Manager inbox
+status: active
+
+schedule:
+  cron: "0 9,14,18 * * *"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-manager
+
+message: |
+  Run this command and capture the output:
+
+  remindctl overdue
+
+  If there are overdue items, write JSON to inbox/reminder-check.json:
+  {
+    "timestamp": "[current ISO8601 timestamp]",
+    "source": "reminder-check",
+    "overdue": [
+      {"id": "[reminder-id]", "title": "[title]", "list": "[list-name]", "days_overdue": [number]}
+    ]
+  }
+
+  If there are NO overdue items, do NOT create the file. Just exit silently.
+
+  IMPORTANT: Only write the file if there are actual overdue items.
+
+output:
+  file: inbox/reminder-check.json
+  cleanup: manager-heartbeat
