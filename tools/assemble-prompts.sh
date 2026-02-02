@@ -161,6 +161,17 @@ resolve_section() {
         fi
     fi
 
+    # Handle 'web-base' - include web agent template
+    if [[ "$entry" == "web-base" ]]; then
+        local template_file="$ROOT_DIR/templates/prompts/web/${prompt_upper}.md"
+        if [[ -f "$template_file" ]]; then
+            cat "$template_file"
+            return 0
+        else
+            return 1
+        fi
+    fi
+
     # Check if bot-managed (bot:name)
     if [[ "$entry" =~ ^bot:(.+)$ ]]; then
         local bot_name="${BASH_REMATCH[1]}"
@@ -213,6 +224,12 @@ get_section_type() {
     elif [[ "$entry" == "manager-base" ]]; then
         if [[ -f "$ROOT_DIR/templates/prompts/manager/${prompt_upper}.md" ]]; then
             echo "manager-base"
+        else
+            echo "missing"
+        fi
+    elif [[ "$entry" == "web-base" ]]; then
+        if [[ -f "$ROOT_DIR/templates/prompts/web/${prompt_upper}.md" ]]; then
+            echo "web-base"
         else
             echo "missing"
         fi
@@ -309,6 +326,16 @@ assemble_prompt_file() {
                     resolve_section "$entry" "$prompt_name" >> "$output_file"
                     echo "" >> "$output_file"
                     log "  + Manager-Base: templates/prompts/manager/${prompt_upper}.md"
+                    base_added=1
+                fi
+                ;;
+            web-base)
+                if [[ "$DRY_RUN" == "true" ]]; then
+                    log "  Would add web-base template"
+                else
+                    resolve_section "$entry" "$prompt_name" >> "$output_file"
+                    echo "" >> "$output_file"
+                    log "  + Web-Base: templates/prompts/web/${prompt_upper}.md"
                     base_added=1
                 fi
                 ;;

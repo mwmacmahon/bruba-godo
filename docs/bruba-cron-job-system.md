@@ -399,35 +399,35 @@ Do NOT read state/nag-history.json - that'\''s for Manager'\''s heartbeat proces
 
 These files live in Manager's `state/` directory and persist across heartbeats.
 
-### state/active-helpers.json
+### state/pending-tasks.json (Optional)
 
-Tracks spawned helpers. Manager updates this when spawning and when helpers complete.
+Tracks async research tasks sent to bruba-web. Optional — Manager can also just check results/ for new files.
 
 ```json
 {
-  "helpers": [
+  "tasks": [
     {
-      "runId": "run_abc123",
-      "childSessionKey": "agent:bruba-manager:subagent:xyz789",
-      "label": "quantum-research",
-      "task": "Research quantum computing trends for 2026",
-      "spawnedAt": "2026-02-02T10:00:00Z",
-      "status": "running",
-      "expectedFile": "results/2026-02-02-quantum.md"
+      "id": "task-abc123",
+      "target": "bruba-web",
+      "topic": "quantum computing trends for 2026",
+      "sentAt": "2026-02-02T10:00:00Z",
+      "expectedFile": "results/2026-02-02-quantum.md",
+      "status": "pending"
     }
   ],
   "lastUpdated": "2026-02-02T10:00:00Z"
 }
 ```
 
-**Status values:** `running`, `completed`, `failed`, `stuck`, `archived`
+**Status values:** `pending`, `completed`, `stuck`
 
 **Manager heartbeat actions:**
-1. Check `sessions_list` for actual subagent status
-2. Compare against this file
-3. If helper completed: check for `expectedFile`, update status, forward results
-4. If helper running > 15 min: mark as potentially stuck
-5. Clean up archived entries older than 24 hours
+1. Check `results/` for expected output files
+2. If file exists: mark complete, queue summary for delivery
+3. If task older than 15 min with no result: flag as potentially stuck
+4. Clean up completed entries older than 24 hours
+
+**Note:** Manager does NOT spawn helpers for research. It sends tasks to bruba-web (a peer agent with web tools) via `sessions_send`. This is due to tool inheritance ceiling — Manager can't give spawned helpers web tools it doesn't have.
 
 ---
 
@@ -518,31 +518,31 @@ ON HEARTBEAT:
      - staleness.json → process_staleness()
      - calendar-prep.json → process_calendar()
      - [any other].json → log unknown, delete
-   
-2. CHECK HELPER STATUS
-   helpers = sessions_list(kinds=["subagent"], activeMinutes=60)
-   tracked = read state/active-helpers.json
-   
-   for each tracked helper:
-     if not in helpers list and status=="running":
-       check results/ for expectedFile
-       if file exists: mark completed, queue for delivery
-       else: mark failed
-   
-   for each running helper:
-     if running > 15 min: flag as potentially stuck
-   
-   update state/active-helpers.json
+
+2. CHECK PENDING ASYNC TASKS
+   # Option A: Track explicitly
+   tracked = read state/pending-tasks.json (if exists)
+
+   for each pending task:
+     if expectedFile exists in results/:
+       mark completed, queue summary for delivery
+     elif task.sentAt > 15 min ago:
+       flag as potentially stuck
+
+   update state/pending-tasks.json
+
+   # Option B: Just check results/ for new files
+   # (simpler, but doesn't track what was requested)
 
 3. COMPILE ALERTS
    alerts = []
-   
+
    add reminder nags (max 3)
    add staleness warnings (max 1)
    add calendar prep notes (max 2)
-   add helper results summaries
-   add stuck helper warnings
-   
+   add completed research summaries
+   add stuck task warnings
+
    if len(alerts) > 5: truncate to most important 5
 
 4. DELIVER OR SUPPRESS
@@ -550,10 +550,12 @@ ON HEARTBEAT:
      respond "HEARTBEAT_OK"  # suppresses output
    else:
      send consolidated message to Signal
-     
+
 5. CLEANUP
    delete all processed inbox/ files
 ```
+
+**Note:** Manager does NOT spawn helpers for research (tool inheritance ceiling prevents this). Instead, it sends tasks to bruba-web via `sessions_send`. bruba-web writes results to a shared `results/` directory.
 
 ### process_reminders()
 
@@ -600,14 +602,18 @@ delete inbox/reminder-check.json
 Run these to initialize Manager's workspace structure:
 
 ```bash
-# Create directory structure
+# Create directory structure for Manager
 mkdir -p /Users/bruba/agents/bruba-manager/inbox
 mkdir -p /Users/bruba/agents/bruba-manager/state
 mkdir -p /Users/bruba/agents/bruba-manager/results
 mkdir -p /Users/bruba/agents/bruba-manager/memory
 
+# Create directory structure for bruba-web
+mkdir -p /Users/bruba/agents/bruba-web
+mkdir -p /Users/bruba/agents/bruba-web/results
+
 # Initialize state files (empty)
-echo '{"helpers": [], "lastUpdated": null}' > /Users/bruba/agents/bruba-manager/state/active-helpers.json
+echo '{"tasks": [], "lastUpdated": null}' > /Users/bruba/agents/bruba-manager/state/pending-tasks.json
 echo '{"reminders": {}, "lastUpdated": null}' > /Users/bruba/agents/bruba-manager/state/nag-history.json
 echo '{"projects": {}, "lastUpdated": null}' > /Users/bruba/agents/bruba-manager/state/staleness-history.json
 
@@ -615,6 +621,8 @@ echo '{"projects": {}, "lastUpdated": null}' > /Users/bruba/agents/bruba-manager
 chmod 755 /Users/bruba/agents/bruba-manager/inbox
 chmod 755 /Users/bruba/agents/bruba-manager/state
 chmod 755 /Users/bruba/agents/bruba-manager/results
+chmod 755 /Users/bruba/agents/bruba-web
+chmod 755 /Users/bruba/agents/bruba-web/results
 ```
 
 ---

@@ -14,17 +14,39 @@ Complete reference for agent configuration, tools, and prompt files in Bruba's m
 
 ## Agent Overview
 
-| Agent | Model | Heartbeat | Role | Spawns Helpers? |
-|-------|-------|-----------|------|-----------------|
-| **Main** | Opus (default, switchable via `/model`) | None | User conversations, complex reasoning | ✅ Yes (sync, waits for result) |
-| **Manager** | Sonnet (Haiku for heartbeat) | 15min | Siri triage, async work, cron coordination | ✅ Yes (async, tracks lifecycle) |
-| **Helpers** | Opus (preferred) / Sonnet (fallback) | None | Ephemeral tasks (research, analysis) | ❌ No (no nesting) |
+| Agent | Model | Heartbeat | Role | Web Access |
+|-------|-------|-----------|------|------------|
+| **Main** | Opus (default, switchable via `/model`) | None | User conversations, complex reasoning | Via spawned helpers (sync) |
+| **Manager** | Sonnet (Haiku for heartbeat) | 15min | Siri triage, cron coordination | Via bruba-web (async) |
+| **Web** | Opus | None | Dedicated web research service | ✅ Direct (web_search, web_fetch) |
+| **Helpers** | Opus (from subagents config) | None | Ephemeral tasks spawned by Main | ✅ Inherits from subagents.tools.allow |
 
-**Key distinction:**
-- **Main** spawns helpers when it needs web results to continue a conversation (synchronous, waits)
-- **Manager** spawns helpers for background/async tasks ("look into this later") and tracks their lifecycle
+**Key architecture:**
+- **Main** spawns helpers for mid-conversation web searches (synchronous, waits for result)
+- **Manager** delegates async research to **bruba-web** via `sessions_send` (NOT `sessions_spawn`)
+- **bruba-web** is a peer agent with web tools, receives tasks, writes results to shared workspace
 
-**Note on helper models:** Helpers ideally use Opus since web research benefits from stronger reasoning. However, Bug #6295 (subagent model override ignored) may cause helpers to inherit their spawner's model. This is acceptable for most research tasks.
+### Tool Inheritance Ceiling
+
+**Critical concept:** Spawned helpers can only have tools their parent agent has (or doesn't deny).
+
+```
+Parent Agent → Spawned Helper
+     │              │
+     │              └─ Tools limited by parent's ceiling
+     │
+     └─ If parent denies web_search, helpers CAN'T have it
+```
+
+**Why Main CAN spawn web-capable helpers:**
+- Main uses neutral approach (web tools NOT in deny list, just not used directly)
+- Global `subagents.tools.allow: [web_search, web_fetch]` applies
+- Helpers inherit web capability
+
+**Why Manager CANNOT spawn web helpers:**
+- Manager doesn't have web tools (not in allow, doesn't matter if not in deny)
+- Ceiling applies: helpers can't exceed parent's capabilities
+- Solution: Manager sends to bruba-web (peer agent with web tools)
 
 ---
 
@@ -232,7 +254,7 @@ On new session or /reset:
 
 ## bruba-manager
 
-**Purpose:** Lightweight coordinator. Cheap heartbeats, Siri triage, async background work. Main handles its own quick web searches now.
+**Purpose:** Lightweight coordinator. Cheap heartbeats, Siri triage, cron inbox processing. Routes async research to bruba-web.
 
 ### Configuration (openclaw.json)
 
@@ -252,9 +274,6 @@ On new session or /reset:
     "activeHours": { "start": "07:00", "end": "22:00" }
   },
   "sandbox": { "mode": "off" },
-  "subagents": {
-    "model": "anthropic/claude-opus-4-5"
-  },
   "tools": {
     "deny": [
       "exec",
@@ -264,7 +283,7 @@ On new session or /reset:
 }
 ```
 
-**Tool config approach:** Manager uses minimal deny list. No exec (security), no browser/canvas (not needed). Spawns helpers with Opus model for research tasks.
+**Tool config approach:** Manager uses minimal deny list. No exec (security), no browser/canvas (not needed). **Does NOT spawn helpers for web research** — sends to bruba-web instead.
 
 ### Tools Rationale
 
@@ -274,12 +293,16 @@ On new session or /reset:
 | `write` | ✅ | Write to `state/`, `results/`, `memory/` only |
 | `exec` | ✅ | Limited use for Siri responses; see note below |
 | `memory_search/get` | ✅ | Check memory for context |
-| `sessions_*` | ✅ | Core coordination tools |
+| `sessions_send` | ✅ | Route to Main or bruba-web |
+| `sessions_list` | ✅ | Check pending requests |
+| `sessions_spawn` | ❌ | Not used (can't spawn web-capable helpers due to ceiling) |
 | `edit/apply_patch` | ❌ | Not a file editor |
-| `web_search/web_fetch` | ❌ | Delegates to helpers |
+| `web_search/web_fetch` | ❌ | Delegates to bruba-web via sessions_send |
 | `browser/canvas` | ❌ | Not needed |
 
 **Note on exec:** Manager has exec for responding to direct Siri queries (e.g., "what's on my calendar?"). However, routine monitoring (reminders, staleness) is handled by **isolated cron jobs writing to inbox/**, not Manager running commands on heartbeat. This keeps heartbeat fast and cheap.
+
+**Note on web research:** Manager routes async research requests to bruba-web (a peer agent with web tools) via `sessions_send`, NOT `sessions_spawn`. This is because tool inheritance ceiling would prevent spawned helpers from having web tools.
 
 ### Prompt Files
 
@@ -293,12 +316,12 @@ You are the Manager agent in Bruba's multi-agent system.
 ## Your Role
 - **Coordinator** — Fast, lightweight, always watching
 - **Triage** — Handle Siri, route async requests
-- **Monitor** — Process inbox files, track your helpers, forward results
-- **Background work** — Handle async tasks that Main delegates
+- **Monitor** — Process inbox files, check pending research, forward results
+- **Router** — Send async research to bruba-web
 
 ## Model Usage
 - **Haiku** for heartbeats (cheap routine checks)
-- **Sonnet** for coordination (spawning, messaging, decisions)
+- **Sonnet** for coordination (routing, messaging, decisions)
 
 ## Your Relationship to Other Agents
 
@@ -306,22 +329,23 @@ You are the Manager agent in Bruba's multi-agent system.
 - The primary conversational agent
 - Main spawns its OWN helpers for mid-conversation web searches
 - Main sends YOU async/background tasks ("look into this later")
-- You forward results to Signal when background work completes
+- You route those to bruba-web, then forward results to Signal
 
-### Helpers (ephemeral, Opus preferred)
-- Main spawns helpers for synchronous web search (Main waits for result)
-- YOU spawn helpers for async/background research (you track, relay later)
-- You track YOUR helpers in `state/active-helpers.json`
-- Main's helpers are fire-and-forget from your perspective
+### bruba-web (Opus)
+- Dedicated web research agent
+- YOU send research tasks via `sessions_send` (NOT sessions_spawn)
+- It writes results to shared results/ directory
+- You check for results on heartbeat, forward to Signal
 
 ## What You Handle
 - Siri sync requests (`[From Siri]` prefix) — answer or escalate
-- Heartbeat checks — process inbox, track YOUR helpers, forward results
-- Async research — when Main delegates "look into this later"
+- Heartbeat checks — process inbox, check for bruba-web results, forward
+- Async research — route to bruba-web when Main delegates
 - Proactive alerts — based on cron job findings in inbox/
 
 ## What You Do NOT Do
-- Quick web searches (Main does these itself now)
+- Spawn helpers for web search (tool ceiling prevents this)
+- Quick web searches (Main handles via its own helpers)
 - Deep conversations (that's Main's job)
 - Run remindctl/calendar checks directly on heartbeat (cron does this)
 
@@ -370,39 +394,34 @@ Messages with `[From Siri]`, `[From Webapp]`, etc.:
 
 ---
 
-## Spawning Helpers (Async/Background Only)
+## Routing to bruba-web (Async Research)
 
-**Note:** Main now spawns its own helpers for quick web searches during conversations. You only spawn helpers for:
-- Async background research ("look into this and get back to me")
-- Tasks delegated by Main via `sessions_send`
-- Work that doesn't need immediate response
+**Important:** Manager does NOT spawn helpers for web research. Due to tool inheritance ceiling, spawned helpers can't have web tools that Manager doesn't have.
 
-For async research tasks:
+Instead, route async research to **bruba-web** (a peer agent with web tools):
 
 ```json
 {
-  "tool": "sessions_spawn",
-  "task": "Research [TOPIC]. Write summary to results/YYYY-MM-DD-[topic].md with sources.",
-  "label": "[short-label]",
-  "model": "anthropic/claude-opus-4-5",
-  "runTimeoutSeconds": 300,
-  "cleanup": "delete"
+  "tool": "sessions_send",
+  "sessionKey": "agent:bruba-web:main",
+  "message": "Research [TOPIC]. Write summary to results/YYYY-MM-DD-[topic].md with sources. Include URLs for all claims.",
+  "timeoutSeconds": 0
 }
 ```
 
-**After spawning:**
-1. Update `state/active-helpers.json` with runId, task, timestamp
-2. On next heartbeat, check helper status via `sessions_list`
-3. When complete, forward results to Signal
+**After sending:**
+1. Optionally track in `state/pending-requests.json`
+2. On next heartbeat, check results/ for output file
+3. When result exists, forward summary to Signal, delete tracking entry
 
-### Helper Capabilities
-- `web_search`, `web_fetch` — Web access
+### bruba-web Capabilities
+- `web_search`, `web_fetch` — Direct web access
 - `read`, `write` — Workspace files (results/ directory)
 
-### Helper Restrictions  
+### bruba-web Restrictions
 - NO `exec` (can't run commands)
-- NO `sessions_spawn` (can't spawn more helpers)
-- Auto-archives after 60 minutes
+- NO `sessions_spawn` (no nesting)
+- NO conversation — task-focused only
 
 ---
 
@@ -433,7 +452,7 @@ Run on each heartbeat (every 15 min, 7am-10pm).
 
 Heartbeat should be **fast and cheap** (Haiku model). Heavy lifting is done by:
 - **Cron jobs** — Write findings to `inbox/` files
-- **Helpers** — Write research to `results/` files
+- **bruba-web** — Writes research results to `results/` files
 
 Your job is to **read, synthesize, deliver, clean up**.
 
@@ -457,17 +476,14 @@ For each file:
 3. Decide: alert user? escalate to Main? ignore?
 4. **Delete file after processing** (prevents re-processing)
 
-### 2. Check Helper Status
+### 2. Check Pending Async Tasks
 
-```json
-{"tool": "sessions_list", "kinds": ["subagent"], "activeMinutes": 60}
-```
+If tracking requests in `state/pending-tasks.json`:
+- Check `results/` for expected output files
+- Tasks with results: mark complete, queue for delivery
+- Tasks older than 15 min with no result: flag as potentially stuck
 
-- Compare against `state/active-helpers.json`
-- Helpers running > 10 min without output? May be stuck
-- Check `results/` for new files from completed helpers
-- Forward completed results to Signal
-- Update `state/active-helpers.json`
+Alternatively, just check `results/` for any new files since last heartbeat.
 
 ### 3. Deliver Alerts
 
@@ -519,7 +535,7 @@ Update `state/nag-history.json` after each nag.
 ## DO NOT
 
 - Run remindctl/calendar commands directly (cron does this)
-- Deep research (spawn helper instead)
+- Spawn helpers for web research (tool ceiling prevents this)
 - Long conversations (that's Main's job)
 - Spam user (max 1 proactive message per heartbeat)
 - Write files outside state/results/memory
@@ -551,15 +567,107 @@ You are a coordinator, not a conversationalist.
 
 ---
 
-## Helpers (Ephemeral)
+## bruba-web (Web Research Service)
 
-**Purpose:** Disposable workers for web research. Spawned by Main (sync) or Manager (async). Auto-archive on completion.
+**Purpose:** Dedicated web research agent. Receives tasks via `sessions_send` from Main or Manager. Peer agent (not a helper).
+
+### Configuration (openclaw.json)
+
+```json
+{
+  "id": "bruba-web",
+  "name": "Web Research",
+  "workspace": "/Users/bruba/agents/bruba-web",
+  "model": {
+    "primary": "anthropic/claude-opus-4-5"
+  },
+  "heartbeat": { "every": "0m" },
+  "tools": {
+    "allow": ["web_search", "web_fetch", "read", "write"],
+    "deny": ["exec", "browser", "canvas", "cron", "gateway", "sessions_spawn"]
+  }
+}
+```
+
+### Tools Rationale
+
+| Tool | Status | Why |
+|------|--------|-----|
+| `web_search` | ✅ | Primary purpose |
+| `web_fetch` | ✅ | Fetch full page content |
+| `read` | ✅ | Read context files |
+| `write` | ✅ | Write results to `results/` |
+| `exec` | ❌ | No command execution |
+| `sessions_spawn` | ❌ | No nested spawning |
+
+### Prompt: IDENTITY.md
+
+```markdown
+# Web Research Agent
+
+You are bruba-web, a dedicated web research agent in Bruba's multi-agent system.
+
+## Your Role
+- Receive research tasks via sessions_send
+- Execute web searches and fetch pages
+- Write results to workspace files
+- Announce completion to requester
+
+## Input Format
+Tasks arrive as messages with structure:
+- Topic to research
+- Output file path (usually results/YYYY-MM-DD-topic.md)
+- Any specific focus areas
+
+## Output Format
+- Write markdown to specified file
+- Include source URLs for all claims
+- Announce when complete
+
+## You Do NOT
+- Engage in conversation (task-focused only)
+- Access memory or exec
+- Spawn helpers (no nesting)
+
+## Personality
+- Thorough researcher
+- Well-sourced summaries
+- Concise but complete
+```
+
+### Usage Pattern
+
+**Manager routing async research:**
+```json
+{
+  "tool": "sessions_send",
+  "sessionKey": "agent:bruba-web:main",
+  "message": "Research quantum computing trends for 2026. Focus on breakthroughs and commercial applications. Write summary to results/2026-02-02-quantum.md with sources.",
+  "timeoutSeconds": 0
+}
+```
+
+**Main can also send directly for non-blocking research:**
+```json
+{
+  "tool": "sessions_send",
+  "sessionKey": "agent:bruba-web:main",
+  "message": "Look into X, write to results/..., I'll check later.",
+  "timeoutSeconds": 0
+}
+```
+
+---
+
+## Helpers (Ephemeral, Main-Only)
+
+**Purpose:** Disposable workers for mid-conversation web research. Spawned ONLY by Main (sync, waits for result).
 
 **Who spawns helpers:**
 | Spawner | Pattern | Tracking |
 |---------|---------|----------|
 | Main | Sync (waits for result) | None — fire and forget |
-| Manager | Async (tracks lifecycle) | `state/active-helpers.json` |
+| Manager | ❌ DOES NOT spawn | Uses bruba-web instead |
 
 ### Configuration (via tools.subagents)
 
@@ -757,14 +865,18 @@ Note: Morning briefing uses `--deliver` to send directly to Signal, bypassing Ma
 │   │   ├── staleness.json
 │   │   └── calendar-prep.json
 │   ├── state/              # Persistent coordinator state
-│   │   ├── active-helpers.json
+│   │   ├── pending-tasks.json   # (optional) Track tasks sent to bruba-web
 │   │   └── nag-history.json
-│   ├── results/            # Helper outputs
+│   ├── results/            # bruba-web outputs (shared write location)
 │   │   └── 2026-02-02-quantum.md
 │   └── memory/
 │       └── siri-log.md
 │
-└── [no helper directory — they use Manager's workspace ephemerally]
+├── bruba-web/
+│   ├── IDENTITY.md         # Minimal prompt (task comes via message)
+│   └── results/            # Alternative: can write here or to Manager's results/
+│
+└── [Helpers are ephemeral — spawned by Main, no persistent workspace]
 ```
 
 ---
@@ -773,7 +885,7 @@ Note: Morning briefing uses `--deliver` to send directly to Signal, bypassing Ma
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  INPUTS                                                              │
+│  USER CONVERSATIONS                                                  │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  Signal ─────────────────────────────────────► Main                 │
@@ -800,6 +912,8 @@ Note: Morning briefing uses `--deliver` to send directly to Signal, bypassing Ma
 │    continues convo ◄─────┘                                          │
 │                                                                      │
 ├─────────────────────────────────────────────────────────────────────┤
+│  SIRI INTEGRATION                                                    │
+├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  Siri Sync ──► HTTP API ──► Manager ──┬──────► Inline response      │
 │  [From Siri]   (header: bruba-manager) │                             │
@@ -809,20 +923,22 @@ Note: Morning briefing uses `--deliver` to send directly to Signal, bypassing Ma
 │  [Via Siri async] (header: bruba-main)                              │
 │                                                                      │
 ├─────────────────────────────────────────────────────────────────────┤
-│  ASYNC/BACKGROUND WORK                                               │
+│  ASYNC/BACKGROUND RESEARCH (Corrected)                               │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  User: "look into X later" ──► Main ──► sessions_send ──► Manager  │
 │                                                              │       │
 │                                                              ▼       │
-│                                                    spawn helper      │
-│                                                    (async, track)    │
+│                                              sessions_send ──► bruba-web
+│                                              (NOT sessions_spawn)    │
 │                                                              │       │
 │                                                              ▼       │
-│                                                    results/ files    │
+│                                              bruba-web researches    │
+│                                              writes to results/      │
 │                                                              │       │
 │                                                              ▼       │
-│                                                    Manager (next HB) │
+│                                              Manager (next heartbeat)│
+│                                              checks results/, forwards│
 │                                                              │       │
 │                                                              ▼       │
 │                                                    Signal delivery   │
@@ -836,7 +952,7 @@ Note: Morning briefing uses `--deliver` to send directly to Signal, bypassing Ma
 │                                                       ▼              │
 │                                                 Signal (alerts)      │
 │                                                                      │
-│  Heartbeat ──────────────► Manager ──────────► track async helpers  │
+│  Heartbeat ──────────────► Manager ──────────► check pending tasks  │
 │  (timer, Haiku)                   │                                  │
 │                                   └──────────► Signal (if alerts)   │
 │                                                                      │
@@ -845,31 +961,39 @@ Note: Morning briefing uses `--deliver` to send directly to Signal, bypassing Ma
 
 **Key patterns:**
 - **Sync search:** Main spawns helper, waits, gets result, continues conversation
-- **Async research:** Main delegates to Manager, Manager spawns/tracks, delivers to Signal later
+- **Async research:** Main → Manager → bruba-web (via sessions_send), results to Signal later
 - **Proactive alerts:** Cron writes to inbox, Manager reads on heartbeat, delivers to Signal
+
+**Why bruba-web instead of helpers for async research:**
+Tool inheritance ceiling — Manager can't spawn helpers with web tools because Manager doesn't have web tools. bruba-web is a peer agent with its own tool config.
 
 ---
 
 ## State File Schemas
 
-### state/active-helpers.json
+### state/pending-tasks.json (Optional)
+
+Track async tasks sent to bruba-web. Optional — Manager can also just check results/ for new files.
 
 ```json
 {
-  "helpers": [
+  "tasks": [
     {
-      "runId": "abc123",
-      "childSessionKey": "agent:bruba-manager:subagent:xyz",
-      "label": "quantum-research",
-      "task": "Research quantum computing trends",
-      "spawnedAt": "2026-02-02T10:00:00Z",
-      "status": "running",
-      "expectedFile": "results/2026-02-02-quantum.md"
+      "id": "task-abc123",
+      "target": "bruba-web",
+      "topic": "quantum computing trends",
+      "sentAt": "2026-02-02T10:00:00Z",
+      "expectedFile": "results/2026-02-02-quantum.md",
+      "status": "pending"
     }
   ],
   "lastUpdated": "2026-02-02T10:00:00Z"
 }
 ```
+
+**Status values:** `pending`, `completed`, `stuck`
+
+Manager updates status when it sees the expected file on heartbeat.
 
 ### state/nag-history.json
 

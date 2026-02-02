@@ -31,14 +31,31 @@ agents:
     workspace: /Users/<bot-username>/agents/<agent-id>-main
     prompts: [agents, tools]  # Which prompt files to assemble
     # Tool permissions (synced to openclaw.json via update-agent-tools.sh)
-    # Use deny-only: Main can do everything except web access and admin tools
+    # Using allow-list: main gets these tools explicitly
+    tools_allow:
+      - read
+      - write
+      - edit
+      - exec
+      - group:memory
+      - group:sessions
+      - image
+    # Admin/UI tools denied; web tools NOT listed (neutral for helper spawning)
     tools_deny:
-      - web_fetch
-      - web_search
       - browser
       - canvas
       - cron
       - gateway
+    # OpenClaw built-in tool groups:
+    #   group:sessions   - sessions_list, sessions_history, sessions_send, sessions_spawn, session_status
+    #   group:memory     - memory_search, memory_get
+    #   group:web        - web_search, web_fetch
+    #   group:fs         - read, write, edit, apply_patch
+    #   group:runtime    - exec, bash, process
+    #   group:ui         - browser, canvas
+    #   group:automation - cron, gateway
+    # Note: Built-in groups work automatically.
+    # IMPORTANT: After changing tool configs, restart the gateway: openclaw gateway restart
     # Prompt assembly sections
     # - base → include full template (templates/prompts/{NAME}.md)
     # - name → component (components/{name}/prompts/{NAME}.snippet.md)
@@ -100,6 +117,27 @@ agents:
     prompts: []
     # Helpers have no persistent prompts - instructions come via spawn task
     # Helper tools defined in subagents section below
+
+  <agent-id>-web:
+    workspace: /Users/<bot-username>/agents/<agent-id>-web
+    prompts: [agents]  # Uses agents assembly path with web-base template
+    # Web research service agent (peer, not helper)
+    # Receives tasks via sessions_send from Main or Manager
+    # Note: Manager can't spawn web-capable helpers due to tool inheritance ceiling
+    tools_allow:
+      - web_search
+      - web_fetch
+      - read
+      - write
+    tools_deny:
+      - exec
+      - browser
+      - canvas
+      - cron
+      - gateway
+      - sessions_spawn  # No nested spawning
+    agents_sections:
+      - web-base  # Uses templates/prompts/web/AGENTS.md
 
 # Subagent (helper) configuration
 # These settings apply to all helpers spawned by any agent
