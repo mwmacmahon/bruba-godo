@@ -7,7 +7,7 @@ Interactively configure bot daemon settings.
 ### 1. Load Current Config
 
 ```bash
-./tools/bot cat /Users/bruba/.clawdbot/clawdbot.json
+./tools/bot cat /Users/bruba/.openclaw/openclaw.json
 ```
 
 Parse and display relevant current settings to the user.
@@ -38,44 +38,44 @@ Current config location: `.agents.list[] | select(.id == "bruba-main") | .heartb
 
 **To enable heartbeat:**
 ```bash
-ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")) += {"heartbeat": {"every": "2m", "target": "signal", "model": "haiku"}}'\'' ~/.clawdbot/clawdbot.json > /tmp/cb.json && mv /tmp/cb.json ~/.clawdbot/clawdbot.json'
+ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")) += {"heartbeat": {"every": "2m", "target": "signal", "model": "haiku"}}'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
 ```
 
 **To disable heartbeat:**
 ```bash
-ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")) |= del(.heartbeat)'\'' ~/.clawdbot/clawdbot.json > /tmp/cb.json && mv /tmp/cb.json ~/.clawdbot/clawdbot.json'
+ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")) |= del(.heartbeat)'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
 ```
 
 **To change interval (example: 5m):**
 ```bash
-ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.every = "5m"'\'' ~/.clawdbot/clawdbot.json > /tmp/cb.json && mv /tmp/cb.json ~/.clawdbot/clawdbot.json'
+ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.every = "5m"'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
 ```
 
 **To change target:**
 ```bash
-ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.target = "signal"'\'' ~/.clawdbot/clawdbot.json > /tmp/cb.json && mv /tmp/cb.json ~/.clawdbot/clawdbot.json'
+ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.target = "signal"'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
 ```
 
 **To change model (example: haiku):**
 ```bash
-ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.model = "haiku"'\'' ~/.clawdbot/clawdbot.json > /tmp/cb.json && mv /tmp/cb.json ~/.clawdbot/clawdbot.json'
+ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.model = "haiku"'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
 ```
 
 ### 3b. Setting: Exec Allowlist
 
-Config file: `~/.clawdbot/exec-approvals.json`
+Config file: `~/.openclaw/exec-approvals.json`
 Location: `.agents["bruba-main"].allowlist`
 
-**Note:** This file is separate from clawdbot.json. It controls which binaries the agent can execute.
+**Note:** This file is separate from openclaw.json. It controls which binaries the agent can execute.
 
 **List current allowlist:**
 ```bash
-./tools/bot cat /Users/bruba/.clawdbot/exec-approvals.json | jq '.agents["bruba-main"].allowlist[] | .pattern'
+./tools/bot cat /Users/bruba/.openclaw/exec-approvals.json | jq '.agents["bruba-main"].allowlist[] | .pattern'
 ```
 
 **Show full allowlist with metadata:**
 ```bash
-./tools/bot cat /Users/bruba/.clawdbot/exec-approvals.json | jq '.agents["bruba-main"].allowlist'
+./tools/bot cat /Users/bruba/.openclaw/exec-approvals.json | jq '.agents["bruba-main"].allowlist'
 ```
 
 **Find binary path before adding:**
@@ -87,12 +87,12 @@ Location: `.agents["bruba-main"].allowlist`
 
 **Add a binary to allowlist:**
 ```bash
-ssh bruba 'jq '\''(.agents["bruba-main"].allowlist) += [{"pattern": "/path/to/binary", "id": "binary-name-bruba-main"}]'\'' ~/.clawdbot/exec-approvals.json > /tmp/ea.json && mv /tmp/ea.json ~/.clawdbot/exec-approvals.json'
+ssh bruba 'jq '\''(.agents["bruba-main"].allowlist) += [{"pattern": "/path/to/binary", "id": "binary-name-bruba-main"}]'\'' ~/.openclaw/exec-approvals.json > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
 ```
 
 **Remove a binary from allowlist:**
 ```bash
-ssh bruba 'jq '\''(.agents["bruba-main"].allowlist) |= map(select(.pattern != "/path/to/binary"))'\'' ~/.clawdbot/exec-approvals.json > /tmp/ea.json && mv /tmp/ea.json ~/.clawdbot/exec-approvals.json'
+ssh bruba 'jq '\''(.agents["bruba-main"].allowlist) |= map(select(.pattern != "/path/to/binary"))'\'' ~/.openclaw/exec-approvals.json > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
 ```
 
 **Common paths:**
@@ -105,7 +105,7 @@ ssh bruba 'jq '\''(.agents["bruba-main"].allowlist) |= map(select(.pattern != "/
 After any config change, ask if user wants to restart the daemon:
 
 ```bash
-ssh bruba 'clawdbot gateway restart'
+ssh bruba 'openclaw gateway restart'
 ```
 
 ## Arguments
@@ -158,7 +158,7 @@ This skill should grow as the user teaches it new config options.
 
 **Example additions to track:**
 - Model selection (agents.list[].model)
-- Tool permissions in clawdbot.json (agents.list[].tools.allow/deny)
+- Tool permissions in openclaw.json (agents.list[].tools.allow/deny)
 - Sandbox settings (agents.list[].sandbox)
 - Channel configs (channels.signal.*, channels.telegram.*)
 
@@ -166,19 +166,19 @@ This skill should grow as the user teaches it new config options.
 
 When you need to understand what config options are available:
 
-**Query defaults with clawdbot CLI:**
+**Query defaults with openclaw CLI:**
 ```bash
-./tools/bot clawdbot config get agents.defaults.heartbeat
-./tools/bot clawdbot config get agents.defaults
-./tools/bot clawdbot config get tools
+./tools/bot openclaw config get agents.defaults.heartbeat
+./tools/bot openclaw config get agents.defaults
+./tools/bot openclaw config get tools
 ```
 
 This shows default values and available fields for different config sections.
 
-**Use clawdbot's built-in help:**
+**Use openclaw's built-in help:**
 ```bash
-./tools/bot clawdbot help
-./tools/bot clawdbot config --help
+./tools/bot openclaw help
+./tools/bot openclaw config --help
 ```
 
 ## Related Skills

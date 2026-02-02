@@ -23,8 +23,15 @@ Display indices don't match internal IDs. Using `remindctl edit 8` will edit the
 **Binary:** /opt/homebrew/bin/icalBuddy (if installed)
 ```
 
-### Example: Voice Tools
+### Voice Tools
+
+**Location:** `~/agents/bruba-main/tools/`
+
+**Transcription:** Always use the script, not raw whisper-cpp:
+```bash
+/Users/bruba/agents/bruba-main/tools/whisper-clean.sh "/path/to/audio"
 ```
-**Location:** ~/clawd/tools/
-(Add paths to TTS/STT scripts if configured)
-```
+
+**TTS:** `~/agents/bruba-main/tools/tts.sh` (for voice replies)
+
+**⚠️ Check tools/ first** before running raw exec commands — there's usually a wrapper script that handles the details.

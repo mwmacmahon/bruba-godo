@@ -7,7 +7,7 @@ description: "Threat model, permissions, and security practices"
 
 # Security Model
 
-Security reference for bot instances running Clawdbot. Covers threat model, permission boundaries, known gaps, and operational security practices.
+Security reference for bot instances running OpenClaw. Covers threat model, permission boundaries, known gaps, and operational security practices.
 
 > **Related docs:**
 > - [Setup Guide](setup.md) — Configuration procedures
@@ -50,19 +50,19 @@ Tracked issues requiring attention.
 
 **Status:** Partially Fixed
 
-**Issue:** Agent can edit `~/.clawdbot/exec-approvals.json` directly using edit/write tools.
+**Issue:** Agent can edit `~/.openclaw/exec-approvals.json` directly using edit/write tools.
 
 **Root cause:** The file serves dual purposes:
 1. Allowlist patterns (should be lockable)
 2. Usage metadata — `lastUsedAt` timestamps (daemon needs to write)
 
 **Partial fix applied:**
-- `clawdbot.json` locked (root:staff) — protects `tools.deny` list
+- `openclaw.json` locked (root:staff) — protects `tools.deny` list
 - `exec-approvals.json` cannot be locked — daemon writes timestamps
 
 **Remaining risk:** Agent can self-escalate by adding binaries to allowlist.
 
-**Proper solution:** Clawdbot feature request — separate allowlist from metadata.
+**Proper solution:** OpenClaw feature request — separate allowlist from metadata.
 
 ---
 
@@ -146,13 +146,13 @@ Agent misuses allowed tools for unintended purposes.
 ```
 Most Trusted                                    Least Trusted
     ←─────────────────────────────────────────────────→
-Your Code      Clawdbot       Docker Sandbox     AI Model
+Your Code      OpenClaw       Docker Sandbox     AI Model
 (scripts)      Gateway        (reader agent)     (Claude)
 ```
 
 **Trust gradient implications:**
 - Scripts and wrappers: Can enforce invariants
-- Clawdbot: Trusted to enforce config
+- OpenClaw: Trusted to enforce config
 - Sandbox: Untrusted code containment
 - AI Model: Assume may attempt unauthorized actions
 
@@ -164,7 +164,7 @@ Your Code      Clawdbot       Docker Sandbox     AI Model
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Bot Clawdbot Instance                         │
+│                    Bot OpenClaw Instance                         │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │                    Main Agent                            │   │
@@ -234,7 +234,7 @@ All entries in `exec-approvals.json` under `agents.<agent-id>.allowlist`:
 
 **Communication flow:**
 ```
-User → Main Agent → exec: web-search.sh → clawdbot agent --local → Reader → Web
+User → Main Agent → exec: web-search.sh → openclaw agent --local → Reader → Web
                 ←── JSON response ←───────────────────────────────────────────←
 ```
 
@@ -300,10 +300,10 @@ Layer 6: OS Permissions (macOS TCC, Linux, etc.)
 | Layer | Enforced By | Bypassable? |
 |-------|-------------|-------------|
 | Account isolation | OS | No* |
-| Sandbox mode | Clawdbot gateway | No |
-| Tool deny list | Clawdbot gateway | Only via config edit |
-| Tool allow list | Clawdbot gateway | Only via config edit |
-| Exec allowlist | Clawdbot gateway | Via exec-approvals.json edit |
+| Sandbox mode | OpenClaw gateway | No |
+| Tool deny list | OpenClaw gateway | Only via config edit |
+| Tool allow list | OpenClaw gateway | Only via config edit |
+| Exec allowlist | OpenClaw gateway | Via exec-approvals.json edit |
 | OS permissions | OS | Via GUI only |
 
 *Unless bot account compromised
@@ -319,11 +319,11 @@ Layer 6: OS Permissions (macOS TCC, Linux, etc.)
 
 | File | Can Lock? | Notes |
 |------|-----------|-------|
-| `clawdbot.json` | ✅ Yes | Root-owned: agent cannot modify tools.deny |
+| `openclaw.json` | ✅ Yes | Root-owned: agent cannot modify tools.deny |
 | `exec-approvals.json` | ❌ No | Daemon writes timestamps; root ownership breaks exec |
 
 **Why exec-approvals.json can't be locked:**
-- Clawdbot daemon writes `lastUsedAt` timestamps on every command
+- OpenClaw daemon writes `lastUsedAt` timestamps on every command
 - Root ownership breaks exec functionality entirely
 - This is a known self-escalation gap
 
@@ -340,7 +340,7 @@ Layer 6: OS Permissions (macOS TCC, Linux, etc.)
 **Current mitigation:** None (documented risk)
 
 **Future solutions:**
-- Clawdbot feature: Separate read-only allowlist from writable metadata
+- OpenClaw feature: Separate read-only allowlist from writable metadata
 - Wrapper approach: Root-owned allowlist file
 
 ### Gap 2: Broad Filesystem Access
@@ -417,19 +417,19 @@ Layer 6: OS Permissions (macOS TCC, Linux, etc.)
 
 1. **Isolate immediately**
    ```bash
-   ssh bruba 'clawdbot daemon stop'
+   ssh bruba 'openclaw daemon stop'
    ```
 
 2. **Preserve evidence**
    ```bash
-   scp -r bruba:~/.clawdbot/logs/ /tmp/incident-$(date +%Y%m%d)/
-   scp bruba:~/.clawdbot/*.json /tmp/incident-$(date +%Y%m%d)/
+   scp -r bruba:~/.openclaw/logs/ /tmp/incident-$(date +%Y%m%d)/
+   scp bruba:~/.openclaw/*.json /tmp/incident-$(date +%Y%m%d)/
    ```
 
 3. **Review changes**
    ```bash
-   diff /backup/clawdbot.json /Users/bruba/.clawdbot/clawdbot.json
-   diff /backup/exec-approvals.json /Users/bruba/.clawdbot/exec-approvals.json
+   diff /backup/openclaw.json /Users/bruba/.openclaw/openclaw.json
+   diff /backup/exec-approvals.json /Users/bruba/.openclaw/exec-approvals.json
    ```
 
 4. **Assess scope**
@@ -465,23 +465,23 @@ Layer 6: OS Permissions (macOS TCC, Linux, etc.)
 ### Config Protection (Choose One)
 
 **Option A: Bot-owned**
-- [ ] `clawdbot.json` has 600 permissions
+- [ ] `openclaw.json` has 600 permissions
 - [ ] `exec-approvals.json` has 600 permissions
 
 **Option B: Root-owned (recommended)**
-- [ ] `clawdbot.json` owned by root:staff
+- [ ] `openclaw.json` owned by root:staff
 - [ ] `exec-approvals.json` has 600 permissions (bot-owned by necessity)
 
 ### Ongoing Verification
 
 - [ ] Config file ownership unchanged
-- [ ] Exec allowlist unchanged: `cat ~/.clawdbot/exec-approvals.json | md5`
-- [ ] No unexpected tools enabled: `clawdbot config get tools`
+- [ ] Exec allowlist unchanged: `cat ~/.openclaw/exec-approvals.json | md5`
+- [ ] No unexpected tools enabled: `openclaw config get tools`
 - [ ] Channel config still locked
 
 ### After Config Changes
 
-- [ ] Re-lock clawdbot.json (if using root-owned)
+- [ ] Re-lock openclaw.json (if using root-owned)
 - [ ] Restart daemon
 - [ ] Reset session
 - [ ] Verify new config active

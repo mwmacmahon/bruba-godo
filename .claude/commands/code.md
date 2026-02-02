@@ -9,7 +9,7 @@ Review code staged in the bot's workspace and migrate approved tools to producti
 Check what's in the workspace code directory:
 
 ```bash
-./tools/bot ls -la /Users/bruba/.clawdbot/agents/bruba-main/workspace/code/
+./tools/bot ls -la /Users/bruba/.openclaw/agents/bruba-main/workspace/code/
 ```
 
 If empty or directory doesn't exist, report "No staged code found" and exit.
@@ -20,19 +20,19 @@ For each staged file, check if it already exists in production:
 
 ```bash
 # Check for shell scripts in tools/
-./tools/bot ls /Users/bruba/clawd/tools/{script}.sh
+./tools/bot ls /Users/bruba/agents/bruba-main/tools/{script}.sh
 
 # Check for Python helpers in tools/helpers/
-./tools/bot ls /Users/bruba/clawd/tools/helpers/{script}.py
+./tools/bot ls /Users/bruba/agents/bruba-main/tools/helpers/{script}.py
 ```
 
 **If file exists in production:**
 - Label as "**UPDATE**" (not "NEW")
 - Show diff between staged and production versions:
   ```bash
-  ssh bruba 'diff ~/clawd/tools/{script}.sh ~/.clawdbot/agents/bruba-main/workspace/code/{script}.sh'
+  ssh bruba 'diff ~/clawd/tools/{script}.sh ~/.openclaw/agents/bruba-main/workspace/code/{script}.sh'
   # Or for Python:
-  ssh bruba 'diff ~/clawd/tools/helpers/{script}.py ~/.clawdbot/agents/bruba-main/workspace/code/{script}.py'
+  ssh bruba 'diff ~/clawd/tools/helpers/{script}.py ~/.openclaw/agents/bruba-main/workspace/code/{script}.py'
   ```
 - Frame review as "approving changes to existing tool" not "approving new code"
 
@@ -48,13 +48,13 @@ For each staged file, search all sessions:
 
 ```bash
 # Find all sessions mentioning the exact filename
-ssh bruba 'grep -l "cleanup-reminders.py" ~/.clawdbot/agents/bruba-main/sessions/*.jsonl'
+ssh bruba 'grep -l "cleanup-reminders.py" ~/.openclaw/agents/bruba-main/sessions/*.jsonl'
 ```
 
 Then get line numbers within each matching session:
 
 ```bash
-ssh bruba 'grep -n "cleanup-reminders.py" ~/.clawdbot/agents/bruba-main/sessions/{session}.jsonl'
+ssh bruba 'grep -n "cleanup-reminders.py" ~/.openclaw/agents/bruba-main/sessions/{session}.jsonl'
 ```
 
 **Display logic:**
@@ -67,7 +67,7 @@ For each hit, grab the matching line plus 2-3 lines before/after:
 
 ```bash
 # If match is at line 162, grab 159-165
-ssh bruba 'sed -n "159,165p" ~/.clawdbot/agents/bruba-main/sessions/{session}.jsonl'
+ssh bruba 'sed -n "159,165p" ~/.openclaw/agents/bruba-main/sessions/{session}.jsonl'
 ```
 
 #### 3c. Parse JSONL and Extract Key Fields
@@ -119,7 +119,7 @@ Goal: hit each conversation cluster around the code, then iteratively find the r
 Read each staged file:
 
 ```bash
-./tools/bot cat /Users/bruba/.clawdbot/agents/bruba-main/workspace/code/{filename}
+./tools/bot cat /Users/bruba/.openclaw/agents/bruba-main/workspace/code/{filename}
 ```
 
 Present a review for each file:
@@ -145,17 +145,17 @@ Wait for user input. Options:
 Check existing tools to avoid conflicts:
 
 ```bash
-./tools/bot ls /Users/bruba/clawd/tools/
-./tools/bot ls /Users/bruba/clawd/tools/helpers/
+./tools/bot ls /Users/bruba/agents/bruba-main/tools/
+./tools/bot ls /Users/bruba/agents/bruba-main/tools/helpers/
 ```
 
 Migrate files to production:
-- Shell wrappers (.sh) → `/Users/bruba/clawd/tools/`
-- Python helpers (.py) → `/Users/bruba/clawd/tools/helpers/`
+- Shell wrappers (.sh) → `/Users/bruba/agents/bruba-main/tools/`
+- Python helpers (.py) → `/Users/bruba/agents/bruba-main/tools/helpers/`
 
 ```bash
 # Use ssh directly for cp (quoting issues with bot wrapper)
-ssh bruba 'cp ~/.clawdbot/agents/bruba-main/workspace/code/script.sh ~/clawd/tools/'
+ssh bruba 'cp ~/.openclaw/agents/bruba-main/workspace/code/script.sh ~/clawd/tools/'
 ssh bruba 'chmod +x ~/clawd/tools/script.sh'
 ```
 
@@ -165,17 +165,17 @@ Add new tools to exec-approvals.json:
 
 ```bash
 # View current allowlist
-./tools/bot cat /Users/bruba/.clawdbot/exec-approvals.json
+./tools/bot cat /Users/bruba/.openclaw/exec-approvals.json
 
 # Add new entry (use ssh for JSON manipulation)
-ssh bruba 'cat ~/.clawdbot/exec-approvals.json | jq ".agents[\"bruba-main\"].allowlist += [{\"pattern\": \"/Users/bruba/clawd/tools/script.sh\", \"id\": \"script-name\"}]" > /tmp/ea.json && mv /tmp/ea.json ~/.clawdbot/exec-approvals.json'
+ssh bruba 'cat ~/.openclaw/exec-approvals.json | jq ".agents[\"bruba-main\"].allowlist += [{\"pattern\": \"/Users/bruba/agents/bruba-main/tools/script.sh\", \"id\": \"script-name\"}]" > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
 ```
 
 ### Step 8: Restart Daemon & Verify
 
 ```bash
-ssh bruba 'clawdbot daemon restart'
-ssh bruba 'clawdbot gateway health'
+ssh bruba 'openclaw daemon restart'
+ssh bruba 'openclaw gateway health'
 ```
 
 ### Step 9: Optional Cleanup
@@ -186,7 +186,7 @@ Ask user if they want to remove migrated files from workspace/code/:
 
 ```bash
 # Run via ssh (not via bot wrapper)
-ssh bruba 'rm ~/.clawdbot/agents/bruba-main/workspace/code/script.sh'
+ssh bruba 'rm ~/.openclaw/agents/bruba-main/workspace/code/script.sh'
 ```
 
 ## Arguments

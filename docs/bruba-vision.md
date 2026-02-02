@@ -14,7 +14,7 @@ description: "Architectural vision for multi-bot operator workspace"
 
 ## The Value Proposition
 
-bruba-godo isn't just "Clawdbot installer with SSH access." The real value is:
+bruba-godo isn't just "OpenClaw installer with SSH access." The real value is:
 
 **"A managed AI assistant where conversations become knowledge that feeds back in."**
 
@@ -78,7 +78,7 @@ The `/component` skill manages all of these: `list`, `setup`, `validate`, `statu
 
 ## The Core Insight
 
-We use Clawdbot/Moltbot as the current bot of choice, but **the entire system is designed to be bot-adaptable, ideally bot-agnostic**.
+We use OpenClaw/Moltbot as the current bot of choice, but **the entire system is designed to be bot-adaptable, ideally bot-agnostic**.
 
 Bot frameworks evolve rapidly. Built-in features break, change APIs, or don't work as expected. Our scripts and prompts should outlive any specific framework.
 
@@ -90,7 +90,7 @@ Bot frameworks evolve rapidly. Built-in features break, change APIs, or don't wo
 - Philosophy (light touch, operator-controlled, persistent identity)
 
 **The bot is not:**
-- OpenClaw/Clawdbot
+- OpenClaw/OpenClaw
 - Signal
 - macOS
 - Any specific runtime
@@ -99,7 +99,7 @@ The implementation is substrate. If tomorrow there's a better framework, the pro
 
 bruba-godo is more implementation-coupled (SSH to a specific daemon, specific CLI commands), but even that's just a convenience layer. **The real value is in the patterns.**
 
-You're not building on Clawdbot — you're building on ideas that happen to run on it today.
+You're not building on OpenClaw — you're building on ideas that happen to run on it today.
 
 ---
 
@@ -108,7 +108,7 @@ You're not building on Clawdbot — you're building on ideas that happen to run 
 ```
 ┌─────────────────────────────────────────┐
 │           Your Bot Framework            │
-│    (Clawdbot, Moltbot, or future)       │
+│    (OpenClaw, Moltbot, or future)       │
 ├─────────────────────────────────────────┤
 │         Exec Control Layer              │
 │  (allowlist, permissions, sandbox)      │
@@ -142,7 +142,7 @@ You're not building on Clawdbot — you're building on ideas that happen to run 
 
 **Principle:** Write lightweight shell scripts rather than relying on bot framework's built-in tools.
 
-**Example:** We use `whisper-clean.sh` rather than Clawdbot's `tools.media.audio` pipeline.
+**Example:** We use `whisper-clean.sh` rather than OpenClaw's `tools.media.audio` pipeline.
 
 **Rationale:**
 - Built-in tools don't work reliably across framework versions
@@ -189,9 +189,9 @@ Bot framework → exec allowlist → our scripts → actual work
 
 ## Current Implementation
 
-### Framework: Clawdbot/Moltbot
+### Framework: OpenClaw/Moltbot
 
-We currently use Clawdbot (or its fork, Moltbot) as the bot runtime. This is the **current choice**, not a requirement.
+We currently use OpenClaw (or its fork, Moltbot) as the bot runtime. This is the **current choice**, not a requirement.
 
 **Framework-specific pieces:**
 - `clawdbot.json` — config format
@@ -479,6 +479,6 @@ Historical record of key architectural and implementation decisions.
 | Unscoped filesystem commands | 2026-01-27 | Approval UX broken; account isolation sufficient |
 | Local TTS (sherpa-onnx) | 2026-01-27 | Privacy-first voice responses; no cloud TTS |
 | Exec self-escalation documented | 2026-01-27 | Agent can edit exec-approvals.json; known gap |
-| Prompt-driven voice (not auto) | 2026-01-28 | Clawdbot media pipeline doesn't invoke wrappers |
+| Prompt-driven voice (not auto) | 2026-01-28 | OpenClaw media pipeline doesn't invoke wrappers |
 | Web search via reader subagent | 2026-01-28 | Tool isolation for injection safety |
 | Bot-agnostic operator design | 2026-01-30 | Prompts and scripts outlive any specific framework |

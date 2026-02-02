@@ -4,7 +4,7 @@ Instructions for Claude Code when working in bruba-godo.
 
 ## What This Is
 
-Operator workspace for managing a personal AI assistant bot running Clawdbot. This repo contains the tools and skills to control the bot from the operator's machine.
+Operator workspace for managing a personal AI assistant bot running OpenClaw. This repo contains the tools and skills to control the bot from the operator's machine.
 
 ## Local Context
 
@@ -50,7 +50,7 @@ bruba-godo/
 │   └── commands/            # Skill definitions
 ├── templates/               # BASE PROMPTS (committed)
 │   ├── prompts/             # IDENTITY, AGENTS, TOOLS, etc.
-│   ├── config/              # clawdbot.json, exec-approvals templates
+│   ├── config/              # openclaw.json, exec-approvals templates
 │   └── tools/               # Sample scripts
 ├── components/              # OPTIONAL CAPABILITIES (committed)
 │   ├── signal/              # Signal messaging channel
@@ -71,12 +71,12 @@ bruba-godo/
 │   └── refdocs/             # Reference documents (PKM docs, guides)
 ├── exports/                 # SYNC OUTPUTS (gitignored)
 │   ├── bot/                 # Content for bot
-│   │   ├── core-prompts/    # AGENTS.md → syncs to ~/clawd/
-│   │   ├── prompts/         # Prompt - *.md → ~/clawd/memory/prompts/
-│   │   ├── transcripts/     # Transcript - *.md → ~/clawd/memory/transcripts/
-│   │   ├── refdocs/         # Refdoc - *.md → ~/clawd/memory/refdocs/
-│   │   ├── docs/            # Doc - *.md → ~/clawd/memory/docs/
-│   │   └── cc_logs/         # Claude Code Log - *.md → ~/clawd/memory/cc_logs/
+│   │   ├── core-prompts/    # AGENTS.md → syncs to ~/agents/bruba-main/
+│   │   ├── prompts/         # Prompt - *.md → ~/agents/bruba-main/memory/prompts/
+│   │   ├── transcripts/     # Transcript - *.md → ~/agents/bruba-main/memory/transcripts/
+│   │   ├── refdocs/         # Refdoc - *.md → ~/agents/bruba-main/memory/refdocs/
+│   │   ├── docs/            # Doc - *.md → ~/agents/bruba-main/memory/docs/
+│   │   └── cc_logs/         # Claude Code Log - *.md → ~/agents/bruba-main/memory/cc_logs/
 │   └── claude/              # Content for Claude Projects/Code
 └── logs/                    # Script logs (gitignored)
 ```
@@ -92,7 +92,7 @@ ssh:
 remote:
   home: /Users/<bot-username>
   workspace: /Users/<bot-username>/clawd
-  clawdbot: /Users/<bot-username>/.clawdbot
+  openclaw: /Users/<bot-username>/.openclaw
   agent_id: <your-agent-id>
 
 local:
@@ -133,20 +133,20 @@ Two rules:
 
 ```bash
 # Good — full paths, no quotes
-./tools/bot ls /Users/bruba/.clawdbot/agents/bruba-main/sessions/
-./tools/bot cat /Users/bruba/clawd/MEMORY.md
+./tools/bot ls /Users/bruba/.openclaw/agents/bruba-main/sessions/
+./tools/bot cat /Users/bruba/agents/bruba-main/MEMORY.md
 
 # Bad — tilde expands locally
-./tools/bot ls ~/.clawdbot/...
+./tools/bot ls ~/.openclaw/...
 
 # Bad — quotes break whitelist
 ./tools/bot 'ls /Users/bruba/...'
 ```
 
 Common paths (on bot machine):
-- `/Users/bruba/clawd/` — workspace root
-- `/Users/bruba/.clawdbot/` — clawdbot config/state
-- `/Users/bruba/.clawdbot/agents/bruba-main/sessions/` — conversation transcripts
+- `/Users/bruba/agents/bruba-main/` — workspace root
+- `/Users/bruba/.openclaw/` — openclaw config/state
+- `/Users/bruba/.openclaw/agents/bruba-main/sessions/` — conversation transcripts
 
 **Only use `ssh bruba` for:** multi-line scripts, pipes, or jq. That's it.
 
@@ -166,7 +166,7 @@ Common paths (on bot machine):
 | `/config` | Configure heartbeat, exec allowlist |
 | `/component` | Manage optional components (signal, voice, distill, etc.) |
 | `/prompts` | Manage prompt assembly, resolve conflicts, explain config |
-| `/update` | Update clawdbot version |
+| `/update` | Update openclaw version |
 | `/code` | Review and migrate staged code |
 | `/convo` | Load active conversation |
 | `/convert` | Add CONFIG block to intake file (AI-assisted) |
@@ -237,7 +237,7 @@ See `templates/prompts/README.md` for full documentation, or use `/prompts` for 
 The `templates/` directory contains starter files for new agents:
 
 - `templates/prompts/` — IDENTITY.md, SOUL.md, USER.md, AGENTS.md, TOOLS.md, MEMORY.md, BOOTSTRAP.md, HEARTBEAT.md
-- `templates/config/` — clawdbot.json.template, exec-approvals.json.template
+- `templates/config/` — openclaw.json.template, exec-approvals.json.template
 - `templates/tools/` — example-tool.sh
 
 Use `./tools/setup-agent.sh` to provision a new agent with these templates.
@@ -280,9 +280,9 @@ Full pipeline for processing conversations to bot memory:
 - `intake/processed/` — Originals after canonicalization
 - `reference/transcripts/` — Canonical conversation files
 - `reference/refdocs/` — Reference documents (synced to bot memory)
-- `exports/bot/core-prompts/` — AGENTS.md (syncs to ~/clawd/)
-- `exports/bot/prompts/` — Prompt files (syncs to ~/clawd/memory/prompts/)
-- `exports/bot/transcripts/` — Transcripts (syncs to ~/clawd/memory/transcripts/)
+- `exports/bot/core-prompts/` — AGENTS.md (syncs to ~/agents/bruba-main/)
+- `exports/bot/prompts/` — Prompt files (syncs to ~/agents/bruba-main/memory/prompts/)
+- `exports/bot/transcripts/` — Transcripts (syncs to ~/agents/bruba-main/memory/transcripts/)
 
 **Note:** `/export` scans all of `reference/` recursively. Files need YAML frontmatter with `scope` tags to be included.
 
@@ -317,7 +317,7 @@ When the user asks to check for a Bruba packet, look here:
 
 `workspace/output/packets/YYYY-MM-DD-<packet-name>.md`
 
-This is on the **bot's filesystem** (`/Users/bruba/clawd/workspace/output/packets/`), so use `./tools/bot cat` to read it.
+This is on the **bot's filesystem** (`/Users/bruba/agents/bruba-main/workspace/output/packets/`), so use `./tools/bot cat` to read it.
 
 Packets include:
 - Clear goal

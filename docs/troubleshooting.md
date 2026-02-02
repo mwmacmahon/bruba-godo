@@ -15,10 +15,10 @@ Consolidated troubleshooting reference for common issues. For setup procedures, 
 
 | Symptom | Likely Cause | Quick Fix |
 |---------|--------------|-----------|
-| Commands hang/timeout | Daemon not running | `/launch` or `ssh bruba "clawdbot daemon start"` |
+| Commands hang/timeout | Daemon not running | `/launch` or `ssh bruba "openclaw daemon start"` |
 | Config changes ignored | Daemon needs restart | `/restart` |
 | Exec command denied | Not in allowlist | Add to `exec-approvals.json`, restart |
-| Memory search empty | Index stale | `ssh bruba "clawdbot memory index"` |
+| Memory search empty | Index stale | `ssh bruba "openclaw memory index"` |
 | "Cannot connect" | SSH config issue | Check `~/.ssh/config` |
 | Memory tools not appearing | Plugin not enabled | Add `group:memory` to `tools.sandbox.tools.allow` |
 | Non-interactive SSH fails | .zshrc not loaded | Create `~/.zshenv` sourcing `~/.zshrc` |
@@ -30,11 +30,11 @@ Consolidated troubleshooting reference for common issues. For setup procedures, 
 
 ### npm link Doesn't Work Reliably
 
-**Symptom:** `clawdbot: command not found` after `pnpm link --global`
+**Symptom:** `openclaw: command not found` after `pnpm link --global`
 
 **Fix:** Create a manual symlink:
 ```bash
-ln -sf ~/src/clawdbot/dist/entry.js ~/.npm-global/bin/clawdbot
+ln -sf ~/src/openclaw/dist/entry.js ~/.npm-global/bin/openclaw
 ```
 
 ### Phone Numbers Need --json Flag
@@ -44,10 +44,10 @@ ln -sf ~/src/clawdbot/dist/entry.js ~/.npm-global/bin/clawdbot
 **Example:**
 ```bash
 # Wrong - gets parsed as a number
-clawdbot config set channels.signal.account +12025551234
+openclaw config set channels.signal.account +12025551234
 
 # Correct - wrapped as JSON string
-clawdbot config set --json channels.signal.account '"+12025551234"'
+openclaw config set --json channels.signal.account '"+12025551234"'
 ```
 
 ### Signal cliPath Defaults Wrong
@@ -56,14 +56,14 @@ clawdbot config set --json channels.signal.account '"+12025551234"'
 
 **Fix:** Explicitly set the path:
 ```bash
-clawdbot config set --json channels.signal.cliPath '"/opt/homebrew/bin/signal-cli"'
+openclaw config set --json channels.signal.cliPath '"/opt/homebrew/bin/signal-cli"'
 ```
 
 ### Daemon Doesn't Load .zshrc
 
 **Impact:** Commands fail because PATH isn't set correctly
 
-**Rule:** Use FULL PATH to binaries in clawdbot config and exec-approvals.json
+**Rule:** Use FULL PATH to binaries in openclaw config and exec-approvals.json
 
 **Example:**
 ```json
@@ -72,7 +72,7 @@ clawdbot config set --json channels.signal.cliPath '"/opt/homebrew/bin/signal-cl
 
 ### Non-Interactive SSH Commands Fail
 
-**Symptom:** `ssh bruba "clawdbot status"` shows "command not found"
+**Symptom:** `ssh bruba "openclaw status"` shows "command not found"
 
 **Cause:** `~/.zshrc` not loaded for non-interactive shells
 
@@ -85,7 +85,7 @@ EOF
 exit
 
 # Test
-ssh bruba "which clawdbot"
+ssh bruba "which openclaw"
 ```
 
 ---
@@ -104,9 +104,9 @@ ssh bruba "which clawdbot"
 
 Missing any step causes connection issues:
 
-1. Configure clawdbot (enable channel, set account, cliPath, httpPort)
+1. Configure openclaw (enable channel, set account, cliPath, httpPort)
 2. Link signal-cli to phone (via QR code)
-3. Approve pairing in clawdbot
+3. Approve pairing in openclaw
 
 ### Signal Port Conflict
 
@@ -117,8 +117,8 @@ Missing any step causes connection issues:
 **Fix:**
 ```bash
 lsof -i :8080  # Check what's using port
-clawdbot config set channels.signal.httpPort 8088
-clawdbot daemon restart
+openclaw config set channels.signal.httpPort 8088
+openclaw daemon restart
 ```
 
 ### dmPolicy "allowlist" Silently Drops Messages
@@ -155,7 +155,7 @@ clawdbot daemon restart
 
 1. Disable auto-transcription:
    ```bash
-   ssh bruba 'clawdbot config set tools.media.audio.enabled false'
+   ssh bruba 'openclaw config set tools.media.audio.enabled false'
    ```
 
 2. Add voice scripts to exec allowlist (whisper-clean.sh, tts.sh)
@@ -199,15 +199,15 @@ ssh bruba 'docker ps'  # Should return without error
 ### Reader Not Responding
 
 **Check:**
-1. Daemon status: `clawdbot daemon status`
-2. agentToAgent enabled: `clawdbot config get tools.agentToAgent`
-3. Reader in agents list: `clawdbot config get agents.list`
+1. Daemon status: `openclaw daemon status`
+2. agentToAgent enabled: `openclaw config get tools.agentToAgent`
+3. Reader in agents list: `openclaw config get agents.list`
 
 ### No Search Results
 
 **Check:**
-1. BRAVE_API_KEY in .env: `cat ~/.clawdbot/.env`
-2. web.search.enabled: `clawdbot config get tools.web`
+1. BRAVE_API_KEY in .env: `cat ~/.openclaw/.env`
+2. web.search.enabled: `openclaw config get tools.web`
 3. Test API directly:
    ```bash
    curl -H "X-Subscription-Token: $BRAVE_API_KEY" \
@@ -223,9 +223,9 @@ ssh bruba 'docker ps'  # Should return without error
 **Symptom:** `/context detail` shows no memory tools
 
 **Check:**
-1. Plugin loaded? `clawdbot status | grep Memory`
-2. Sandbox tools configured? `cat ~/.clawdbot/clawdbot.json | jq '.tools.sandbox.tools'`
-3. Restart after config change? `clawdbot daemon restart`
+1. Plugin loaded? `openclaw status | grep Memory`
+2. Sandbox tools configured? `cat ~/.openclaw/openclaw.json | jq '.tools.sandbox.tools'`
+3. Restart after config change? `openclaw daemon restart`
 
 **Fix:** Add `group:memory` to `tools.sandbox.tools.allow`
 
@@ -233,7 +233,7 @@ ssh bruba 'docker ps'  # Should return without error
 
 **Symptom:**
 ```
-clawdbot memory search "query"
+openclaw memory search "query"
 No matches.
 [memory] sync failed (search): Error: database is not open
 ```
@@ -242,16 +242,16 @@ No matches.
 
 **Fix:**
 ```bash
-clawdbot memory index --verbose
-clawdbot memory status --deep  # Should show Dirty: no
+openclaw memory index --verbose
+openclaw memory status --deep  # Should show Dirty: no
 ```
 
 **Nuclear option:**
 ```bash
-clawdbot daemon stop
-rm -f ~/.clawdbot/memory/*.sqlite
-clawdbot daemon start
-clawdbot memory index --verbose
+openclaw daemon stop
+rm -f ~/.openclaw/memory/*.sqlite
+openclaw daemon start
+openclaw memory index --verbose
 ```
 
 ### Files Not Being Indexed
@@ -293,7 +293,7 @@ Phone → Tailscale HTTPS → tailscale serve (bruba account)
                                     ↓
                           http://127.0.0.1:18789
                                     ↓
-                          clawdbot gateway (bruba account)
+                          openclaw gateway (bruba account)
 ```
 
 **Gateway config stays on loopback** — don't change `bind: "loopback"` to `tailnet` or `all`. Let tailscale serve handle external access while gateway stays locked to localhost.
@@ -340,8 +340,8 @@ https://your-machine.tail042aa8.ts.net/chat?session=main
 If Bearer token is exposed:
 ```bash
 NEW_TOKEN="bruba_gw_$(openssl rand -base64 32 | tr -d '/+=' | head -c 40)"
-ssh bruba "clawdbot config set gateway.http.auth.token '$NEW_TOKEN'"
-ssh bruba 'clawdbot gateway restart'
+ssh bruba "openclaw config set gateway.http.auth.token '$NEW_TOKEN'"
+ssh bruba 'openclaw gateway restart'
 ```
 
 ### HTTP API Logging for Siri/Shortcuts
@@ -366,8 +366,8 @@ Messages via HTTP API (Siri, Shortcuts) should be logged for continuity:
 
 **Fix:**
 ```bash
-ssh bruba 'clawdbot config set agents.defaults.sandbox.mode off'
-ssh bruba "clawdbot daemon restart"
+ssh bruba 'openclaw config set agents.defaults.sandbox.mode off'
+ssh bruba "openclaw daemon restart"
 ```
 
 **Sandbox mode options:**
@@ -388,9 +388,9 @@ ssh bruba "clawdbot daemon restart"
 
 **Fix:**
 ```bash
-clawdbot config set tools.exec.host gateway
-clawdbot config set tools.exec.security allowlist
-clawdbot daemon restart
+openclaw config set tools.exec.host gateway
+openclaw config set tools.exec.security allowlist
+openclaw daemon restart
 ```
 
 ### Wrong Agent ID in exec-approvals.json
@@ -399,7 +399,7 @@ clawdbot daemon restart
 
 The agent ID includes the instance prefix. Check:
 ```bash
-ssh bruba 'cat ~/.clawdbot/exec-approvals.json | jq ".agents | keys"'
+ssh bruba 'cat ~/.openclaw/exec-approvals.json | jq ".agents | keys"'
 # Should return: ["bruba-main"]
 ```
 
@@ -434,7 +434,7 @@ Then have bot run authorize commands again.
 
 **Fix:**
 ```bash
-ssh bruba "clawdbot memory index"
+ssh bruba "openclaw memory index"
 ```
 
 ### Pull Finds No New Sessions
@@ -471,7 +471,7 @@ ssh bruba "ls ~/clawd/"
 **~/.zshrc:**
 ```bash
 # PATH setup - order matters (first = highest priority)
-export PATH="$HOME/.npm-global/bin:$PATH"    # npm globals (clawdbot)
+export PATH="$HOME/.npm-global/bin:$PATH"    # npm globals (openclaw)
 export PATH="/opt/homebrew/bin:$PATH"         # Homebrew
 export PATH="$HOME/.local/bin:$PATH"          # Local binaries
 ```
@@ -493,13 +493,13 @@ prefix=/Users/bruba/.npm-global
 ssh bruba "launchctl getenv PATH"
 
 # Watch logs for audio processing
-ssh bruba "tail -f /tmp/clawdbot/clawdbot-$(date +%Y-%m-%d).log" | grep -i audio
+ssh bruba "tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log" | grep -i audio
 
 # Test whisper manually
 ssh bruba "whisper ~/.local/share/signal-cli/attachments/example.m4a --model base"
 
 # Check media config
-ssh bruba "clawdbot config get tools.media"
+ssh bruba "openclaw config get tools.media"
 
 # Check if binary accessible in daemon context
 ssh bruba "sudo -u bruba /bin/zsh -c 'which whisper'"
@@ -514,7 +514,7 @@ Response depends on ownership model:
 | bruba:wheel | chmod 600 | Safe to apply |
 | root:staff | chmod 600 | Do NOT apply (would break daemon) |
 
-**Check before applying:** `ls -la ~/.clawdbot/clawdbot.json`
+**Check before applying:** `ls -la ~/.openclaw/openclaw.json`
 
 ---
 

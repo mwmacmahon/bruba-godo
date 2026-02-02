@@ -81,7 +81,7 @@ If user chooses to update:
 Restart daemon to apply synced changes (prompts, allowlist, memory index):
 
 ```bash
-./tools/bot clawdbot daemon restart
+./tools/bot openclaw daemon restart
 ```
 
 ---

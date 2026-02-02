@@ -47,7 +47,7 @@ ssh:
 
 remote:
   home: /Users/bruba             # Bot's home directory
-  workspace: /Users/bruba/clawd  # Bot's workspace
+  workspace: /Users/bruba/agents/bruba-main  # Bot's workspace
   clawdbot: /Users/bruba/.clawdbot
   agent_id: bruba-main
 

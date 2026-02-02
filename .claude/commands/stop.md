@@ -1,25 +1,25 @@
 # /stop - Stop Bot Daemon
 
-Stop the Clawdbot daemon.
+Stop the OpenClaw daemon.
 
 ## Instructions
 
 ### 1. Check Current Status
 ```bash
-./tools/bot clawdbot daemon status 2>/dev/null || echo "Cannot connect"
+./tools/bot openclaw daemon status 2>/dev/null || echo "Cannot connect"
 ```
 
 If already stopped, report and exit.
 
 ### 2. Stop the Daemon
 ```bash
-ssh bruba "clawdbot daemon stop"
+ssh bruba "openclaw daemon stop"
 ```
 
 ### 3. Verify Stopped
 ```bash
 sleep 1
-./tools/bot clawdbot daemon status 2>/dev/null || echo "Daemon stopped"
+./tools/bot openclaw daemon status 2>/dev/null || echo "Daemon stopped"
 ```
 
 ## Arguments

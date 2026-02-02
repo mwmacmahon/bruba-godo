@@ -12,10 +12,10 @@ The path to a file in `intake/` (without CONFIG). If omitted, show available fil
 
 `/convert` does TWO things:
 
-1. **REMOVES noise** from the file — heartbeats, exec denials, system errors are **deleted from the file**
+1. **REMOVES noise** from the file — heartbeats, exec denials, system errors are **deleted automatically** before analysis
 2. **MARKS content** in CONFIG block — sections_remove, sensitivity are **just marked** (applied later at export)
 
-**CRITICAL:** Only noise is removed from the file. Everything else stays in the file — CONFIG just marks it for processing at export time. The canonical file keeps all content except noise.
+**CRITICAL:** Noise removal happens automatically with default patterns before the file is sent for analysis. Everything else stays in the file — CONFIG just marks it for processing at export time.
 
 **NOTE:** Use `sections_remove` for walls of text, large code blocks, pasted docs, and log dumps. The `description` field becomes the replacement text.
 
@@ -25,65 +25,86 @@ The path to a file in `intake/` (without CONFIG). If omitted, show available fil
 
 This skill uses `tools/helpers/convert-doc.py` for document analysis to prevent context bloat. The script makes isolated API calls — document content dies when the script exits. CC only sees the analysis results.
 
+CONFIG + backmatter are appended using `tools/helpers/file-bookend.py` — no need to read the file into context just to append.
+
 ### 1. Select Target File
 
-If no file specified, list files in intake/ without CONFIG blocks:
+If no file specified:
+
+**"convert something" / "convert any" / "just pick one"** → Auto-select the first available file. Don't ask, just proceed.
+
+**"/convert" with no context** → List files and ask which one:
 
 ```bash
 grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
 ```
 
-Show a numbered list with message count and size. Ask which to convert.
+Show a numbered list with message count and size.
 
-### 2. Open in IDE
+### 2. Remove Noise (Automatic)
 
-Show a clickable link so the user can view the file:
+Run noise removal with default patterns **before** analysis. This cleans up heartbeats, system errors, and pings so the analyzer sees clean content.
 
+```bash
+python3 tools/helpers/remove-noise.py intake/<file>.md
 ```
-📄 File: intake/<session-id>.md
-   View: code intake/<session-id>.md
+
+Report the result briefly:
 ```
+🗑️  Noise removed: N messages (heartbeats, errors, pings)
+```
+
+If nothing was removed, skip the message and proceed silently.
 
 ### 3. Analyze via Script
 
-**DO NOT read the file directly.** Instead, call the conversion script:
+Show file info header, then run analysis:
+
+```
+📄 intake/<session-id>.md (N KB)
+   View: code intake/<session-id>.md
+```
+
+**DO NOT read the file directly.** Call the conversion script:
 
 ```bash
 python3 tools/helpers/convert-doc.py intake/<file>.md "Analyze this conversation for CONFIG block generation.
 
 Identify and report:
 
-1. NOISE TO DELETE (remove from file):
-   - Heartbeat interrupts (exec denials + HEARTBEAT_OK responses)
-   - System errors (gateway timeouts, etc.)
-   - Zero-value system cruft
-   Format: msg number, type, brief description
-
-2. SECTIONS TO REMOVE (mark in CONFIG):
+1. SECTIONS TO REMOVE (mark in CONFIG):
    - Debugging tangents, off-topic discussions
    - Walls of text, large code blocks, pasted docs
    - Failed attempts
    Format: msg range, type, description (will be replacement text)
 
-3. SENSITIVITY:
+2. SENSITIVITY:
    - Terms by category: names, health, personal, financial
    - Sections with sensitive content
    Format: category → [terms] or msg range + tags
 
-4. METADATA:
+3. METADATA:
    - Suggested title
    - Date (from timestamps)
    - Source (bruba/claude-projects/claude-code/voice-memo)
    - Tags
 
-5. ARTIFACTS:
+4. ARTIFACTS:
    - Large pasted content, code blocks, logs
    Format: type, size, recommendation (remove/keep)
 
-Output as structured analysis table."
+Output as structured analysis table.
+
+Note: Noise (heartbeats, system errors, pings) has already been removed automatically."
 ```
 
 Parse the script output to extract findings.
+
+**If script fails:**
+- Report the error to user and STOP
+- Do NOT fall back to reading the file directly — that defeats context isolation
+- User must fix script/config before proceeding
+- Common issues: missing ANTHROPIC_API_KEY, wrong .env path, network errors
 
 **Automatic (handled by canonicalize):**
 - Signal/Telegram wrappers (`[Signal Michael id:... 2026-01-28 ...]`) → stripped automatically
@@ -102,11 +123,6 @@ Present findings in a clear table format:
    Date: 2026-01-28
    Source: bruba
    Tags: [tag1, tag2, tag3]
-
-🗑️  NOISE TO DELETE (N found) — will be removed from file
-   #  Location     Type           Description
-   1  msgs 6-7     heartbeat      "Exec denials + HEARTBEAT_OK"
-   2  msg 15       system-error   "Gateway timeout message"
 
 ✂️  SECTIONS TO REMOVE (N found) — marked in CONFIG, replaced with description at export
    #  Location     Type           Description
@@ -132,47 +148,40 @@ Present findings in a clear table format:
    2  continuation   800ch    "Session state packet" → keep (small)
 ```
 
-### 5. Interactive Review
+### 5. Batched Approval
 
-Go through each category with findings:
+**Use ONE AskUserQuestion to approve all categories at once.** Do NOT ask serial questions.
 
-**Noise (to delete from file):**
+After showing the analysis table, use AskUserQuestion with up to 2 questions (one per category that has findings):
+
 ```
-Noise to Delete (will be removed from file):
-  1. [msgs 6-7] Heartbeat: Exec denials + HEARTBEAT_OK
-  2. [msg 15] System error: Gateway timeout
+questions:
+  - question: "Approve sections_remove? (N items marked for export filtering)"
+    header: "Sections"
+    options:
+      - label: "Approve all"
+        description: "Mark sections for removal at export time"
+      - label: "Skip"
+        description: "Don't mark any sections"
+      - label: "Edit"
+        description: "Modify the list"
 
-Delete these? [Y/n]
-```
-
-**Sections to remove:**
-```
-Sections to Remove (replaced with description at export):
-  1. [msgs 15-18] tangent: "Debugging path issue"
-  2. [msgs 30-35] off-topic: "Unrelated discussion"
-  3. [msg 6] pasted-docs: "[Pasted documentation: Section 2.5 ...]"
-  4. [msg 22] code-block: "[Code: 45 lines bash - debug output]"
-
-Accept all? [Y/n/edit]
-```
-
-**Sensitivity terms:**
-```
-Sensitive Terms:
-  names: [Michael]
-
-Accept? [Y/n/edit/add more]
+  - question: "Approve sensitivity terms? (terms: [list])"
+    header: "Sensitivity"
+    options:
+      - label: "Approve all"
+        description: "Mark terms for redaction per export profile"
+      - label: "Skip"
+        description: "No sensitivity marking"
+      - label: "Edit"
+        description: "Modify term list"
 ```
 
-Use AskUserQuestion for structured choices, or let user type responses.
+If user selects "Edit" for any category, ask ONE follow-up for just that category.
 
-### 6. Delete Noise from File
+**Skip categories with no findings** — don't ask about empty categories.
 
-If user approved noise deletion, use Edit tool to **actually remove** those messages from the file.
-
-**This is the ONLY thing that gets removed from the file.** Everything else (sections_remove, sensitivity) is just marked in CONFIG — the content stays in the file.
-
-### 7. Generate CONFIG Block via Script
+### 6. Generate CONFIG Block via Script
 
 After user approval of findings, call the script to generate the CONFIG block. Pass the approved decisions in the prompt:
 
@@ -223,7 +232,7 @@ sensitivity:
 === END CONFIG ===
 ```
 
-### 8. Generate Backmatter via Script
+### 7. Generate Backmatter via Script
 
 Call the script to generate the summary backmatter:
 
@@ -254,26 +263,39 @@ Output in this exact format:
 [Context for future work on this topic]"
 ```
 
-### 9. Show Final CONFIG for Approval
+### 8. Show and Apply CONFIG
 
-Display the complete CONFIG block and backmatter:
+Display the complete CONFIG block and backmatter, then append to file using the bookend tool:
 
 ```
-=== PROPOSED CONFIG + BACKMATTER ===
+=== APPLYING CONFIG + BACKMATTER ===
 
 [show full CONFIG block]
 
 ---
 [show full backmatter]
-
-Apply to file? [Y/n/edit]
 ```
 
-### 10. Write to File
+**Do NOT ask for another approval here** — the batch approval in step 5 already covered this. Just show what's being added and append it.
 
-Only after approval, **append** CONFIG and backmatter to the END of the file.
+**Append using file-bookend.py** (avoids reading file into context):
 
-### 11. Verify
+```bash
+cat <<'EOF' | python3 tools/helpers/file-bookend.py intake/<file>.md
+
+=== EXPORT CONFIG ===
+...config content...
+=== END CONFIG ===
+
+---
+<!-- === BACKMATTER === -->
+...backmatter content...
+EOF
+```
+
+**Do NOT use Edit tool here** — that requires reading the file first, which defeats context isolation.
+
+### 9. Verify
 
 ```bash
 python -m components.distill.lib.cli parse intake/<file>

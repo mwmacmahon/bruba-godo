@@ -15,10 +15,10 @@ Day-to-day operations reference for managing your bot. For initial setup, see [S
 
 | Task | Skill | Direct Command |
 |------|-------|----------------|
-| Start daemon | `/launch` | `ssh bruba "clawdbot daemon start"` |
-| Restart daemon | `/restart` | `ssh bruba "clawdbot daemon restart"` |
-| Stop daemon | `/stop` | `ssh bruba "clawdbot daemon stop"` |
-| Check status | `/status` | `ssh bruba "clawdbot status"` |
+| Start daemon | `/launch` | `ssh bruba "openclaw daemon start"` |
+| Restart daemon | `/restart` | `ssh bruba "openclaw daemon restart"` |
+| Stop daemon | `/stop` | `ssh bruba "openclaw daemon stop"` |
+| Check status | `/status` | `ssh bruba "openclaw status"` |
 | Mirror files | `/mirror` | `./tools/mirror.sh` |
 | Pull sessions | `/pull` | `./tools/pull-sessions.sh` |
 | Push content | `/push` | `./tools/push.sh` |
@@ -27,28 +27,28 @@ Day-to-day operations reference for managing your bot. For initial setup, see [S
 
 ## 1. Daemon Management
 
-The Clawdbot daemon runs as a LaunchAgent on the bot account.
+The OpenClaw daemon runs as a LaunchAgent on the bot account.
 
 ```bash
 # Start the daemon
-ssh bruba "clawdbot daemon start"
+ssh bruba "openclaw daemon start"
 
 # Stop the daemon
-ssh bruba "clawdbot daemon stop"
+ssh bruba "openclaw daemon stop"
 
 # Restart (required after config changes)
-ssh bruba "clawdbot daemon restart"
+ssh bruba "openclaw daemon restart"
 
 # Check daemon status
-ssh bruba "clawdbot daemon status"
+ssh bruba "openclaw daemon status"
 
 # Comprehensive status (daemon + agents + sessions + memory)
-ssh bruba "clawdbot status"
+ssh bruba "openclaw status"
 ```
 
 **When to restart:**
-- After editing `~/.clawdbot/clawdbot.json`
-- After editing `~/.clawdbot/exec-approvals.json`
+- After editing `~/.openclaw/openclaw.json`
+- After editing `~/.openclaw/exec-approvals.json`
 - If bot becomes unresponsive
 
 ---
@@ -59,13 +59,13 @@ ssh bruba "clawdbot status"
 
 ```bash
 # Comprehensive status
-ssh bruba "clawdbot status"
+ssh bruba "openclaw status"
 
 # List sessions
-ssh bruba "clawdbot sessions"
+ssh bruba "openclaw sessions"
 
 # Only recent sessions (last 2 hours)
-ssh bruba "clawdbot sessions --active 120"
+ssh bruba "openclaw sessions --active 120"
 ```
 
 **Understanding session keys:**
@@ -77,10 +77,10 @@ ssh bruba "clawdbot sessions --active 120"
 
 ```bash
 # List configured agents
-ssh bruba "clawdbot agents list"
+ssh bruba "openclaw agents list"
 
 # Agent details with bindings
-ssh bruba "clawdbot agents list --bindings"
+ssh bruba "openclaw agents list --bindings"
 ```
 
 ---
@@ -131,16 +131,16 @@ ssh bruba "rm ~/clawd/memory/archive/*.md"    # Clear old continuations
 
 ## 4. Code Review & Migration
 
-The bot stages draft tools in `~/.clawdbot/agents/<agent-id>/workspace/code/` for review before production deployment.
+The bot stages draft tools in `~/.openclaw/agents/<agent-id>/workspace/code/` for review before production deployment.
 
 ### Directory Reference
 
 | Location | Purpose |
 |----------|---------|
-| `~/.clawdbot/agents/<id>/workspace/code/` | Staged scripts awaiting review |
+| `~/.openclaw/agents/<id>/workspace/code/` | Staged scripts awaiting review |
 | `~/clawd/tools/` | Production shell wrappers |
 | `~/clawd/tools/helpers/` | Production Python helpers |
-| `~/.clawdbot/exec-approvals.json` | Exec command allowlist |
+| `~/.openclaw/exec-approvals.json` | Exec command allowlist |
 
 ### Migration Checklist
 
@@ -169,20 +169,20 @@ Component tools with `allowlist.json` files are updated automatically:
 ./tools/push.sh --tools-only --update-allowlist
 
 # Restart daemon after changes
-ssh bruba 'clawdbot daemon restart'
+ssh bruba 'openclaw daemon restart'
 ```
 
 **Manual (for custom tools):**
 
 ```bash
 # 1. Add pattern to exec-approvals.json
-ssh bruba 'cat ~/.clawdbot/exec-approvals.json | jq ".agents[\"bruba-main\"].allowlist += [{\"pattern\": \"/Users/bruba/clawd/tools/new-tool.sh\", \"id\": \"new-tool\"}]" > /tmp/ea.json && mv /tmp/ea.json ~/.clawdbot/exec-approvals.json'
+ssh bruba 'cat ~/.openclaw/exec-approvals.json | jq ".agents[\"bruba-main\"].allowlist += [{\"pattern\": \"/Users/bruba/agents/bruba-main/tools/new-tool.sh\", \"id\": \"new-tool\"}]" > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
 
 # 2. Restart daemon
-ssh bruba 'clawdbot daemon restart'
+ssh bruba 'openclaw daemon restart'
 
 # 3. Verify
-ssh bruba 'clawdbot gateway health'
+ssh bruba 'openclaw gateway health'
 ```
 
 ### Cleanup
@@ -190,7 +190,7 @@ ssh bruba 'clawdbot gateway health'
 **Important:** The bot cannot delete files from its own workspace. After migration, clean up from operator side:
 
 ```bash
-ssh bruba 'rm ~/.clawdbot/agents/bruba-main/workspace/code/migrated-script.sh'
+ssh bruba 'rm ~/.openclaw/agents/bruba-main/workspace/code/migrated-script.sh'
 ```
 
 Use `/code` skill to interactively review staged code, find conversation context, and migrate approved tools.
@@ -201,16 +201,16 @@ Use `/code` skill to interactively review staged code, find conversation context
 
 ```bash
 # Check memory index status
-ssh bruba "clawdbot memory status"
+ssh bruba "openclaw memory status"
 
 # Verbose status (shows chunk counts, vector status)
-ssh bruba "clawdbot memory status --verbose"
+ssh bruba "openclaw memory status --verbose"
 
 # Reindex memory files
-ssh bruba "clawdbot memory index"
+ssh bruba "openclaw memory index"
 
 # Search memory
-ssh bruba "clawdbot memory search 'query terms'"
+ssh bruba "openclaw memory search 'query terms'"
 ```
 
 ---
@@ -221,16 +221,16 @@ ssh bruba "clawdbot memory search 'query terms'"
 
 | File | Purpose |
 |------|---------|
-| `~/.clawdbot/clawdbot.json` | Main config (agents, tools, channels) |
-| `~/.clawdbot/exec-approvals.json` | Exec command allowlist |
-| `~/.clawdbot/.env` | API keys (ANTHROPIC_API_KEY) |
+| `~/.openclaw/openclaw.json` | Main config (agents, tools, channels) |
+| `~/.openclaw/exec-approvals.json` | Exec command allowlist |
+| `~/.openclaw/.env` | API keys (ANTHROPIC_API_KEY) |
 
 ### Viewing Config
 
 ```bash
 # View specific config sections
-ssh bruba "clawdbot config get agents"
-ssh bruba "clawdbot config get tools"
+ssh bruba "openclaw config get agents"
+ssh bruba "openclaw config get tools"
 ```
 
 ### Diagnostic Commands
@@ -239,15 +239,15 @@ Quick health checks:
 
 ```bash
 # Quick gateway health (compact)
-ssh bruba "clawdbot gateway health"
+ssh bruba "openclaw gateway health"
 
 # Security audit summary only
-ssh bruba "clawdbot security audit --json" | jq '.summary'
+ssh bruba "openclaw security audit --json" | jq '.summary'
 
 # Full diagnostics
-ssh bruba "clawdbot doctor"
-ssh bruba "clawdbot security audit"
-ssh bruba "clawdbot status"
+ssh bruba "openclaw doctor"
+ssh bruba "openclaw security audit"
+ssh bruba "openclaw status"
 ```
 
 **Output comparison:**
@@ -265,14 +265,14 @@ ssh bruba "clawdbot status"
 ```bash
 # Option 1: SSH and edit directly
 ssh bruba
-nano ~/.clawdbot/clawdbot.json
+nano ~/.openclaw/openclaw.json
 exit
 
-# Option 2: Use clawdbot config commands
-ssh bruba 'clawdbot config set tools.exec.security allowlist'
+# Option 2: Use openclaw config commands
+ssh bruba 'openclaw config set tools.exec.security allowlist'
 ```
 
-**After any config change:** `ssh bruba "clawdbot daemon restart"`
+**After any config change:** `ssh bruba "openclaw daemon restart"`
 
 ---
 
@@ -297,7 +297,7 @@ ssh bruba 'clawdbot config set tools.exec.security allowlist'
 │  mirror/       ◄────────── mirror ──────── ~/clawd/                         │
 │  (local backup)                            MEMORY.md, journals, etc.        │
 │                                                                             │
-│  sessions/     ◄────────── pull ────────── ~/.clawdbot/sessions/*.jsonl     │
+│  sessions/     ◄────────── pull ────────── ~/.openclaw/sessions/*.jsonl     │
 │  (transcripts)                             (immutable after close)          │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -325,7 +325,7 @@ ssh bruba 'clawdbot config set tools.exec.security allowlist'
 ./tools/push.sh --tools-only
 
 # Reindex bot's memory after push
-ssh bruba "clawdbot memory index"
+ssh bruba "openclaw memory index"
 ```
 
 ### What Gets Mirrored
@@ -386,7 +386,7 @@ See [Pipeline Documentation](pipeline.md) for full details.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Push succeeds but memory search empty | Index stale | `ssh bruba "clawdbot memory index"` |
+| Push succeeds but memory search empty | Index stale | `ssh bruba "openclaw memory index"` |
 | Pull finds no new sessions | All sessions already pulled | Check `sessions/.pulled` |
 | Mirror missing files | Bot hasn't created them | Check bot's `~/clawd/` directly |
 
@@ -401,17 +401,17 @@ See [Pipeline Documentation](pipeline.md) for full details.
 | Commands hang/timeout | Daemon not running | `/launch` |
 | Config changes not taking effect | Daemon needs restart | `/restart` |
 | Exec command denied | Not in allowlist | Add to `exec-approvals.json`, restart |
-| Memory search empty | Index stale | `ssh bruba "clawdbot memory index"` |
+| Memory search empty | Index stale | `ssh bruba "openclaw memory index"` |
 | "Cannot connect" | SSH config issue | Check `~/.ssh/config` |
 
 ### Checking Logs
 
 ```bash
 # View recent daemon logs
-ssh bruba "tail -50 /tmp/clawdbot/clawdbot-$(date +%Y-%m-%d).log"
+ssh bruba "tail -50 /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log"
 
 # Follow logs in real-time
-ssh bruba "tail -f /tmp/clawdbot/clawdbot-$(date +%Y-%m-%d).log"
+ssh bruba "tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log"
 ```
 
 ---
@@ -427,7 +427,7 @@ Some commands require interactive prompts — run them directly via SSH session:
 ```bash
 ssh bruba
 # Run interactive command
-clawdbot onboard
+openclaw onboard
 exit
 ```
 
@@ -436,7 +436,7 @@ exit
 Config protection may require sudo. Run from operator machine with sudo access:
 
 ```bash
-sudo chown root:staff /Users/bruba/.clawdbot/clawdbot.json
+sudo chown root:staff /Users/bruba/.openclaw/openclaw.json
 ```
 
 ### Examples Requiring User Action
@@ -447,13 +447,13 @@ sudo chown root:staff /Users/bruba/.clawdbot/clawdbot.json
 
 ---
 
-## 10. Updating Clawdbot
+## 10. Updating OpenClaw
 
 ### From Source (Recommended)
 
 ```bash
 ssh bruba
-cd ~/src/clawdbot
+cd ~/src/openclaw
 git fetch --tags
 git tag -l | grep 2026 | tail -5  # See recent releases
 git checkout v2026.x.y            # Checkout latest
@@ -462,14 +462,14 @@ pnpm build
 exit
 
 # Restart daemon
-ssh bruba "clawdbot daemon restart"
+ssh bruba "openclaw daemon restart"
 ```
 
 ### Verify Update
 
 ```bash
-ssh bruba "clawdbot --version"
-ssh bruba "clawdbot status"
+ssh bruba "openclaw --version"
+ssh bruba "openclaw status"
 ```
 
 ---

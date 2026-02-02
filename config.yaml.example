@@ -7,8 +7,8 @@ ssh:
 
 remote:
   home: /Users/<bot-username>      # Or /home/<bot-username> on Linux
-  workspace: /Users/<bot-username>/clawd
-  clawdbot: /Users/<bot-username>/.clawdbot
+  workspace: /Users/<bot-username>/agents/<agent-id>
+  openclaw: /Users/<bot-username>/.openclaw
   agent_id: <your-agent-id>        # e.g., mybot-main
 
 local:

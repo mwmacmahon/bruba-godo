@@ -30,7 +30,7 @@ The core architecture is working. I use this daily.
 
 **Current limitations:**
 - Currently macOS on both machines, but Linux (EC2, etc.) should be a small lift for either side
-- Only integrates with Clawdbot as the bot runtime
+- Only integrates with OpenClaw as the bot runtime
 - **Setup is the shakiest part** — I've documented what I've tried and where I've hit issues, but it's nowhere near streamlined yet. Expect to debug.
 
 ## The Architecture
@@ -39,7 +39,7 @@ The core architecture is working. I use this daily.
 Your laptop  ──────SSH──────►  Bot machine
 (operator)                     (sandboxed)
 
-bruba-godo tools               Clawdbot daemon
+bruba-godo tools               OpenClaw daemon
 Review & approve               Tool execution
 Content pipeline               Memory/RAG
 ```
@@ -50,13 +50,13 @@ The operator machine has all the control tooling. The bot machine just runs the 
 
 - Two machines (or a VM for the bot)
 - SSH access between them
-- [Clawdbot](https://github.com/moltbot/clawdbot) on the bot machine
+- [OpenClaw](https://github.com/moltbot/clawdbot) on the bot machine
 - Python 3, rsync, jq
 - Claude Code (optional but recommended)
 
 ## Quick Start
 
-1. Set up a dedicated user on the bot machine, install Clawdbot
+1. Set up a dedicated user on the bot machine, install OpenClaw
 2. Configure SSH from your machine to the bot
 3. Clone this repo, `cp config.yaml.example config.yaml`, edit it
 4. Run `./tools/provision-bot.sh`
@@ -97,7 +97,7 @@ Best used with Claude Code. Open this directory and use skills:
 |-------|--------------|
 | `/config` | Manage bot settings (heartbeat, exec allowlist) |
 | `/component` | Enable/disable optional components |
-| `/update` | Update Clawdbot version on bot machine |
+| `/update` | Update OpenClaw version on bot machine |
 | `/code` | Review staged code from bot, migrate to approved tools |
 | `/convo` | Load the bot's active conversation for context |
 

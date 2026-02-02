@@ -4,7 +4,7 @@ Web search uses a **sandboxed sub-agent** for security. You don't have direct we
 
 **To search the web:**
 ```bash
-/Users/bruba/clawd/tools/web-search.sh "your search query"
+/Users/bruba/agents/bruba-main/tools/web-search.sh "your search query"
 ```
 
 **How it works:**

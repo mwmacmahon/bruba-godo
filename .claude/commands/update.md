@@ -1,10 +1,10 @@
-# /update - Update Clawdbot
+# /update - Update OpenClaw
 
-Update Clawdbot to a new version. Clawdbot is installed from source on the bot account, so updates use git checkout + pnpm build via SSH.
+Update OpenClaw to a new version. OpenClaw is installed from source on the bot account, so updates use git checkout + pnpm build via SSH.
 
-> **Source location:** `~/src/clawdbot/` (on bot account)
+> **Source location:** `~/src/openclaw/` (on bot account)
 > **Access via:** `ssh bruba "..."`
-> **Binary symlink:** `~/.npm-global/bin/clawdbot` → source dist/entry.js
+> **Binary symlink:** `~/.npm-global/bin/openclaw` → source dist/entry.js
 
 **User intervention may be needed for:**
 - Interactive prompts (e.g., `pnpm approve-builds` if dependencies change)
@@ -18,13 +18,13 @@ When these occur, provide the command and ask the user to run it.
 
 ```bash
 # Current version
-./tools/bot clawdbot --version
+./tools/bot openclaw --version
 
 # Daemon status
-./tools/bot clawdbot daemon status
+./tools/bot openclaw daemon status
 
 # Health check
-./tools/bot clawdbot doctor
+./tools/bot openclaw doctor
 ```
 
 Review doctor output for install issues or warnings.
@@ -43,7 +43,7 @@ Review doctor output for install issues or warnings.
 
 **Before suggesting permission changes:**
 ```bash
-./tools/bot ls -la /Users/bruba/.clawdbot/clawdbot.json
+./tools/bot ls -la /Users/bruba/.openclaw/openclaw.json
 ```
 Check ownership model (bruba-owned vs root-owned) — the correct action depends on which is deployed.
 
@@ -56,19 +56,19 @@ Check ownership model (bruba-owned vs root-owned) — the correct action depends
 
 ```bash
 # Fetch latest from remote
-ssh bruba "cd ~/src/clawdbot && git fetch --all --tags"
+ssh bruba "cd ~/src/openclaw && git fetch --all --tags"
 
 # Get current checkout info
-./tools/bot cd /Users/bruba/src/clawdbot && echo 'HEAD:' && git rev-parse --short HEAD && echo 'Tag:' && git describe --tags --abbrev=0
+./tools/bot cd /Users/bruba/src/openclaw && echo 'HEAD:' && git rev-parse --short HEAD && echo 'Tag:' && git describe --tags --abbrev=0
 
 # List recent releases (tagged versions)
-./tools/bot cd /Users/bruba/src/clawdbot && git tag -l 'v2026.*' | sort -V | tail -5
+./tools/bot cd /Users/bruba/src/openclaw && git tag -l 'v2026.*' | sort -V | tail -5
 
 # Check main branch status
-./tools/bot cd /Users/bruba/src/clawdbot && echo 'main:' && git rev-parse --short origin/main && git log --oneline HEAD..origin/main | wc -l | xargs echo 'commits ahead:'
+./tools/bot cd /Users/bruba/src/openclaw && echo 'main:' && git rev-parse --short origin/main && git log --oneline HEAD..origin/main | wc -l | xargs echo 'commits ahead:'
 
 # Check for beta branches
-./tools/bot cd /Users/bruba/src/clawdbot && git branch -r | grep -E 'beta|rc' | head -5
+./tools/bot cd /Users/bruba/src/openclaw && git branch -r | grep -E 'beta|rc' | head -5
 ```
 
 ### Phase 3: Security Advisory Check
@@ -76,16 +76,16 @@ ssh bruba "cd ~/src/clawdbot && git fetch --all --tags"
 **Ask user:** "Check for security advisories? (uses WebSearch)"
 
 If yes, use WebSearch to search for:
-- "clawdbot moltbot security vulnerability CVE [current year]"
-- "clawdbot moltbot release notes security"
+- "openclaw moltbot security vulnerability CVE [current year]"
+- "openclaw moltbot release notes security"
 
 **Also check the repo's security commits:**
 ```bash
 # Security-related commits since current version
-./tools/bot cd /Users/bruba/src/clawdbot && git log --oneline HEAD..origin/main --grep='security\|CVE\|vuln' | head -10
+./tools/bot cd /Users/bruba/src/openclaw && git log --oneline HEAD..origin/main --grep='security\|CVE\|vuln' | head -10
 
 # Check if any recent releases mention security
-./tools/bot cd /Users/bruba/src/clawdbot && git tag -l --format='%(refname:short) %(contents:subject)' 'v2026.*' | tail -5
+./tools/bot cd /Users/bruba/src/openclaw && git tag -l --format='%(refname:short) %(contents:subject)' 'v2026.*' | tail -5
 ```
 
 Summarize any security findings relevant to the decision.
@@ -129,7 +129,7 @@ BACKUP_DIR=~/clawd/backups/$(date +%Y-%m-%d)
 mkdir -p "$BACKUP_DIR"
 
 # Backup bot's config to main account
-ssh bruba "tar -czf - .clawdbot/" > "$BACKUP_DIR/bruba-clawdbot-config.tar.gz"
+ssh bruba "tar -czf - .openclaw/" > "$BACKUP_DIR/bruba-openclaw-config.tar.gz"
 
 # Verify backup
 ls -la "$BACKUP_DIR/"
@@ -142,37 +142,37 @@ Based on user's choice:
 **For tagged release:**
 ```bash
 # Checkout the tag
-ssh bruba "cd ~/src/clawdbot && git checkout [TAG]"
+ssh bruba "cd ~/src/openclaw && git checkout [TAG]"
 ```
 
 **For main branch:**
 ```bash
 # Checkout main
-ssh bruba "cd ~/src/clawdbot && git checkout main && git pull"
+ssh bruba "cd ~/src/openclaw && git checkout main && git pull"
 ```
 
 **For beta/other branch:**
 ```bash
 # Checkout specific branch/commit
-ssh bruba "cd ~/src/clawdbot && git checkout [BRANCH]"
+ssh bruba "cd ~/src/openclaw && git checkout [BRANCH]"
 ```
 
 **Then build:**
 ```bash
 # Rebuild
-ssh bruba "cd ~/src/clawdbot && pnpm install && pnpm build"
+ssh bruba "cd ~/src/openclaw && pnpm install && pnpm build"
 
 # Relink global
-ssh bruba "cd ~/src/clawdbot && pnpm link --global"
+ssh bruba "cd ~/src/openclaw && pnpm link --global"
 
 # Verify
-ssh bruba "clawdbot --version"
+ssh bruba "openclaw --version"
 ```
 
 **If `pnpm install` prompts for build approval:** Ask user to run interactively:
 ```bash
 ssh bruba
-cd ~/src/clawdbot
+cd ~/src/openclaw
 pnpm approve-builds  # Select packages as needed
 pnpm rebuild node-llama-cpp  # If llama-cpp changed
 exit
@@ -182,14 +182,14 @@ exit
 
 **Restart daemon and verify:**
 ```bash
-ssh bruba "clawdbot daemon restart"
+ssh bruba "openclaw daemon restart"
 sleep 3
 
 # Quick health check (compact output)
-./tools/bot clawdbot gateway health
+./tools/bot openclaw gateway health
 
 # Security audit summary
-./tools/bot clawdbot security audit --json | jq '.summary'
+./tools/bot openclaw security audit --json | jq '.summary'
 ```
 
 Expected health output:
@@ -202,13 +202,13 @@ Signal: ok (Xms)
 
 **If issues detected**, run full diagnostics:
 ```bash
-./tools/bot clawdbot doctor
-./tools/bot clawdbot security audit
+./tools/bot openclaw doctor
+./tools/bot openclaw security audit
 ```
 
 **Verify config permissions:**
 ```bash
-./tools/bot ls -la /Users/bruba/.clawdbot/clawdbot.json
+./tools/bot ls -la /Users/bruba/.openclaw/openclaw.json
 ```
 
 ### Phase 8: Log Update
@@ -232,16 +232,16 @@ If something goes wrong:
 
 ```bash
 # Find previous version
-./tools/bot cd /Users/bruba/src/clawdbot && git tag -l | grep 2026 | sort -V | tail -5
+./tools/bot cd /Users/bruba/src/openclaw && git tag -l | grep 2026 | sort -V | tail -5
 
 # Checkout previous (replace [previous-version])
-ssh bruba "cd ~/src/clawdbot && git checkout [previous-version]"
+ssh bruba "cd ~/src/openclaw && git checkout [previous-version]"
 
 # Rebuild
-ssh bruba "cd ~/src/clawdbot && pnpm install && pnpm build && pnpm link --global"
+ssh bruba "cd ~/src/openclaw && pnpm install && pnpm build && pnpm link --global"
 
 # Restart daemon
-ssh bruba "clawdbot daemon restart"
+ssh bruba "openclaw daemon restart"
 ```
 
 ## Arguments

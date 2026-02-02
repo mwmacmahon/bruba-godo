@@ -19,7 +19,7 @@ Provides web search capability through a sandboxed sub-agent architecture. The m
 │  - Invokes web-reader agent with query                      │
 │  - Returns JSON response                                    │
 └─────────────────┬───────────────────────────────────────────┘
-                  │ clawdbot agent --agent web-reader
+                  │ openclaw agent --agent web-reader
                   ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  Web Reader Agent (web-reader)                              │
@@ -44,7 +44,7 @@ Wrapper script that invokes the web-reader agent. Add to main agent's exec-appro
 
 ```json
 {
-  "pattern": "/Users/bruba/clawd/tools/web-search.sh",
+  "pattern": "/Users/bruba/agents/bruba-main/tools/web-search.sh",
   "id": "web-search-wrapper"
 }
 ```
@@ -61,7 +61,7 @@ Use cases:
 ## Prerequisites
 
 1. **Docker Desktop** running and configured to start at login
-2. **Multi-agent setup** in `~/.clawdbot/clawdbot.json`:
+2. **Multi-agent setup** in `~/.openclaw/openclaw.json`:
 
 ```json
 {
@@ -88,7 +88,7 @@ Use cases:
 }
 ```
 
-3. **Brave Search API** configured in clawdbot for web_search tool
+3. **Brave Search API** configured in openclaw for web_search tool
 
 ## Setup
 
@@ -103,10 +103,10 @@ Use cases:
 
 2. Add to exec-approvals on bot:
    ```bash
-   ssh bruba 'cat ~/.clawdbot/exec-approvals.json | jq ".agents[\"bruba-main\"].allowlist += [
-     {\"pattern\": \"/Users/bruba/clawd/tools/web-search.sh\", \"id\": \"web-search-wrapper\"},
-     {\"pattern\": \"/Users/bruba/clawd/tools/ensure-web-reader.sh\", \"id\": \"ensure-web-reader\"}
-   ]" > /tmp/ea.json && mv /tmp/ea.json ~/.clawdbot/exec-approvals.json'
+   ssh bruba 'cat ~/.openclaw/exec-approvals.json | jq ".agents[\"bruba-main\"].allowlist += [
+     {\"pattern\": \"/Users/bruba/agents/bruba-main/tools/web-search.sh\", \"id\": \"web-search-wrapper\"},
+     {\"pattern\": \"/Users/bruba/agents/bruba-main/tools/ensure-web-reader.sh\", \"id\": \"ensure-web-reader\"}
+   ]" > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
    ```
 
 3. (Optional) Set up auto-start - see `docs/setup.md` "Multi-Agent Setup" section
@@ -116,7 +116,7 @@ Use cases:
 From the main agent, web searches are triggered via:
 
 ```bash
-/Users/bruba/clawd/tools/web-search.sh "search query here"
+/Users/bruba/agents/bruba-main/tools/web-search.sh "search query here"
 ```
 
 The script returns JSON with the reader's response.

@@ -24,7 +24,7 @@ load_config() {
     # Remote paths
     REMOTE_HOME=$(grep "^  home:" "$config_file" | awk '{print $2}' | tr -d '"')
     REMOTE_WORKSPACE=$(grep "^  workspace:" "$config_file" | awk '{print $2}' | tr -d '"')
-    REMOTE_CLAWDBOT=$(grep "^  clawdbot:" "$config_file" | awk '{print $2}' | tr -d '"')
+    REMOTE_OPENCLAW=$(grep "^  openclaw:" "$config_file" | awk '{print $2}' | tr -d '"')
     REMOTE_AGENT_ID=$(grep "^  agent_id:" "$config_file" | awk '{print $2}' | tr -d '"')
 
     # Local paths (relative to ROOT_DIR)
@@ -48,7 +48,7 @@ load_config() {
     CLONE_REPO_CODE="${CLONE_REPO_CODE:-false}"
 
     # Derived remote paths
-    REMOTE_SESSIONS="$REMOTE_CLAWDBOT/agents/$REMOTE_AGENT_ID/sessions"
+    REMOTE_SESSIONS="$REMOTE_OPENCLAW/agents/$REMOTE_AGENT_ID/sessions"
 }
 
 # Cross-platform sed in-place

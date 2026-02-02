@@ -2,12 +2,12 @@
 type: doc
 scope: reference
 title: "Setup Guide"
-description: "Complete guide for setting up Clawdbot from scratch"
+description: "Complete guide for setting up OpenClaw from scratch"
 ---
 
 # Setup Guide
 
-Complete guide for setting up a personal AI assistant bot with Clawdbot. Covers remote machine preparation, operator configuration, and bot setup.
+Complete guide for setting up a personal AI assistant bot with OpenClaw. Covers remote machine preparation, operator configuration, and bot setup.
 
 > **Already set up?** See the [Operations Guide](operations-guide.md) for day-to-day usage.
 > **Having issues?** See [Troubleshooting](troubleshooting.md).
@@ -34,7 +34,7 @@ For users who just need to get connected to an existing bot:
 
 - [ ] Bot user created on remote machine
 - [ ] SSH enabled and accessible
-- [ ] Clawdbot installed (`clawdbot --version` works)
+- [ ] OpenClaw installed (`openclaw --version` works)
 - [ ] API key set (`echo $ANTHROPIC_API_KEY`)
 - [ ] SSH key copied and config updated
 - [ ] config.yaml updated with new host
@@ -62,7 +62,7 @@ Host bruba
 
 # 5. First sync
 ./tools/mirror.sh
-./tools/bot clawdbot status
+./tools/bot openclaw status
 ```
 
 For full setup from scratch, continue below.
@@ -96,7 +96,7 @@ xcode-select --install
 # Install Node.js
 brew install node
 
-# Install pnpm (preferred for Clawdbot)
+# Install pnpm (preferred for OpenClaw)
 npm install -g pnpm
 pnpm setup
 source ~/.zshrc
@@ -179,7 +179,7 @@ sudo systemctl enable sshd
 sudo systemctl start sshd
 ```
 
-### 1.3 Install Clawdbot
+### 1.3 Install OpenClaw
 
 SSH in as the bot user:
 
@@ -189,8 +189,8 @@ ssh bruba
 # Clone repository (recommended over npm install)
 mkdir -p ~/src
 cd ~/src
-git clone https://github.com/clawdbot/clawdbot.git
-cd clawdbot
+git clone https://github.com/openclaw/openclaw.git
+cd openclaw
 
 # Checkout latest release (not main!)
 git tag -l | grep 2026 | tail -1
@@ -204,12 +204,12 @@ pnpm build
 pnpm link --global
 
 # Verify
-clawdbot --version
+openclaw --version
 
 exit  # Back to your operator machine
 ```
 
-> **Note:** Source lives at `~/src/clawdbot/` on the bot account. See Operations Guide for update procedures.
+> **Note:** Source lives at `~/src/openclaw/` on the bot account. See Operations Guide for update procedures.
 
 ### 1.4 Set API Key
 
@@ -221,7 +221,7 @@ echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-Or create `~/.clawdbot/.env`:
+Or create `~/.openclaw/.env`:
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
@@ -246,8 +246,8 @@ After setup, the bot's home should have:
 │   │   └── helpers/          # Helper scripts
 │   └── output/               # Generated files
 │
-├── .clawdbot/                # Created by Clawdbot installer
-│   ├── clawdbot.json         # Main config
+├── .openclaw/                # Created by OpenClaw installer
+│   ├── openclaw.json         # Main config
 │   ├── exec-approvals.json   # Allowed executables
 │   └── agents/               # Per-agent data
 │       └── <agent-id>/
@@ -340,8 +340,8 @@ Host bruba
 # Simple test
 ssh bruba echo "Connection successful"
 
-# Check clawdbot
-ssh bruba clawdbot --version
+# Check openclaw
+ssh bruba openclaw --version
 
 # Test the tools/bot wrapper (from bruba-godo directory)
 ./tools/bot echo ok
@@ -362,7 +362,7 @@ EOF
 exit
 
 # Verify from operator
-ssh bruba "clawdbot --version"
+ssh bruba "openclaw --version"
 ```
 
 ### 2.6 Clone bruba-godo
@@ -388,7 +388,7 @@ ssh:
 remote:
   home: /Users/bruba
   workspace: /Users/bruba/clawd
-  clawdbot: /Users/bruba/.clawdbot
+  openclaw: /Users/bruba/.openclaw
   agent_id: bruba-main
 ```
 
@@ -438,7 +438,7 @@ Host *
 
 ```bash
 ssh bruba
-clawdbot onboard --install-daemon
+openclaw onboard --install-daemon
 ```
 
 **Key wizard answers:**
@@ -453,7 +453,7 @@ clawdbot onboard --install-daemon
 
 ### 3.2 Security Hardening
 
-Edit `~/.clawdbot/clawdbot.json` to restrict agent permissions:
+Edit `~/.openclaw/openclaw.json` to restrict agent permissions:
 
 ```json
 {
@@ -483,11 +483,11 @@ Edit `~/.clawdbot/clawdbot.json` to restrict agent permissions:
 
 ```bash
 # Restrict config permissions
-chmod 700 ~/.clawdbot
+chmod 700 ~/.openclaw
 
 # Validate
-clawdbot status
-clawdbot security audit
+openclaw status
+openclaw security audit
 ```
 
 ### 3.3 Exec Lockdown
@@ -495,9 +495,9 @@ clawdbot security audit
 **Critical:** With `sandbox.mode: "off"`, exec-approvals.json is ignored unless you explicitly enable gateway exec with allowlist security.
 
 ```bash
-ssh bruba 'clawdbot config set tools.exec.host gateway'
-ssh bruba 'clawdbot config set tools.exec.security allowlist'
-ssh bruba 'clawdbot daemon restart'
+ssh bruba 'openclaw config set tools.exec.host gateway'
+ssh bruba 'openclaw config set tools.exec.security allowlist'
+ssh bruba 'openclaw daemon restart'
 ```
 
 **Why:** Without these settings, the bot can run arbitrary commands. The allowlist only enforces when `host: gateway` + `security: allowlist` are set.
@@ -506,7 +506,7 @@ ssh bruba 'clawdbot daemon restart'
 
 Allowlists are **per-agent**. If your agent ID is `bruba-main`, entries must be in `agents.bruba-main.allowlist`:
 
-**~/.clawdbot/exec-approvals.json:**
+**~/.openclaw/exec-approvals.json:**
 ```json
 {
   "agents": {
@@ -528,7 +528,7 @@ Allowlists are **per-agent**. If your agent ID is `bruba-main`, entries must be 
 
 **Verify structure:**
 ```bash
-ssh bruba 'cat ~/.clawdbot/exec-approvals.json | jq ".agents | keys"'
+ssh bruba 'cat ~/.openclaw/exec-approvals.json | jq ".agents | keys"'
 # Should return: ["bruba-main"]
 ```
 
@@ -552,8 +552,8 @@ The agent can use `edit` and `write` tools to modify config files. Two ownership
 #### Option A: Bot-Owned (Simpler)
 
 ```bash
-ssh bruba "chmod 600 ~/.clawdbot/clawdbot.json"
-ssh bruba "chmod 600 ~/.clawdbot/exec-approvals.json"
+ssh bruba "chmod 600 ~/.openclaw/openclaw.json"
+ssh bruba "chmod 600 ~/.openclaw/exec-approvals.json"
 ```
 
 **Protection:** Medium — agent could still modify via write/edit tools, but 600 prevents other users from reading.
@@ -561,11 +561,11 @@ ssh bruba "chmod 600 ~/.clawdbot/exec-approvals.json"
 #### Option B: Root-Owned (Hardened)
 
 ```bash
-sudo chown root:staff /Users/bruba/.clawdbot/clawdbot.json
-sudo chmod 644 /Users/bruba/.clawdbot/clawdbot.json
+sudo chown root:staff /Users/bruba/.openclaw/openclaw.json
+sudo chmod 644 /Users/bruba/.openclaw/openclaw.json
 ```
 
-**Protection:** High — agent cannot modify clawdbot.json.
+**Protection:** High — agent cannot modify openclaw.json.
 
 **Why exec-approvals.json stays bot-owned:**
 - Daemon writes `lastUsedAt` timestamps on each command execution
@@ -574,13 +574,13 @@ sudo chmod 644 /Users/bruba/.clawdbot/clawdbot.json
 **Modifying root-owned config:**
 ```bash
 # 1. Unlock
-sudo chown bruba:staff /Users/bruba/.clawdbot/clawdbot.json
+sudo chown bruba:staff /Users/bruba/.openclaw/openclaw.json
 
 # 2. Make changes
-ssh bruba 'clawdbot config set tools.deny ...'
+ssh bruba 'openclaw config set tools.deny ...'
 
 # 3. Re-lock
-sudo chown root:staff /Users/bruba/.clawdbot/clawdbot.json
+sudo chown root:staff /Users/bruba/.openclaw/openclaw.json
 ```
 
 ### 3.5 Config Architecture Reference
@@ -651,7 +651,7 @@ Multiple layers control tool access (evaluated in order):
 
 #### Enable Memory Plugin
 
-Edit `~/.clawdbot/clawdbot.json`:
+Edit `~/.openclaw/openclaw.json`:
 
 ```json
 {
@@ -685,7 +685,7 @@ Edit `~/.clawdbot/clawdbot.json`:
 
 #### Enable Memory Tools in Sandbox
 
-If using sandboxed sessions, add to `~/.clawdbot/clawdbot.json`:
+If using sandboxed sessions, add to `~/.openclaw/openclaw.json`:
 
 ```json
 {
@@ -705,10 +705,10 @@ If using sandboxed sessions, add to `~/.clawdbot/clawdbot.json`:
 
 ```bash
 # Restart to download model (~600MB)
-clawdbot daemon restart
+openclaw daemon restart
 
 # Watch progress
-tail -f ~/.clawdbot/logs/gateway.log
+tail -f ~/.openclaw/logs/gateway.log
 # Wait for "Model loaded successfully"
 ```
 
@@ -721,9 +721,9 @@ tail -f ~/.clawdbot/logs/gateway.log
 #### Check Index Status
 
 ```bash
-ssh bruba "clawdbot memory status"
-ssh bruba "clawdbot memory status --verbose"
-ssh bruba "clawdbot memory index --verbose"  # Force reindex
+ssh bruba "openclaw memory status"
+ssh bruba "openclaw memory status --verbose"
+ssh bruba "openclaw memory index --verbose"  # Force reindex
 ```
 
 ### 3.7 Project Context Setup
@@ -766,10 +766,10 @@ The answer to the universe is 42.
 EOF
 
 # Index
-clawdbot memory index --verbose
+openclaw memory index --verbose
 
 # Search
-clawdbot memory search "universe"
+openclaw memory search "universe"
 # Should find the test file
 ```
 
@@ -828,7 +828,7 @@ For security isolation, you may want multiple agents with different permission p
 
 | Test | Command/Action | Expected |
 |------|----------------|----------|
-| Daemon running | `ssh bruba "clawdbot status"` | Shows status |
+| Daemon running | `ssh bruba "openclaw status"` | Shows status |
 | Memory loads | Ask about your MEMORY.md | Mentions content |
 | Memory search | Ask to search memory | Returns results |
 | File reading | Ask to read a file | Can read ~/clawd/ |
@@ -839,10 +839,10 @@ For security isolation, you may want multiple agents with different permission p
 
 | Path | Purpose |
 |------|---------|
-| `~/.clawdbot/clawdbot.json` | Main config |
-| `~/.clawdbot/exec-approvals.json` | Exec command allowlist |
-| `~/.clawdbot/.env` | API keys |
-| `~/.clawdbot/agents/<id>/sessions/` | Session JSONL files |
+| `~/.openclaw/openclaw.json` | Main config |
+| `~/.openclaw/exec-approvals.json` | Exec command allowlist |
+| `~/.openclaw/.env` | API keys |
+| `~/.openclaw/agents/<id>/sessions/` | Session JSONL files |
 | `~/clawd/` | Workspace root |
 | `~/clawd/memory/` | Memory files (indexed) |
 | `~/clawd/MEMORY.md` | Curated long-term memory |

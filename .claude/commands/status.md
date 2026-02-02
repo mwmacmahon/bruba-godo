@@ -4,12 +4,12 @@ Show the current state of the bot daemon and local files.
 
 ## Instructions
 
-### 1. Clawdbot Status
+### 1. OpenClaw Status
 ```bash
-./tools/bot clawdbot status 2>/dev/null | head -40
+./tools/bot openclaw status 2>/dev/null | head -40
 ```
 
-Shows: daemon, gateway, agents, sessions, memory index, heartbeat.
+Shows: gateway, agents, sessions, memory index, heartbeat.
 
 ### 2. Local Mirror Status
 ```bash
@@ -30,7 +30,7 @@ $ARGUMENTS
 ```
 === Bot Status ===
 
-Clawdbot:
+OpenClaw:
   Gateway: running (pid 25866)
   Dashboard: http://127.0.0.1:18789/
   Agents: 1 (bruba-main)
