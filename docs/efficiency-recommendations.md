@@ -4,16 +4,144 @@ Audit date: 2026-02-03
 
 ## Script Audit Summary
 
-| Script | SSH Calls | Change Detection | Critical Issues |
-|--------|-----------|------------------|-----------------|
-| **mirror.sh** | 16-20+ | None | **N+1 pattern**: 1 SSH per file test |
-| push.sh | 9 | MD5 hash of exports/ | Multiple rsync calls could batch |
-| pull-sessions.sh | 3 | `.pulled` tracking | Good incremental design |
-| assemble-prompts.sh | 0 | None needed | Pure local, efficient |
-| sync-cronjobs.sh | 3+ | Name existence check | Parses YAML 9x per job |
-| update-allowlist.sh | 5 | Early exit if unchanged | Good |
-| update-agent-tools.sh | 4 | Local comparison | Good |
-| detect-conflicts.sh | 0 | N/A | Pure local |
+| Script | Purpose | Avg Runtime | SSH Calls | Pain Points |
+|--------|---------|-------------|-----------|-------------|
+| **mirror.sh** | Pull bot state | ~15s | 16-20+ | **N+1 anti-pattern** |
+| push.sh | Push exports to bot | ~10s | 9 | Multiple rsync calls |
+| pull-sessions.sh | Pull closed sessions | ~5s | 3 | Good design |
+| assemble-prompts.sh | Assemble prompts | <1s | 0 | Pure local |
+| sync-cronjobs.sh | Sync cron jobs | ~5s | 3+ | YAML parsed 9x/job |
+| update-allowlist.sh | Update exec allowlist | ~3s | 5 | Good |
+| update-agent-tools.sh | Update tool permissions | ~3s | 4 | Good |
+| detect-conflicts.sh | Detect prompt conflicts | <1s | 0 | Pure local |
+
+### Detailed Script Analysis (5-Question Audit)
+
+#### mirror.sh
+| Question | Answer |
+|----------|--------|
+| SSH connections opened? | **16-20+** — 1 per file existence test (N+1 anti-pattern) |
+| Transfers unchanged files? | **Yes** — always copies, no mtime/hash comparison |
+| Checksum skipping possible? | **Yes** — compare remote stat() vs local mtime |
+| Parallelization possible? | **Limited** — could batch file tests, but single rsync is fine |
+| SSH batching possible? | **Yes (critical)** — single `find` replaces all `test -f` calls |
+
+#### push.sh
+| Question | Answer |
+|----------|--------|
+| SSH connections opened? | **9** — 1 check + 8 rsync calls (per content type) |
+| Transfers unchanged files? | **No** — rsync handles delta transfer |
+| Checksum skipping possible? | **Already using** — MD5 hash of exports/ for early exit |
+| Parallelization possible? | **Yes** — rsync calls are independent, could xargs -P |
+| SSH batching possible? | **Moderate** — mkdir calls could batch, rsync calls inherently separate |
+
+#### pull-sessions.sh
+| Question | Answer |
+|----------|--------|
+| SSH connections opened? | **3** — list, check .pulled, copy new |
+| Transfers unchanged files? | **No** — `.pulled` tracks processed sessions |
+| Checksum skipping possible? | **N/A** — already incremental |
+| Parallelization possible? | **No** — sequential by design (order matters for .pulled) |
+| SSH batching possible? | **Minimal** — already efficient |
+
+#### assemble-prompts.sh
+| Question | Answer |
+|----------|--------|
+| SSH connections opened? | **0** — pure local |
+| Transfers unchanged files? | **N/A** |
+| Checksum skipping possible? | **N/A** |
+| Parallelization possible? | **No** — prompt files have dependencies |
+| SSH batching possible? | **N/A** |
+
+#### sync-cronjobs.sh
+| Question | Answer |
+|----------|--------|
+| SSH connections opened? | **3+** — list, per-job ops |
+| Transfers unchanged files? | **Sometimes** — updates job even if content unchanged |
+| Checksum skipping possible? | **Yes** — hash job YAML, skip if bot job matches |
+| Parallelization possible? | **No** — cron API calls are sequential |
+| SSH batching possible? | **N/A** — uses openclaw CLI, not SSH |
+
+**Critical issue:** Parses YAML 9 times per job (once per field extraction).
+
+#### update-allowlist.sh
+| Question | Answer |
+|----------|--------|
+| SSH connections opened? | **5** — backup, read, compare, write, verify |
+| Transfers unchanged files? | **No** — early exit if unchanged |
+| Checksum skipping possible? | **Already using** — diff check before write |
+| Parallelization possible? | **No** — single file operation |
+| SSH batching possible? | **Minimal** — already reasonable |
+
+#### update-agent-tools.sh
+| Question | Answer |
+|----------|--------|
+| SSH connections opened? | **4** — read config, compare, write, verify |
+| Transfers unchanged files? | **No** — compares before write |
+| Checksum skipping possible? | **Already using** |
+| Parallelization possible? | **No** — single config file |
+| SSH batching possible? | **Minimal** |
+
+#### detect-conflicts.sh
+| Question | Answer |
+|----------|--------|
+| SSH connections opened? | **0** — pure local (reads mirror/) |
+| Transfers unchanged files? | **N/A** |
+| Checksum skipping possible? | **N/A** |
+| Parallelization possible? | **N/A** |
+| SSH batching possible? | **N/A** |
+
+---
+
+## Command Audit
+
+| Command | Calls Scripts | Typical Duration | User Friction |
+|---------|---------------|------------------|---------------|
+| /sync | 7 (assemble, push, pull, etc.) | ~30s | Conflicts block; many decisions |
+| /prompt-sync | 4 (assemble, detect-conflicts, push) | ~15s | Manual config edits for conflicts |
+| /pull | 1 (pull-sessions.sh) | ~5s | Requires /convert next |
+| /convert | 3 Python helpers | ~2s/file | Script failures opaque |
+| /intake | distill CLI | variable | Triage slows batch |
+| /export | distill CLI | ~3s | Anchor mismatches silent |
+| /push | 2 (push.sh, update-allowlist) | ~10s | Export fallback unfiltered |
+
+### Command Friction Details
+
+**`/sync`** — Full pipeline, most moving parts:
+- Runs assemble → detect-conflicts → push → pull → convert (optional)
+- Conflicts halt entire pipeline requiring manual config.yaml edits
+- User must decide: keep local, keep bot, or merge for each conflict
+- Many prompts/decisions before completion
+
+**`/prompt-sync`** — Prompt-focused subset:
+- Runs assemble-prompts → detect-conflicts → push
+- Conflict detection blocks push until resolved
+- Manual editing of config.yaml `*_sections` arrays required
+
+**`/pull`** — Clean but incomplete:
+- Runs pull-sessions.sh only
+- Creates intake/*.md files requiring /convert next
+- Two-step workflow friction
+
+**`/convert`** — AI-assisted but fragile:
+- Uses Claude to generate CONFIG blocks
+- Python helper failures produce cryptic errors
+- No batch mode — one file at a time
+
+**`/intake`** — Batch but slow:
+- Uses distill CLI for canonicalization
+- Triage mode adds decision overhead
+- Silent failures on malformed CONFIG
+
+**`/export`** — Filter mismatches silent:
+- Anchor pattern mismatches produce no output
+- User doesn't know if file was filtered or failed
+- Fallback to unfiltered export can surprise
+
+**`/push`** — Generally reliable:
+- Runs push.sh + update-allowlist.sh
+- Export directory fallback can push unfiltered content
+- Good rsync delta handling
 
 ---
 
@@ -117,35 +245,98 @@ bot_cmd() {
 
 ## Larger Refactors (4+ hours)
 
-### Bidirectional cron sync
+### Bidirectional Cron Sync Design
 
-**Problem:** Current sync-cronjobs.sh is one-way (local → bot). Jobs created on bot aren't tracked locally.
+#### Problem
 
-**Proposed flow:**
+Current `sync-cronjobs.sh` is one-way (local → bot). Jobs created on bot aren't tracked locally. This causes:
+- Manual bot job creation gets lost on next sync
+- No visibility into what's actually running on bot
+- Risk of accidentally deleting bot-created jobs
+
+#### Proposed Flow
+
+**Step 1: Pull current state**
+```bash
+# Get all jobs from bot as JSON
+./tools/bot openclaw cron list --json > /tmp/bot-cron-state.json
 ```
-1. Pull current state
-   openclaw cron list --json → parse into bot_jobs map
 
-2. Compare against local cronjobs/*.yaml
-   - bot-only: Job on bot, no local YAML
-   - local-only: YAML exists, not on bot
-   - modified: Both exist, content differs
-   - synced: Both exist, content matches
+**Step 2: Compare against local cronjobs/*.yaml**
 
-3. Interactive reconciliation
-   [K]eep bot job (create local YAML)
-   [D]elete from bot
-   [L]ocal wins (update bot)
-   [B]ot wins (update local YAML)
-   [S]kip
+Classification:
+| Category | Definition | Example |
+|----------|------------|---------|
+| bot-only | Job on bot, no local YAML | Created via `openclaw cron add` directly |
+| local-only | YAML exists, not on bot | New job pending first sync |
+| modified | Both exist, content differs | Either side changed since last sync |
+| synced | Both exist, content matches | No action needed |
 
-4. State tracking: sync/cron-sync-state.yaml
-   last_sync: timestamp
-   jobs:
-     <name>:
-       local_hash: <md5 of yaml content>
-       bot_id: <uuid>
-       last_synced: <timestamp>
+**Step 3: Interactive reconciliation**
+
+For **bot-only** jobs:
+```
+[nightly-weather-check] exists on bot but not locally.
+  [K]eep (add to local cronjobs/)
+  [D]elete from bot
+  [S]kip (leave as-is, don't track)
+>
+```
+
+For **modified** jobs:
+```
+[reminder-check] differs between local and bot.
+  Local:  schedule="0 9,14,18 * * *"
+  Bot:    schedule="0 10,15,19 * * *"
+  [L]ocal wins (overwrite bot)
+  [B]ot wins (update local yaml)
+  [S]kip
+>
+```
+
+**Step 4: State tracking file**
+
+```yaml
+# sync/cron-sync-state.yaml
+last_sync: 2026-02-03T17:00:00-05:00
+jobs:
+  nightly-reset-prep:
+    local_hash: abc123def456
+    bot_id: 5ad704f1-2b3c-4d5e-6f7a-8b9c0d1e2f3a
+    last_synced: 2026-02-03T17:00:00-05:00
+    status: synced
+  reminder-check:
+    local_hash: 789xyz012abc
+    bot_id: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+    last_synced: 2026-02-03T17:00:00-05:00
+    status: synced
+  nightly-weather-check:
+    local_hash: null  # bot-only, not tracked locally
+    bot_id: 9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f
+    last_synced: null
+    status: bot-only
+```
+
+#### Implementation Notes
+
+**Hash calculation:**
+```bash
+# Hash the meaningful content, not metadata
+cat cronjobs/reminder-check.yaml | grep -v '^#' | md5sum | cut -d' ' -f1
+```
+
+**YAML generation for bot-only jobs:**
+```bash
+# When user selects [K]eep, generate YAML from bot JSON
+./tools/helpers/cron-to-yaml.py "$job_json" > cronjobs/$job_name.yaml
+```
+
+**Sync modes:**
+```bash
+./tools/sync-cronjobs.sh              # Interactive (default)
+./tools/sync-cronjobs.sh --local      # Local wins, no prompts
+./tools/sync-cronjobs.sh --bot        # Bot wins, no prompts
+./tools/sync-cronjobs.sh --dry-run    # Show what would change
 ```
 
 ---
@@ -196,3 +387,26 @@ echo "${agents[@]}" | xargs -P4 -I{} ./process-agent.sh {}
 4. **mirror.sh incremental** - Good follow-up to N+1 fix
 5. **Bidirectional cron sync** - Quality of life improvement
 6. **Manifest-based sync** - Enables proper deletion handling
+
+---
+
+## Testing
+
+Efficiency improvements are validated by `tests/test-efficiency.sh` (17 tests):
+
+```bash
+./tests/test-efficiency.sh           # Run all efficiency tests
+./tests/test-efficiency.sh --quick   # Same (no SSH tests)
+./tests/test-efficiency.sh --verbose # Detailed output
+```
+
+**Test categories:**
+- YAML parsing efficiency (single-parse pattern)
+- SSH call patterns (N+1 avoidance)
+- Change detection mechanisms
+- Rsync efficiency settings
+- SSH ControlMaster configuration
+- Pure local script verification
+- Documentation completeness
+
+See `tests/README.md` for full test documentation.

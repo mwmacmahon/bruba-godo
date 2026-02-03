@@ -278,9 +278,9 @@ test_core_files_list() {
         "BOOTSTRAP.md"
     )
 
-    # Extract CORE_FILES from mirror.sh
+    # Extract CORE_FILES from mirror.sh (may be indented)
     local core_files_line
-    core_files_line=$(grep '^CORE_FILES=' "$ROOT_DIR/tools/mirror.sh" | cut -d'"' -f2)
+    core_files_line=$(grep 'CORE_FILES=' "$ROOT_DIR/tools/mirror.sh" | head -1 | cut -d'"' -f2)
 
     local all_present=true
     for file in "${expected_files[@]}"; do

@@ -23,6 +23,8 @@ python3 tests/run_tests.py test_variants
 ./tests/test-mirror.sh --quick
 ./tests/test-pull-sessions.sh --quick
 ./tests/test-push.sh --quick
+./tests/test-sync-cronjobs.sh --quick
+./tests/test-efficiency.sh --quick
 
 # Full test suite
 python3 tests/run_tests.py -v && \
@@ -33,7 +35,9 @@ python3 tests/run_tests.py -v && \
   ./tests/test-lib.sh --quick && \
   ./tests/test-mirror.sh --quick && \
   ./tests/test-pull-sessions.sh --quick && \
-  ./tests/test-push.sh --quick
+  ./tests/test-push.sh --quick && \
+  ./tests/test-sync-cronjobs.sh --quick && \
+  ./tests/test-efficiency.sh --quick
 ```
 
 ## Test Structure
@@ -52,7 +56,9 @@ tests/
 ├── test-lib.sh                     # Shared library tests (9 tests)
 ├── test-mirror.sh                  # Mirror script tests (7 tests)
 ├── test-pull-sessions.sh           # Pull sessions tests (9 tests)
-├── test-push.sh                    # Push script tests (12 tests)
+├── test-push.sh                    # Push script tests (16 tests)
+├── test-sync-cronjobs.sh           # Cron sync tests (6 tests)
+├── test-efficiency.sh              # Efficiency audit tests (17 tests)
 └── fixtures/                       # Test fixtures
     ├── FIXTURES.md                 # Fixture documentation
     ├── 001-ui-artifacts/
@@ -140,9 +146,11 @@ Tests for `tools/helpers/convert-doc.py`, an isolated LLM document conversion sc
 | `test-lib.sh` | 9 | Shared library: config loading, arg parsing, log rotation |
 | `test-mirror.sh` | 7 | Mirror script: date filtering, token redaction |
 | `test-pull-sessions.sh` | 9 | Pull sessions: state file, deduplication, JSON parsing |
-| `test-push.sh` | 12 | Push script: config parsing, file counting, routing |
+| `test-push.sh` | 16 | Push script: config parsing, file counting, routing |
+| `test-sync-cronjobs.sh` | 6 | Cron sync: YAML parsing, validation, status filtering |
+| `test-efficiency.sh` | 17 | Efficiency audit: SSH patterns, change detection, documentation |
 
-**Total tests: 209** (57 Python + 152 Shell)
+**Total tests: 236** (57 Python + 179 Shell)
 
 #### What's Tested in `test-export-prompts.sh`
 
@@ -226,6 +234,55 @@ Tests for `tools/push.sh` core logic:
 - **Argument flags** - --no-index, --tools-only, --update-allowlist present
 - **Tools-only mode** - Early exit pattern
 - **Clone repo code** - Conditional check exists
+- **Subdirectory routing** - transcripts → memory/transcripts/, docs → memory/docs/
+- **mkdir before rsync** - Target directory creation
+
+#### What's Tested in `test-sync-cronjobs.sh`
+
+Tests for `tools/sync-cronjobs.sh` cron synchronization:
+
+- **YAML parsing** - Single-parse field extraction (name, cron, session, agent, etc.)
+- **Status filtering** - Only syncs jobs with status: active
+- **Field validation** - Required fields (name, cron, message) checked
+- **Session handling** - Main sessions use --system-event flag
+- **YAML validity** - All cronjobs/*.yaml files are valid YAML
+- **Required fields** - All YAML files have name, status, schedule, message
+
+#### What's Tested in `test-efficiency.sh`
+
+Tests for sync pipeline efficiency (from 2026-02-03 audit):
+
+**YAML Parsing Efficiency:**
+- **Single parse** - Extracts all 9 cron fields in one YAML load
+- **Helper exists** - parse-yaml.py helper available
+
+**SSH Call Patterns:**
+- **N+1 avoidance** - mirror.sh uses find instead of individual test -f
+- **Batch operations** - CORE_FILES enables batch file operations
+
+**Change Detection:**
+- **Hash detection** - push.sh uses MD5 for change detection
+- **Incremental tracking** - pull-sessions.sh uses .pulled file
+- **Diff before write** - update-allowlist.sh compares before writing
+
+**Rsync Efficiency:**
+- **Compression** - push.sh uses -z flag
+- **Archive mode** - push.sh uses -a flag
+
+**SSH ControlMaster:**
+- **Configuration** - lib.sh has ControlMaster settings
+
+**Pure Local Scripts:**
+- **No SSH in assemble** - assemble-prompts.sh is pure local
+- **No SSH in conflicts** - detect-conflicts.sh is pure local
+
+**Documentation:**
+- **Usage docs** - All core scripts have usage documentation
+- **Efficiency doc** - docs/efficiency-recommendations.md exists
+- **Script audit** - Doc has script audit table
+- **Command audit** - Doc has command audit table
+- **Cron sync spec** - Doc has bidirectional cron sync design
+- **Discovery searches** - Audit log has grep search results
 
 ## Fixtures
 
@@ -362,7 +419,9 @@ python3 tests/run_tests.py -v && \
   ./tests/test-lib.sh --quick && \
   ./tests/test-mirror.sh --quick && \
   ./tests/test-pull-sessions.sh --quick && \
-  ./tests/test-push.sh --quick
+  ./tests/test-push.sh --quick && \
+  ./tests/test-sync-cronjobs.sh --quick && \
+  ./tests/test-efficiency.sh --quick
 
 # Verify profile targeting
 python3 -m components.distill.lib.cli export --profile bot --verbose
