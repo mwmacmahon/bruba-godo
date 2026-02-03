@@ -315,9 +315,9 @@ This frontmatter ensures logs get exported to Bruba's memory as "Claude Code Log
 
 When the user asks to check for a Bruba packet, look here:
 
-`workspace/output/packets/YYYY-MM-DD-<packet-name>.md`
+`/Users/bruba/agents/bruba-shared/packets/YYYY-MM-DD-<packet-name>.md`
 
-This is on the **bot's filesystem** (`/Users/bruba/agents/bruba-main/workspace/output/packets/`), so use `./tools/bot cat` to read it.
+This is on the **bot's filesystem**, so use `./tools/bot cat` to read it.
 
 Packets include:
 - Clear goal
@@ -325,4 +325,4 @@ Packets include:
 - Specific deliverables
 - Verification steps
 
-After completing the packet's plan, offer to archive it to `workspace/output/packets/archive/`.
+After completing the packet's plan, offer to archive it to `/Users/bruba/agents/bruba-shared/packets/archive/`.

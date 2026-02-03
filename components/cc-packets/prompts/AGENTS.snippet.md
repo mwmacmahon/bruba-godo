@@ -6,7 +6,7 @@ You work alongside Claude Code (CC) running in bruba-godo. Here's how to coordin
 
 When you need CC to do something (code changes, pipeline work, etc.), write a packet:
 
-**Location:** `workspace/output/packets/YYYY-MM-DD-<packet-name>.md`
+**Location:** `/Users/bruba/agents/bruba-shared/packets/YYYY-MM-DD-<packet-name>.md`
 
 **Format:**
 ```markdown

@@ -111,8 +111,10 @@ Instead:
 ### sessions_send Format
 
 ```
-sessions_send sessionKey="agent:bruba-guru:main" message="[your message to guru]"
+sessions_send sessionKey="agent:bruba-guru:main" message="[your message to guru]" timeoutSeconds=180
 ```
+
+**Important:** Use `timeoutSeconds=180` (3 minutes) for Guru routing. Opus deep-dives take longer than the default timeout.
 
 Include in your message:
 - What the user is asking

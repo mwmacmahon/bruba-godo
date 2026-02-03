@@ -1,10 +1,12 @@
 ---
-version: 1.0.0
-updated: 2026-02-03 01:45
+version: 1.1.0
+updated: 2026-02-02
 type: prompt-snippets
 project: planning
 tags: [bruba, prompts, guru, siri, voice, message-tool]
 ---
+<!-- v1.1.0: Added timeoutSeconds=180 to guru sessions_send format -->
+<!-- v1.0.0: Initial version with direct message pattern -->
 
 # Complete Prompt Snippets
 
@@ -432,8 +434,10 @@ Instead:
 ### sessions_send Format
 
 ```
-sessions_send sessionKey="agent:bruba-guru:main" message="[your message to guru]"
+sessions_send sessionKey="agent:bruba-guru:main" message="[your message to guru]" timeoutSeconds=180
 ```
+
+**Important:** Use `timeoutSeconds=180` (3 minutes) for Guru routing. Opus deep-dives take longer than the default timeout.
 
 Include in your message:
 - What the user is asking

@@ -1,5 +1,5 @@
 ---
-version: 1.2.1
+version: 1.3.0
 updated: 2026-02-02
 type: refdoc
 project: planning
@@ -234,8 +234,10 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   ├── memory/             # Persistent notes
 │   │   └── results/            # Technical analysis outputs
 │   │
-│   └── bruba-shared/           # Shared handoff zone (Main + Guru)
-│       ├── packets/            # Work handoff packets
+│   └── bruba-shared/           # Shared resources (all agents)
+│       ├── repo/               # bruba-godo clone (read-only reference)
+│       ├── packets/            # Work handoff packets (CC ↔ Bruba, Guru ↔ Main)
+│       │   └── archive/        # Completed packets
 │       └── context/            # Shared context files
 │
 └── .openclaw/
@@ -847,6 +849,7 @@ With Docker sandbox, we can enable full delete permissions with a safety net:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.3.0 | 2026-02-02 | Moved shared resources to bruba-shared (repo/, packets/) |
 | 1.2.1 | 2026-02-02 | Added guru cron job, expanded cronjobs listing |
 | 1.2.0 | 2026-02-02 | Added bruba-guru and bruba-shared directories |
 | 1.1.0 | 2026-02-02 | Added Part 12: Node Host + Docker Sandboxing |

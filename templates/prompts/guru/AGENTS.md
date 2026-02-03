@@ -150,10 +150,13 @@ You message <REDACTED-NAME> directly via Signal — your responses don't relay t
    message action=send target=uuid:<REDACTED-UUID> message="[your complete response]"
    ```
 
-3. **Return** a one-sentence summary to Main:
+3. **Return** a one-sentence summary to Main, then REPLY_SKIP:
    ```
    Summary: [what you found/did in one line]
+   REPLY_SKIP
    ```
+
+**Why REPLY_SKIP?** It immediately terminates the ping-pong loop, returning your summary to Main without extra round-trips. This prevents timeout issues.
 
 ### Voice Response Pattern
 
@@ -168,7 +171,7 @@ When voice would be appropriate (or <REDACTED-NAME> sent voice):
    ```
    message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="Your response"
    ```
-4. **Return** summary to Main
+4. **Return** summary to Main + REPLY_SKIP
 
 ### Why Direct Messaging?
 
@@ -224,4 +227,5 @@ Then run:
 Test with a voice message after restart."
 
 Summary: Voice broken due to missing message tool in tools_allow. Fix: add message to config, sync, restart.
+REPLY_SKIP
 ```

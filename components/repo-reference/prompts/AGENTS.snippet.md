@@ -1,6 +1,6 @@
 ## 📂 bruba-godo Repository Access
 
-**Looking for the repo? It's at `workspace/repo/`**
+**Looking for the repo? It's at `/Users/bruba/agents/bruba-shared/repo/`**
 
 This is a read-only snapshot of bruba-godo, synced so you can reference the codebase without asking where it is.
 
@@ -22,8 +22,8 @@ This is a read-only snapshot of bruba-godo, synced so you can reference the code
 ### Quick Commands
 ```bash
 # Browse the repo
-ls ~/clawd/workspace/repo/
+ls /Users/bruba/agents/bruba-shared/repo/
 
 # Find something
-grep -r "search term" ~/clawd/workspace/repo/
+grep -r "search term" /Users/bruba/agents/bruba-shared/repo/
 ```
