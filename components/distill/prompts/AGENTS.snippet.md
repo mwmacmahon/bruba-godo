@@ -70,24 +70,24 @@ If you search for something and don't find it, it may be intentionally excluded.
 Before loading large files into context, check their size first:
 
 ```bash
-# Check file size in tokens (rough: chars/4)
-wc -c ~/clawd/memory/some-file.md | awk '{print int($1/4) " tokens"}'
+# Check file size (divide by 4 for rough token count)
+/usr/bin/wc -c /Users/bruba/agents/bruba-main/memory/some-file.md
 
 # Check directory size
-du -sh ~/clawd/memory/
+/usr/bin/du -sh /Users/bruba/agents/bruba-main/memory/
 
 # List files with sizes
-ls -la ~/clawd/memory/
+/bin/ls -la /Users/bruba/agents/bruba-main/memory/
 
 # Preview first/last lines without loading full file
-head -20 ~/clawd/memory/some-file.md
-tail -20 ~/clawd/memory/some-file.md
+/usr/bin/head -20 /Users/bruba/agents/bruba-main/memory/some-file.md
+/usr/bin/tail -20 /Users/bruba/agents/bruba-main/memory/some-file.md
 
 # Find files containing a keyword (without loading them)
-grep -l "keyword" ~/clawd/memory/*.md
+/usr/bin/grep -l "keyword" /Users/bruba/agents/bruba-main/memory/*.md
 
 # Read a file (use sparingly - loads full content)
-cat ~/clawd/memory/some-file.md
+/bin/cat /Users/bruba/agents/bruba-main/memory/some-file.md
 ```
 
 **Reporting requirement:** When loading any file >2000 tokens, report to the user:
