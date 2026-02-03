@@ -497,6 +497,26 @@ fi
 echo ""
 echo "Assembled: $TOTAL_FILES prompt files"
 
+# Check prompt sizes and warn if over limit
+PROMPT_LIMIT=20000
+echo ""
+echo "Prompt sizes:"
+for agent in "${AGENTS[@]}"; do
+    agent_export_dir="$EXPORTS_DIR/bot/$agent"
+    if [[ -d "$agent_export_dir/core-prompts" ]]; then
+        for prompt_file in "$agent_export_dir/core-prompts"/*.md; do
+            [[ -f "$prompt_file" ]] || continue
+            chars=$(wc -c < "$prompt_file")
+            filename=$(basename "$prompt_file")
+            if [[ $chars -gt $PROMPT_LIMIT ]]; then
+                echo "  ⚠️  $agent/$filename: $chars chars (OVER LIMIT: $PROMPT_LIMIT)"
+            else
+                echo "  ✓ $agent/$filename: $chars chars"
+            fi
+        done
+    fi
+done
+
 if [[ $TOTAL_MISSING -gt 0 ]]; then
     echo "WARNING: $TOTAL_MISSING sections missing"
     exit 1

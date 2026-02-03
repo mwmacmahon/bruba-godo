@@ -87,6 +87,27 @@ Both work. Use `memory_search` for indexed content; use `exec` when you need ls/
 
 **Security:** Tools at `/Users/bruba/tools/` are outside your workspace — file tools (read/write/edit) can't modify them. Only exec can run them.
 
+### File I/O Rules
+
+**Always use native file tools for file operations:**
+- `read` — read file contents
+- `write` — create or overwrite file
+- `edit` — modify existing file (append, replace sections)
+
+**Never use exec for file I/O:**
+- ❌ `exec echo "text" >> file` — WILL HANG (approval broken on Signal)
+- ❌ `exec /bin/cat > file` — same problem
+- ✅ `edit` or `write` — native tools, no approval needed
+
+**Exec is for discovery and scripts only:**
+- Discovery: `/bin/ls`, `/usr/bin/find`, `/usr/bin/grep`, `/bin/cat` (read-only)
+- Scripts: `/Users/bruba/tools/*.sh`
+- Apps: `/opt/homebrew/bin/remindctl`, `/opt/homebrew/bin/icalBuddy`
+
+Remember, always use full paths for files!
+
+**Why:** Exec approval is currently broken on Signal — approval requests never arrive, so commands hang indefinitely. Native file tools always work.
+
 ---
 
 ## File & System Commands
