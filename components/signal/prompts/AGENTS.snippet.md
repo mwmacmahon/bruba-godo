@@ -3,70 +3,33 @@
 
 ### Message Format
 
-Signal messages arrive with metadata in the header:
-
 ```
-[Signal NAME id:uuid:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX +Ns TIMESTAMP TIMEZONE] message text
+[Signal NAME id:uuid:XXXX... +Ns TIMESTAMP TIMEZONE] message text
 [message_id: XXXXXXXXXXXXX]
 ```
 
-**Components:**
-- `NAME` — Sender's Signal display name
-- `uuid:XXXX...` — Sender's unique Signal identifier (stable, doesn't change)
-- `+Ns` — Seconds since conversation started
-- `TIMESTAMP` — When message was sent
-- `message_id` — Unique ID for this message
+The `uuid:XXXX...` is the sender's stable identifier.
 
 ### <REDACTED-NAME>'s Identity
 
-- **Name:** <REDACTED-NAME> (or variations)
-- **UUID:** `uuid:<REDACTED-UUID>`
+**UUID:** `uuid:<REDACTED-UUID>`
 
-This UUID is stable across sessions. It only changes if <REDACTED-NAME> re-registers his Signal account.
+### Message Tool
 
-### Using the Message Tool
-
-To send messages or media to Signal outside the normal response flow:
-
-**Text only:**
-```
-message action=send target=uuid:<REDACTED-UUID> message="Your message here"
-```
-
-**With media (image, audio, file):**
-```
-message action=send target=uuid:<REDACTED-UUID> filePath=/path/to/file message="Caption text"
-```
-
-### When to Use Message Tool vs Normal Response
-
-| Scenario | Use |
-|----------|-----|
-| Normal reply to Signal message | Normal response |
-| Voice reply (audio file) | Message tool + NO_REPLY |
-| Siri async (HTTP→Signal) | Message tool |
-| Guru direct response | Message tool |
-| Sending unprompted alert | Message tool |
-
-### NO_REPLY Pattern
-
-When you use the `message` tool AND you're bound to Signal (like bruba-main), follow with `NO_REPLY` to prevent duplicate delivery:
+Send messages/media outside normal response flow:
 
 ```
-message action=send target=uuid:... message="response"
-NO_REPLY
+message action=send target=uuid:<REDACTED-UUID> message="text"
+message action=send target=uuid:... filePath=/path/to/file message="caption"
 ```
 
-Without `NO_REPLY`, both the message tool delivery AND your normal response would go to Signal.
+**Use for:** Voice replies, Siri async, Guru responses, unprompted alerts.
+**Normal replies:** Just respond normally (no message tool needed).
 
-**Exception:** If you're NOT bound to Signal (like bruba-guru), you don't need `NO_REPLY` — your normal response goes back to the calling agent, not to Signal.
+### Media Location
 
-### Media Locations
-
-Incoming media is stored at:
+Incoming media paths are relative. Prepend `/Users/bruba/.openclaw/`:
 ```
-/Users/bruba/.openclaw/media/signal/
+media/inbound/xxx.mp3 → /Users/bruba/.openclaw/media/inbound/xxx.mp3
 ```
-
-Files are named with timestamps and random suffixes for uniqueness.
 <!-- /COMPONENT: signal -->

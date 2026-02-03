@@ -1,5 +1,5 @@
 ---
-version: 3.5.2
+version: 3.5.3
 updated: 2026-02-03
 type: refdoc
 project: planning
@@ -28,6 +28,8 @@ Bruba uses a **four-agent architecture** with three peer agents and one service 
 **Specialist pattern:** Main routes technical deep-dives to Guru (Opus) for thorough analysis. Guru has full technical capabilities (read/write/edit/exec/memory) and can reach bruba-web for research. **Guru messages users directly via Signal** — returning only a one-sentence summary to Main. This keeps Main's context lightweight for everyday interactions while preserving deep reasoning capability.
 
 **Proactive monitoring pattern:** Isolated cron jobs (cheap, stateless) detect conditions and write to inbox files. Manager's heartbeat (cheap, stateful) reads inbox, applies rules, delivers alerts. This separation keeps heartbeat fast while enabling rich monitoring.
+
+**Prompt budget constraint:** OpenClaw injects AGENTS.md into context at session start. **Hard limit: 20,000 characters.** Despite the multi-agent architecture, component snippets, and detailed guidance, the assembled prompt must stay under this limit or it gets truncated. This means every component snippet needs to be concise — verbose examples and duplicated explanations bloat the prompt and risk losing critical instructions. When adding new components or updating existing ones, always check the assembled size: `wc -c exports/bot/bruba-main/core-prompts/AGENTS.md`.
 
 ---
 

@@ -1,89 +1,24 @@
 <!-- COMPONENT: voice -->
 ## 🎤 Voice Messages
 
-### Receiving Voice Messages
+### Voice Input → Voice Response Flow
 
-When <REDACTED-NAME> sends a voice note, you'll see:
-```
-[Signal <REDACTED-NAME> id:uuid:18ce66e6-... +5s 2026-02-03 10:30 EST]
-[media attached: /Users/bruba/.openclaw/media/signal/voice-xxxx.m4a type:audio/mp4 size:45KB duration:12s]
-[message_id: 1234567890]
-```
+Media paths are relative — prepend `/Users/bruba/.openclaw/` (e.g., `media/inbound/xxx.mp3` → `/Users/bruba/.openclaw/media/inbound/xxx.mp3`)
 
-### Processing Voice Input
-
-1. **Transcribe** the audio (output goes to stdout, don't echo):
-   ```
-   exec /Users/bruba/tools/whisper-clean.sh "/Users/bruba/.openclaw/media/signal/voice-xxxx.m4a"
-   ```
-
-2. **Process** the transcribed content — understand what <REDACTED-NAME> is asking/saying
-
-3. **Formulate** your text response
-
-### Sending Voice Response
-
-4. **Generate TTS** audio file:
-   ```
-   exec /Users/bruba/tools/tts.sh "Your response text here" /tmp/response.wav
-   ```
-
-5. **Send** voice + text via message tool:
-   ```
-   message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="Your response text here"
-   ```
-
-6. **Prevent duplicate** — respond with exactly:
-   ```
-   NO_REPLY
-   ```
+1. **Transcribe:** `exec /Users/bruba/tools/whisper-clean.sh "/Users/bruba/.openclaw/media/inbound/voice.m4a"`
+2. **Process** the transcribed content
+3. **Generate TTS:** `exec /Users/bruba/tools/tts.sh "response text" /tmp/response.wav`
+4. **Send:** `message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="response text"`
+5. **Prevent duplicate:** `NO_REPLY`
 
 ### Why NO_REPLY?
 
-The `message` tool already delivered both the audio file AND the text caption to Signal. Without `NO_REPLY`, your normal text response would ALSO be sent, creating a duplicate.
+The `message` tool already delivered audio + text to Signal. Without `NO_REPLY`, your normal response would also send (duplicate).
 
-### Complete Example
+### When to Use Voice vs Text
 
-```
-[<REDACTED-NAME> sends voice: "Hey, remind me to call the dentist tomorrow"]
+**Voice response:** When <REDACTED-NAME> sent voice, response is conversational, natural as speech.
+**Text-only:** Simple inputs where text reply is fine — just respond normally, no TTS/NO_REPLY needed.
 
-You:
-exec /Users/bruba/tools/whisper-clean.sh "/Users/bruba/.openclaw/media/signal/voice-1234.m4a"
-→ Output: "Hey, remind me to call the dentist tomorrow"
-
-[You process: create reminder]
-exec remindctl add --list "Immediate" --title "Call the dentist" --due "tomorrow 9am"
-
-[Generate voice response]
-exec /Users/bruba/tools/tts.sh "Done - I've set a reminder to call the dentist for tomorrow at 9 AM" /tmp/response.wav
-
-[Send voice + text]
-message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="Done - I've set a reminder to call the dentist for tomorrow at 9 AM"
-
-NO_REPLY
-```
-
-### Text-Only Responses
-
-For simple voice inputs where a text reply is fine (no voice response needed):
-- Just respond normally with text
-- No need for TTS or message tool
-- No NO_REPLY needed
-
-Use voice responses when:
-- <REDACTED-NAME> sent a voice message (match the medium)
-- The response is conversational
-- It would be natural as speech
-
-### Voice + Text Must Match
-
-The text in `message="..."` should be exactly what the TTS audio says. Don't say one thing in audio and write something different in text.
-
-### Troubleshooting
-
-**Audio not sending?** Check that `message` is in your tools_allow list.
-
-**Duplicate text appearing?** You forgot `NO_REPLY` after the message tool.
-
-**TTS failing?** Check the script exists: `/Users/bruba/tools/tts.sh`
+**Voice + text must match** — the `message="..."` text should be exactly what TTS says.
 <!-- /COMPONENT: voice -->
