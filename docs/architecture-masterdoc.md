@@ -769,15 +769,24 @@ ON HEARTBEAT:
 
 ## Part 7: Security Model
 
-### Security Gap (CLOSED)
+### Security Gap (OPEN - Sandbox Disabled)
 
-**Status:** ✅ Resolved as of 2026-02-03 via Docker sandboxing.
+**Status:** ⚠️ Sandbox DISABLED as of 2026-02-03 due to agent-to-agent session visibility issues.
 
-Previously, agents could theoretically edit `~/.openclaw/exec-approvals.json` to self-escalate permissions. With sandbox mode enabled, containers cannot access the host filesystem where exec-approvals.json lives.
+**Problem:** With `sandbox.scope: "agent"`, `sessions_send` cannot see other agents' sessions. Error: "Session not visible from this sandboxed agent session: agent:bruba-guru:main". This breaks guru routing.
 
-### Docker Sandbox Architecture (IMPLEMENTED)
+**Current mitigation:** `sandbox.mode: "off"` — agents run directly on host. Security relies on:
+- `exec-approvals.json` allowlist (still enforced)
+- `tools.allow/deny` lists per agent (still enforced)
+- Workspace isolation via separate directories
 
-All four agents run in Docker containers via OpenClaw's native sandbox support. Exec commands route through the node host process on the host machine.
+**TODO:** Re-enable sandbox once OpenClaw fixes cross-agent session visibility in sandboxed mode.
+
+Previously, agents could theoretically edit `~/.openclaw/exec-approvals.json` to self-escalate permissions. This risk is currently accepted until sandbox is re-enabled.
+
+### Docker Sandbox Architecture (DISABLED)
+
+When sandbox is re-enabled, all four agents would run in Docker containers via OpenClaw's native sandbox support. Exec commands route through the node host process on the host machine.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -1648,6 +1657,7 @@ Auto-recovery sometimes fails on context overflow.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.5.3 | 2026-02-03 | **Sandbox disabled:** Agent-to-agent session visibility broken in sandbox mode. Set `sandbox.mode: "off"` until OpenClaw fixes. Added `/wake` skill. |
 | 3.5.2 | 2026-02-03 | **Sandbox tool policy:** Documented tools.sandbox.tools.allow ceiling (message tool missing fix) |
 | 3.5.1 | 2026-02-03 | **Defense-in-depth:** ALL agents now have tools/:ro (not just bruba-main), updated access matrices and debugging commands |
 | 3.5.0 | 2026-02-03 | **Part 7 major expansion:** Docker sandbox implementation details, per-agent access matrix (read/write/none for every resource), network isolation matrix, exec vs file path split, security implications, container lifecycle, debugging commands |

@@ -1,0 +1,23 @@
+name: post-reset-wake
+description: Wake all agents after daily reset to initialize fresh sessions
+status: active
+
+schedule:
+  cron: "5 4 * * *"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-manager
+
+message: |
+  Post-reset wake check. Ping all agents to initialize their sessions:
+
+  1. Use sessions_send to bruba-main: "Good morning. Session initialized."
+  2. Use sessions_send to bruba-guru: "Good morning. Session initialized."
+  3. Use sessions_send to bruba-web: "Good morning. Session initialized."
+
+  Log results to workspace/logs/wake-YYYY-MM-DD.log
+
+  Reply NO_REPLY when done.

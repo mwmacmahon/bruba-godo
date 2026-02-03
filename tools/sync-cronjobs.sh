@@ -23,9 +23,17 @@ LOG_FILE="$LOG_DIR/sync-cronjobs.log"
 
 mkdir -p "$LOG_DIR"
 
-# Get existing cron jobs from bot
+# Get existing cron jobs from bot (using --json for reliable parsing)
 get_existing_jobs() {
-    ./tools/bot openclaw cron list 2>/dev/null | grep -E "^\s*-\s*" | sed 's/^[[:space:]]*-[[:space:]]*//' || echo ""
+    ./tools/bot openclaw cron list --json 2>/dev/null | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    for job in data.get('jobs', []):
+        print(job.get('name', ''))
+except:
+    pass
+" || echo ""
 }
 
 # Parse a single YAML cron job file
@@ -78,10 +86,13 @@ register_job() {
     local tmp_file="/Users/bruba/.openclaw/tmp-cron-msg-$$.txt"
     echo "$message" | ssh "$SSH_HOST" "cat > '$tmp_file'"
 
-    # Main sessions use --system-event, isolated use --message
+    # Main sessions use --system-event + --wake now (agent has no heartbeat)
+    # Isolated sessions use --message (default wake mode is fine)
     local payload_flag="--message"
+    local wake_flag=""
     if [[ "$session" == "main" ]]; then
         payload_flag="--system-event"
+        wake_flag="--wake now"
     fi
 
     # Build and run the openclaw cron add command on bot
@@ -93,6 +104,7 @@ register_job() {
         --tz '$timezone' \
         --agent '$agent' \
         --session '$session' \
+        $wake_flag \
         $payload_flag \"\$(cat '$tmp_file')\" \
         && rm -f '$tmp_file'" 2>&1); then
         [[ "$VERBOSE" == "true" ]] && echo "$result"

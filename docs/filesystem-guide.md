@@ -831,11 +831,17 @@ Bot memory uses **flat structure with prefix naming**:
 
 ## Part 12: Node Host + Docker Sandboxing
 
-**Status:** IMPLEMENTED (2026-02-03). All agents run in Docker containers via OpenClaw native sandbox mode.
+**Status:** ⚠️ DISABLED (2026-02-03). Sandbox mode turned off due to agent-to-agent session visibility issues.
 
-### Security Model
+**Problem:** With `sandbox.scope: "agent"`, `sessions_send` cannot see other agents' sessions. Breaks guru routing with error: "Session not visible from this sandboxed agent session".
 
-**Security gap closed:** Agents cannot edit `~/.openclaw/exec-approvals.json` — the file exists only on the host filesystem, which containers cannot access.
+**Current state:** `sandbox.mode: "off"` — agents run directly on host. Security relies on exec-approvals allowlist and tools.allow/deny lists (both still enforced).
+
+**TODO:** Re-enable when OpenClaw fixes cross-agent visibility in sandboxed mode.
+
+### Security Model (When Sandbox Re-enabled)
+
+**Security gap (currently open):** Agents could theoretically edit `~/.openclaw/exec-approvals.json` to self-escalate. When sandbox is re-enabled, this file would exist only on the host filesystem, which containers cannot access.
 
 **Exec flow:**
 ```
@@ -1107,6 +1113,7 @@ docker exec -it openclaw-sandbox-bruba-main /bin/sh
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.7.0 | 2026-02-03 | **Sandbox disabled:** Agent-to-agent session visibility broken in sandbox mode. Set `sandbox.mode: "off"` until OpenClaw fixes. |
 | 1.6.0 | 2026-02-03 | **File access architecture:** `/memory/` read-only (docs, transcripts, repos), `/workspace/` read-write (outputs, continuation). Discovery via `memory_search`. Updated Part 12 with new structure. |
 | 1.5.2 | 2026-02-03 | Added sandbox tool policy ceiling documentation (tools.sandbox.tools.allow) |
 | 1.5.1 | 2026-02-03 | Defense-in-depth: ALL agents now have tools/:ro (not just bruba-main) |

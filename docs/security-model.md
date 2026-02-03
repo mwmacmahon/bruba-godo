@@ -198,8 +198,8 @@ Your Code      OpenClaw       Docker Sandbox     AI Model
 
 | Category | Configuration | Rationale |
 |----------|---------------|-----------|
-| **sandbox.mode** | all | Full Docker isolation |
-| **sandbox.scope** | agent | Per-agent sandbox |
+| **sandbox.mode** | off | ⚠️ DISABLED - agent-to-agent broken |
+| **sandbox.scope** | agent | (inactive while mode=off) |
 | **tools.allow** | web_fetch, web_search, read | Minimal for web tasks |
 | **tools.deny** | exec, write, edit, memory_* | No persistence, no escalation |
 

@@ -1,5 +1,5 @@
 ---
-version: 1.2.0
+version: 1.3.0
 updated: 2026-02-03
 type: cc-packet
 project: bruba-godo
@@ -7,6 +7,13 @@ tags: [node-host, docker, security, migration, guru, defense-in-depth]
 ---
 
 # CC Packet: Node Host Migration
+
+> ⚠️ **STATUS: SANDBOX DISABLED (2026-02-03)**
+>
+> Sandbox mode turned off due to agent-to-agent session visibility bug. With `sandbox.scope: "agent"`, `sessions_send` cannot see other agents' sessions, breaking guru routing.
+>
+> **Current config:** `sandbox.mode: "off"` — agents run on host.
+> **TODO:** Re-enable when OpenClaw fixes cross-agent visibility.
 
 **Objective:** Dockerize Bruba agents while keeping exec on the host via OpenClaw's node host. This closes the exec-approvals.json self-escalation security gap.
 

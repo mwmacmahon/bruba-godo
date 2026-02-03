@@ -12,21 +12,14 @@ execution:
   agent: bruba-main
 
 message: |
-  Session reset in 5 minutes. Write continuation packet to memory/CONTINUATION.md:
+  Session reset in 5 minutes. Write a continuation packet to memory/CONTINUATION.md.
 
-  ## Session Summary
-  [What we discussed/accomplished today]
+  Include:
+  - Session Summary: What you remember from today (or write "Nothing recorded" if empty)
+  - In Progress: Current tasks and status
+  - Open Questions: Unresolved items
+  - Next Steps: Action items for tomorrow
 
-  ## In Progress
-  [Tasks with status and blockers]
-
-  ## Open Questions
-  [Unresolved items]
-
-  ## Next Steps
-  [Action items for tomorrow]
-
-  ## Relevant Files
-  [Paths and descriptions]
+  Write actual content, not placeholders. Create the file now.
 
   Reply NO_REPLY when done.

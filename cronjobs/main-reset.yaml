@@ -1,0 +1,14 @@
+name: main-reset
+description: Reset bruba-main session after continuation packet is written
+status: proposed
+
+schedule:
+  cron: "0 4 * * *"
+  timezone: America/New_York
+
+execution:
+  session: main
+  agent: bruba-main
+
+message: |
+  /reset
