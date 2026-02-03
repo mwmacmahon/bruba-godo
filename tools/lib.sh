@@ -49,6 +49,9 @@ load_config() {
 
     # Derived remote paths
     REMOTE_SESSIONS="$REMOTE_OPENCLAW/agents/$REMOTE_AGENT_ID/sessions"
+
+    # SSH multiplexing options for faster connections
+    SSH_OPTS="-o ControlMaster=auto -o ControlPath=/tmp/ssh-%r@%h:%p -o ControlPersist=60"
 }
 
 # Get list of configured agents (excludes agents with null workspace or empty prompts)
@@ -212,13 +215,13 @@ rotate_log() {
 # Run command on remote bot
 # Usage: bot_cmd "command"
 bot_cmd() {
-    ssh "$SSH_HOST" "$*"
+    ssh $SSH_OPTS "$SSH_HOST" "$*"
 }
 
 # Copy file from remote bot
 # Usage: bot_scp "remote_path" "local_path"
 bot_scp() {
-    scp -q "$SSH_HOST:$1" "$2"
+    scp $SSH_OPTS -q "$SSH_HOST:$1" "$2"
 }
 
 # Parse common arguments

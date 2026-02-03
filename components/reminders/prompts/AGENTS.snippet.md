@@ -10,7 +10,7 @@
 
 **Cleanup tool:**
 ```bash
-/Users/bruba/agents/bruba-main/tools/cleanup-reminders.sh
+/Users/bruba/tools/cleanup-reminders.sh
 ```
 Removes completed reminders older than 30 days.
 

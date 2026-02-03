@@ -191,7 +191,7 @@ When voice would be appropriate (or <REDACTED-NAME> sent voice):
 1. **Complete** your analysis
 2. **Generate TTS:**
    ```
-   exec /Users/bruba/agents/bruba-main/tools/tts.sh "Your response" /tmp/response.wav
+   exec /Users/bruba/tools/tts.sh "Your response" /tmp/response.wav
    ```
 3. **Send** voice + text:
    ```

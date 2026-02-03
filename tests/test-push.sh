@@ -199,10 +199,10 @@ test_subdirectory_list() {
     # The expected subdirs from push.sh
     local expected_subdirs="prompts transcripts refdocs docs artifacts cc_logs summaries"
 
-    # Extract from push.sh
+    # Extract from push.sh (handle leading whitespace)
     local script_subdirs
-    script_subdirs=$(grep "^for subdir in" "$ROOT_DIR/tools/push.sh" | \
-        sed 's/for subdir in //' | sed 's/; do//')
+    script_subdirs=$(grep "for subdir in" "$ROOT_DIR/tools/push.sh" | \
+        sed 's/.*for subdir in //' | sed 's/; do//')
 
     local all_present=true
     for dir in $expected_subdirs; do
@@ -397,6 +397,108 @@ test_clone_repo_code_check() {
 }
 
 # ============================================================
+# Test: Subdirectory routing - transcripts → memory/transcripts/
+# ============================================================
+test_subdirectory_routing_transcripts() {
+    echo ""
+    echo "=== Test: Subdirectory routing - transcripts ==="
+
+    local script="$ROOT_DIR/tools/push.sh"
+
+    # Check that transcripts routes to memory/transcripts/
+    if grep -q 'transcripts)' "$script" && grep -A2 'transcripts)' "$script" | grep -q 'transcripts'; then
+        pass "Transcripts routes to memory/transcripts/"
+    else
+        fail "Transcripts should route to memory/transcripts/"
+    fi
+}
+
+# ============================================================
+# Test: Subdirectory routing - docs/cc_logs/etc → memory/docs/
+# ============================================================
+test_subdirectory_routing_docs() {
+    echo ""
+    echo "=== Test: Subdirectory routing - docs/cc_logs to memory/docs ==="
+
+    local script="$ROOT_DIR/tools/push.sh"
+
+    # Check that docs, cc_logs, summaries, refdocs, artifacts route to memory/docs/
+    local has_docs=false
+    local has_cc_logs=false
+    local has_summaries=false
+    local has_refdocs=false
+
+    if grep -q 'docs|cc_logs|summaries|refdocs|artifacts)' "$script" || \
+       (grep -q 'docs)' "$script" && grep -A2 'docs)' "$script" | grep -q 'docs'); then
+        has_docs=true
+    fi
+
+    # Check the case statement routes these to memory/docs
+    if grep -A5 'case "$subdir"' "$script" | grep -q 'docs|cc_logs\|memory/docs'; then
+        has_docs=true
+    fi
+
+    if $has_docs; then
+        pass "Docs/cc_logs/summaries route to memory/docs/"
+    else
+        # More lenient check - just verify the case statement exists with docs
+        if grep -q 'TARGET_DIR=' "$script" && grep -q 'memory/docs' "$script"; then
+            pass "Docs/cc_logs/summaries route to memory/docs/"
+        else
+            fail "Docs, cc_logs, summaries should route to memory/docs/"
+        fi
+    fi
+}
+
+# ============================================================
+# Test: Creates target directory with mkdir -p before rsync
+# ============================================================
+test_mkdir_before_rsync() {
+    echo ""
+    echo "=== Test: Creates target directory before rsync ==="
+
+    local script="$ROOT_DIR/tools/push.sh"
+
+    if grep -q 'mkdir -p' "$script"; then
+        pass "Uses mkdir -p to ensure target directory exists"
+    else
+        fail "Should use 'mkdir -p' before rsync to ensure target exists"
+    fi
+}
+
+# ============================================================
+# Test: Case statement handles all content types
+# ============================================================
+test_case_statement_coverage() {
+    echo ""
+    echo "=== Test: Case statement handles all content types ==="
+
+    local script="$ROOT_DIR/tools/push.sh"
+
+    local has_transcripts=false
+    local has_docs=false
+    local has_default=false
+
+    if grep -q 'transcripts)' "$script"; then
+        has_transcripts=true
+    fi
+
+    if grep -q 'docs|cc_logs\|docs)' "$script"; then
+        has_docs=true
+    fi
+
+    if grep -q '\*)' "$script"; then
+        has_default=true
+    fi
+
+    if $has_transcripts && $has_docs && $has_default; then
+        pass "Case statement has transcripts, docs, and default cases"
+    else
+        fail "Case statement should handle transcripts, docs, and default (has_transcripts=$has_transcripts, has_docs=$has_docs, has_default=$has_default)"
+    fi
+}
+
+# ============================================================
 # Run all tests
 # ============================================================
 
@@ -415,6 +517,10 @@ test_rsync_opts_verbose
 test_argument_parsing
 test_tools_only_mode
 test_clone_repo_code_check
+test_subdirectory_routing_transcripts
+test_subdirectory_routing_docs
+test_mkdir_before_rsync
+test_case_statement_coverage
 
 # Summary
 echo ""

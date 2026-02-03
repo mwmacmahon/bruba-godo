@@ -815,72 +815,60 @@ All four agents run in Docker containers via OpenClaw's native sandbox support. 
 
 ### Critical: File Tools vs Exec
 
-**Key principle:** Use native file tools for file operations. Reserve `exec` only for running scripts and CLI tools.
+**Simple rule:** Use full host paths for everything.
 
-**File System Layout:**
+| Operation | Tool | Example |
+|-----------|------|---------|
+| **Read file** | `read` | `read /Users/bruba/agents/bruba-main/memory/docs/Doc - setup.md` |
+| **Write file** | `write` | `write /Users/bruba/agents/bruba-main/workspace/output/result.md` |
+| **Edit file** | `edit` | `edit /Users/bruba/agents/bruba-main/workspace/drafts/draft.md` |
+| **List files** | `exec` | `exec /bin/ls /Users/bruba/agents/bruba-main/memory/` |
+| **Find files** | `exec` | `exec /usr/bin/find /Users/bruba/agents/bruba-main/memory/ -name "*.md"` |
+| **Search content** | `exec` | `exec /usr/bin/grep -r "pattern" /Users/bruba/agents/bruba-main/memory/` |
+| **Run script** | `exec` | `exec /Users/bruba/tools/tts.sh "hello" /tmp/out.wav` |
+| **Memory search** | `memory_search` | `memory_search "topic"` (indexed content) |
 
-| Directory | Container Path | Access | Purpose |
-|-----------|----------------|--------|---------|
-| **Workspace root** | `/workspace/` | Read-write | Prompts, memory, working files |
-| **Memory** | `/workspace/memory/` | Read-write | Docs, transcripts, repos (synced by operator) |
-| **Tools** | `/workspace/tools/` | Read-only | Scripts (exec uses host paths) |
-| Shared packets | `/workspaces/shared/packets/` | Read-write | Main↔Guru handoff |
-| Shared context | `/workspaces/shared/context/` | Read-write | Shared context files |
+**When to use what:**
+- `read/write/edit` = when you need exactly that file operation
+- `exec` = when you need shell utilities (ls, find, grep, head, tail, etc.)
+- `memory_search` = when searching indexed content (most efficient for large memory)
 
-**Memory Structure (`/workspace/memory/`):**
-```
-/workspace/memory/
-├── transcripts/          # Transcript - *.md
-├── docs/                 # Doc - *.md, Refdoc - *.md, CC Log - *.md
-├── repos/bruba-godo/     # bruba-godo mirror (updated on sync)
-└── workspace-snapshot/   # Copy of workspace/ at last sync
-```
+**Allowlisted exec commands:**
 
-**Workspace Structure (`/workspace/`):**
-```
-/workspace/
-├── memory/              # Synced content (searchable via memory_search)
-├── output/              # Working outputs
-├── drafts/              # Work in progress
-├── temp/                # Temporary files
-└── continuation/        # CONTINUATION.md and archive/
-```
+| Category | Commands |
+|----------|----------|
+| File listing | `/bin/ls` |
+| File viewing | `/bin/cat`, `/usr/bin/head`, `/usr/bin/tail` |
+| Searching | `/usr/bin/grep`, `/usr/bin/find` |
+| Info | `/usr/bin/wc`, `/usr/bin/du`, `/usr/bin/uname`, `/usr/bin/whoami` |
+| Custom tools | `/Users/bruba/tools/*.sh` |
+| System utils | `/opt/homebrew/bin/remindctl`, `/opt/homebrew/bin/icalBuddy` |
 
-| Task | Tool to Use | Path Style | Example |
-|------|-------------|------------|---------|
-| **Discover files** | `memory_search` | N/A (query) | `memory_search "topic"` |
-| Read memory | `read` | Container (`/workspace/memory/...`) | `read /workspace/memory/docs/Doc - setup.md` |
-| Read workspace | `read` | Container (`/workspace/...`) | `read /workspace/output/analysis.md` |
-| Write file | `write` | Container (`/workspace/...`) | `write /workspace/output/result.md` |
-| Edit file | `edit` | Container (`/workspace/...`) | `edit /workspace/drafts/draft.md` |
-| Run a script | `exec` | Host (`/Users/bruba/...`) | `exec /Users/bruba/agents/bruba-main/tools/tts.sh` |
-| Run a CLI tool | `exec` | Host (`/Users/bruba/...`) | `exec /opt/homebrew/bin/remindctl list` |
+**File System Layout (host paths):**
 
-**Key distinction:**
-- **Read/write** `/workspace/...` → container paths
-- **Exec commands** → host paths (`/Users/bruba/...`)
+| Directory | Path | Access | Purpose |
+|-----------|------|--------|---------|
+| **Agent workspace** | `/Users/bruba/agents/bruba-main/` | Read-write | Prompts, memory, working files |
+| **Memory** | `/Users/bruba/agents/bruba-main/memory/` | Read-write | Docs, transcripts, repos |
+| **Tools** | `/Users/bruba/tools/` | Read (exec only) | Scripts — outside workspace, protected |
+| **Shared packets** | `/Users/bruba/agents/bruba-shared/packets/` | Read-write | Main↔Guru handoff |
 
-**File Discovery Pattern:**
-```
-memory_search "topic"        → Returns paths like /workspace/memory/docs/Doc - setup.md
-read /workspace/memory/docs/Doc - setup.md  → File contents
-```
+**Security:**
+- Tools directory (`/Users/bruba/tools/`) is outside agent workspaces
+- File tools (read/write/edit) can't modify it — path validation blocks it
+- Only exec can run scripts there — and only allowlisted commands execute
 
-**Why this matters:**
-1. `exec` runs on the HOST via node host — container paths don't exist there
-2. `/workspace/tools/` is read-only — write attempts fail with "read-only filesystem"
-3. `memory_search` is the discovery mechanism (no `ls`, `find` available)
-4. Workspace contents become searchable after sync via `workspace-snapshot/`
+**Examples:**
 
-**Correct examples:**
-- `read /workspace/memory/docs/Doc - setup.md` → Container reads from workspace → Works
-- `write /workspace/output/result.md` → Container writes to workspace → Works
-- `exec /Users/bruba/agents/bruba-main/tools/whisper.sh` → Node host executes on HOST → Works
+✅ **Correct:**
+- `read /Users/bruba/agents/bruba-main/memory/docs/Doc - setup.md`
+- `write /Users/bruba/agents/bruba-main/workspace/output/result.md`
+- `exec /bin/ls /Users/bruba/agents/bruba-main/memory/`
+- `exec /usr/bin/grep -r "pattern" /Users/bruba/agents/bruba-main/`
+- `exec /Users/bruba/tools/tts.sh "hello" /tmp/out.wav`
 
-**Incorrect examples:**
-- `write /workspace/tools/new.sh` → Read-only tools directory → Fails
-- `exec ls /workspace/` → Node host looks for `/workspace/` on HOST → Fails
-- `read /Users/bruba/agents/bruba-main/memory/file.md` → Container can't see host path → Fails
+❌ **Incorrect:**
+- `write /Users/bruba/tools/new.sh` → Outside workspace, blocked by file tools
 
 ### Sandbox Configuration
 
@@ -911,25 +899,22 @@ read /workspace/memory/docs/Doc - setup.md  → File contents
   "id": "bruba-main",
   "workspace": "/Users/bruba/agents/bruba-main",
   "sandbox": {
-    "workspaceRoot": "/Users/bruba/agents/bruba-main",
-    "docker": {
-      "binds": ["/Users/bruba/agents/bruba-main/tools:/workspace/tools:ro"]
-    }
+    "workspaceRoot": "/Users/bruba/agents/bruba-main"
   }
 }
 ```
 
 **Key settings:**
 - `sandbox.workspaceRoot` = agent's `workspace` path (tells OpenClaw file tools where `/workspace/` is)
-- `tools:/workspace/tools:ro` = read-only overlay prevents tool script modification
+- Tools are at `/Users/bruba/tools/` (outside workspaces) — no Docker bind needed for protection
 
 **Per-agent overrides:**
 
 | Agent | Override | Reason |
 |-------|----------|--------|
-| bruba-main | `workspaceRoot` + `tools:ro` bind | File tool validation + tool protection |
-| bruba-guru | `workspaceRoot` + `tools:ro` bind | Same |
-| bruba-manager | `workspaceRoot` + `tools:ro` bind | Same |
+| bruba-main | `workspaceRoot` | File tool validation |
+| bruba-guru | `workspaceRoot` | File tool validation |
+| bruba-manager | `workspaceRoot` | File tool validation |
 | bruba-web | `workspaceRoot` + `network: "bridge"` | Needs internet for web_search |
 
 ### Sandbox Tool Policy (IMPORTANT)

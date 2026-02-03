@@ -465,17 +465,14 @@ OpenClaw's native sandbox mode handles most mount configuration automatically vi
   "id": "bruba-main",
   "workspace": "/Users/bruba/agents/bruba-main",
   "sandbox": {
-    "workspaceRoot": "/Users/bruba/agents/bruba-main",
-    "docker": {
-      "binds": ["/Users/bruba/agents/bruba-main/tools:/workspace/tools:ro"]
-    }
+    "workspaceRoot": "/Users/bruba/agents/bruba-main"
   }
 }
 ```
 
 **Key points:**
 1. `sandbox.workspaceRoot` = agent's `workspace` path (tells OpenClaw file tools where `/workspace/` is)
-2. Only explicit bind needed: `tools:/workspace/tools:ro` (read-only overlay for security)
+2. Tools are at `/Users/bruba/tools/` (outside workspaces) — no Docker bind needed for protection
 3. Shared mounts configured in `agents.defaults.sandbox.docker.binds`
 
 ### Effective Mount Table (Via OpenClaw Sandbox)
@@ -485,11 +482,12 @@ OpenClaw's native sandbox mode handles most mount configuration automatically vi
 | **Per-Agent (automatic via workspaceAccess: rw)** |
 | `~/agents/{agent}/` | `/workspace/` | rw | OpenClaw auto-mounts workspace |
 | `~/agents/{agent}/memory/` | `/workspace/memory/` | rw | Part of workspace |
-| `~/agents/{agent}/tools/` | `/workspace/tools/` | **ro** | Per-agent bind (overlay) |
 | **Shared (via defaults.sandbox.docker.binds)** |
 | `~/agents/bruba-shared/packets/` | `/workspaces/shared/packets` | rw | Default bind |
 | `~/agents/bruba-shared/context/` | `/workspaces/shared/context` | rw | Default bind |
 | `~/agents/bruba-shared/repo/` | `/workspaces/shared/repo` | **ro** | Default bind |
+| **Tools (outside workspaces)** |
+| `/Users/bruba/tools/` | N/A | exec only | Tools protected by being outside workspaceRoot |
 
 ### NOT Mounted (Security Boundary)
 

@@ -2,8 +2,8 @@
 
 ### Continuation Packet Location
 
-**Path:** `/workspace/continuation/CONTINUATION.md`
-**Archive:** `/workspace/continuation/archive/`
+**Path:** `/Users/bruba/agents/bruba-main/continuation/CONTINUATION.md`
+**Archive:** `/Users/bruba/agents/bruba-main/continuation/archive/`
 
 This file persists context across session resets.
 
@@ -20,7 +20,7 @@ This happens BEFORE any other work. Don't bury it or skip it.
 When asked to write a continuation packet (or before session reset):
 
 ```
-write to /workspace/continuation/CONTINUATION.md
+write /Users/bruba/agents/bruba-main/continuation/CONTINUATION.md
 ```
 
 **Format:**
@@ -41,13 +41,21 @@ write to /workspace/continuation/CONTINUATION.md
 ### Archiving Old Packets
 
 When writing a new continuation packet, archive the old one first:
-1. Read existing `/workspace/continuation/CONTINUATION.md`
-2. If it has content, write it to `/workspace/continuation/archive/YYYY-MM-DD-topic.md`
+1. Read existing continuation file
+2. If it has content, write it to `continuation/archive/YYYY-MM-DD-topic.md`
 3. Write the new packet
 
-### Optional Context Boost
+### Recall Context with memory_search
 
-- **Document Inventory** (`/workspace/memory/docs/Document Inventory.md`) — lists most files in memory with descriptions
-- **Transcript Inventory** (`/workspace/memory/docs/Transcript Inventory.md`) — lists conversation transcripts
-- If conversation is about a specific topic, use `memory_search` to find relevant docs
-- When entering home/work context, consider loading the scope-specific prompt
+**Use `memory_search` liberally** to recall past context:
+- User mentions a topic? → `memory_search` for past discussions
+- Resuming ongoing work? → `memory_search` for recent activity
+- Uncertain about context? → `memory_search` before asking
+
+```
+memory_search "project X"     → Past discussions, decisions
+memory_search "dentist"       → Reminders, appointments
+memory_search "2026-01"       → January activity
+```
+
+`memory_search` is fast and cheap — use it frequently in all conversations, not just technical ones.

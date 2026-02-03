@@ -86,7 +86,7 @@ Input: [Tell Bruba] what's the weather like
 You:
 [check weather however you do]
 
-exec /Users/bruba/agents/bruba-main/tools/tts.sh "It's 72 degrees and sunny, perfect day to be outside" /tmp/response.wav
+exec /Users/bruba/tools/tts.sh "It's 72 degrees and sunny, perfect day to be outside" /tmp/response.wav
 
 message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="It's 72 degrees and sunny, perfect day to be outside"
 

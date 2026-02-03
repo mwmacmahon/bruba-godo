@@ -332,12 +332,31 @@ if [[ "$UPDATE_ALLOWLIST" == "true" ]]; then
 fi
 
 # Trigger reindex for main agent if not dry run
+# Use conditional reindex to skip if no content changed
 if [[ "$DRY_RUN" != "true" && "$NO_INDEX" != "true" ]]; then
-    log "Triggering memory reindex..."
-    if bot_cmd "openclaw memory index" 2>/dev/null; then
-        log "Memory indexed"
+    HASH_FILE="$ROOT_DIR/.last-sync-hash"
+    CURRENT_HASH=""
+
+    # Compute hash of exported content
+    if [[ -d "$EXPORTS_DIR/bot" ]]; then
+        CURRENT_HASH=$(find "$EXPORTS_DIR/bot" -type f -exec md5 -q {} \; 2>/dev/null | sort | md5 -q 2>/dev/null || echo "")
+    fi
+
+    PREV_HASH=""
+    if [[ -f "$HASH_FILE" ]]; then
+        PREV_HASH=$(cat "$HASH_FILE" 2>/dev/null)
+    fi
+
+    if [[ -n "$CURRENT_HASH" && "$CURRENT_HASH" != "$PREV_HASH" ]]; then
+        log "Triggering memory reindex (content changed)..."
+        if bot_cmd "openclaw memory index" 2>/dev/null; then
+            log "Memory indexed"
+            echo "$CURRENT_HASH" > "$HASH_FILE"
+        else
+            log "Warning: Memory index failed (may need manual reindex)"
+        fi
     else
-        log "Warning: Memory index failed (may need manual reindex)"
+        log "Skipping reindex (no content changes)"
     fi
 fi
 

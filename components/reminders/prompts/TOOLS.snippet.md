@@ -25,13 +25,13 @@ Display indices don't match internal IDs. Using `remindctl edit 8` will edit the
 
 ### Voice Tools
 
-**Location:** `~/agents/bruba-main/tools/`
+**Location:** `/Users/bruba/tools/`
 
 **Transcription:** Always use the script, not raw whisper-cpp:
 ```bash
-/Users/bruba/agents/bruba-main/tools/whisper-clean.sh "/path/to/audio"
+/Users/bruba/tools/whisper-clean.sh "/path/to/audio"
 ```
 
-**TTS:** `~/agents/bruba-main/tools/tts.sh` (for voice replies)
+**TTS:** `/Users/bruba/tools/tts.sh` (for voice replies)
 
 **⚠️ Check tools/ first** before running raw exec commands — there's usually a wrapper script that handles the details.

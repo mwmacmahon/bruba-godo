@@ -1,19 +1,17 @@
 ## Generated Content
 
-**Working Area:** `/workspace/`
+**Working Area:** `/Users/bruba/agents/bruba-main/workspace/`
 
-Everything you generate in sessions goes here. This is your read-write space for outputs, drafts, and working files.
+Everything you generate goes here. This is your read-write space for outputs, drafts, and working files.
 
 **Subdirectories:**
-- `output/` — scripts, tools, analysis outputs
-- `drafts/` — work in progress
-- `temp/` — temporary files
+- `workspace/output/` — scripts, tools, analysis outputs
+- `workspace/drafts/` — work in progress
+- `workspace/temp/` — temporary files
 - `continuation/` — CONTINUATION.md and archive/
 
-**Note:** Your memory is at `/workspace/memory/` (synced content from operator).
-- `/workspace/memory/` — docs, transcripts, repos (searchable via `memory_search`)
-- `/workspace/` — your working outputs
+**Memory:** `/Users/bruba/agents/bruba-main/memory/`
+- Docs, transcripts, repos (searchable via `memory_search`)
+- Synced content from operator
 
-After each sync, your working files are snapshotted to `/workspace/memory/workspace-snapshot/` so they become searchable.
-
-**Path Note:** Use `/workspace/...` for file operations (read/write/edit). These run inside the container.
+After each sync, your working files are snapshotted to `memory/workspace-snapshot/` so they become searchable via `memory_search`.

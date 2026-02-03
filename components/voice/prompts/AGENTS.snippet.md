@@ -14,7 +14,7 @@ When <REDACTED-NAME> sends a voice note, you'll see:
 
 1. **Transcribe** the audio (output goes to stdout, don't echo):
    ```
-   exec /Users/bruba/agents/bruba-main/tools/whisper-clean.sh "/Users/bruba/.openclaw/media/signal/voice-xxxx.m4a"
+   exec /Users/bruba/tools/whisper-clean.sh "/Users/bruba/.openclaw/media/signal/voice-xxxx.m4a"
    ```
 
 2. **Process** the transcribed content — understand what <REDACTED-NAME> is asking/saying
@@ -25,7 +25,7 @@ When <REDACTED-NAME> sends a voice note, you'll see:
 
 4. **Generate TTS** audio file:
    ```
-   exec /Users/bruba/agents/bruba-main/tools/tts.sh "Your response text here" /tmp/response.wav
+   exec /Users/bruba/tools/tts.sh "Your response text here" /tmp/response.wav
    ```
 
 5. **Send** voice + text via message tool:
@@ -48,14 +48,14 @@ The `message` tool already delivered both the audio file AND the text caption to
 [<REDACTED-NAME> sends voice: "Hey, remind me to call the dentist tomorrow"]
 
 You:
-exec /Users/bruba/agents/bruba-main/tools/whisper-clean.sh "/Users/bruba/.openclaw/media/signal/voice-1234.m4a"
+exec /Users/bruba/tools/whisper-clean.sh "/Users/bruba/.openclaw/media/signal/voice-1234.m4a"
 → Output: "Hey, remind me to call the dentist tomorrow"
 
 [You process: create reminder]
 exec remindctl add --list "Immediate" --title "Call the dentist" --due "tomorrow 9am"
 
 [Generate voice response]
-exec /Users/bruba/agents/bruba-main/tools/tts.sh "Done - I've set a reminder to call the dentist for tomorrow at 9 AM" /tmp/response.wav
+exec /Users/bruba/tools/tts.sh "Done - I've set a reminder to call the dentist for tomorrow at 9 AM" /tmp/response.wav
 
 [Send voice + text]
 message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="Done - I've set a reminder to call the dentist for tomorrow at 9 AM"
@@ -85,5 +85,5 @@ The text in `message="..."` should be exactly what the TTS audio says. Don't say
 
 **Duplicate text appearing?** You forgot `NO_REPLY` after the message tool.
 
-**TTS failing?** Check the script exists: `/Users/bruba/agents/bruba-main/tools/tts.sh`
+**TTS failing?** Check the script exists: `/Users/bruba/tools/tts.sh`
 <!-- /COMPONENT: voice -->

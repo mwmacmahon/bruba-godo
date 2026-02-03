@@ -876,25 +876,23 @@ Agent (container) → exec tool → Gateway → Node Host (on HOST) → checks a
 
 ### File Tools vs Exec
 
-| Task | Tool to Use | Path Style | Example |
-|------|-------------|------------|---------|
-| **Discover files** | `memory_search` | N/A (query) | `memory_search "topic"` |
-| Read memory | `read` | Container (`/workspace/memory/...`) | `read /workspace/memory/docs/Doc - setup.md` |
-| Write file | `write` | Container (`/workspace/...`) | `write /workspace/output/result.md` |
-| Edit file | `edit` | Container (`/workspace/...`) | `edit /workspace/drafts/draft.md` |
-| Run a script | `exec` | Host (`/Users/bruba/...`) | `exec /Users/bruba/agents/bruba-main/tools/tts.sh` |
+| Task | Tool | Example |
+|------|------|---------|
+| **Read file** | `read` | `read /Users/bruba/agents/bruba-main/memory/docs/Doc - setup.md` |
+| **Write file** | `write` | `write /Users/bruba/agents/bruba-main/workspace/output/result.md` |
+| **Edit file** | `edit` | `edit /Users/bruba/agents/bruba-main/workspace/drafts/draft.md` |
+| **List files** | `exec` | `exec /bin/ls /Users/bruba/agents/bruba-main/memory/` |
+| **Find files** | `exec` | `exec /usr/bin/find /Users/bruba/agents/bruba-main/ -name "*.md"` |
+| **Search content** | `exec` | `exec /usr/bin/grep -r "pattern" /Users/bruba/agents/bruba-main/` |
+| **Run script** | `exec` | `exec /Users/bruba/tools/tts.sh "text" /tmp/out.wav` |
+| **Discover in memory** | `memory_search` | `memory_search "topic"` |
 
 **Key distinction:**
-- **Read/write** `/workspace/...` → container paths
-- **Exec commands** → host paths (`/Users/bruba/...`)
+- `read/write/edit` = use when you need that exact file operation
+- `exec` = use for shell utilities (ls, find, grep — read-only discovery)
+- All paths are full host paths (`/Users/bruba/...`)
 
-**File Discovery Pattern:**
-```
-memory_search "topic"        → Returns paths like /workspace/memory/docs/Doc - setup.md
-read /workspace/memory/docs/Doc - setup.md  → File contents
-```
-
-**Note:** `ls`, `find`, `grep` are NOT available in sandbox mode. Use `memory_search` for discovery.
+**Note:** `ls`, `find`, `grep` are available via `exec` with full paths (e.g., `exec /bin/ls /Users/bruba/...`). For indexed content, `memory_search` is more efficient.
 
 ### Configuration
 
@@ -925,20 +923,17 @@ read /workspace/memory/docs/Doc - setup.md  → File contents
   "id": "bruba-main",
   "workspace": "/Users/bruba/agents/bruba-main",
   "sandbox": {
-    "workspaceRoot": "/Users/bruba/agents/bruba-main",
-    "docker": {
-      "binds": ["/Users/bruba/agents/bruba-main/tools:/workspace/tools:ro"]
-    }
+    "workspaceRoot": "/Users/bruba/agents/bruba-main"
   }
 }
 ```
 
 **Key settings:**
 - `sandbox.workspaceRoot` = agent's `workspace` path (tells OpenClaw file tools where `/workspace/` is)
-- `tools:/workspace/tools:ro` = read-only overlay prevents tool script modification
+- Tools are at `/Users/bruba/tools/` (outside workspaces) — no Docker bind needed for protection
 
 **Per-agent overrides:**
-- `bruba-main`, `bruba-guru`, `bruba-manager`: `workspaceRoot` + `tools:ro` bind
+- `bruba-main`, `bruba-guru`, `bruba-manager`: `workspaceRoot` only
 - `bruba-web`: `workspaceRoot` + bridge network for web access
 
 ### Sandbox Tool Policy (IMPORTANT)
@@ -967,7 +962,7 @@ read /workspace/memory/docs/Doc - setup.md  → File contents
 | `~/agents/bruba-shared/packets/` | `/workspaces/shared/packets/` | rw | All agents |
 | `~/agents/bruba-shared/context/` | `/workspaces/shared/context/` | rw | All agents |
 | `~/agents/bruba-shared/repo/` | `/workspaces/shared/repo/` | **ro** | All agents |
-| `~/agents/bruba-main/tools/` | `/workspace/tools/` | **ro** | bruba-main only (overlay) |
+| `/Users/bruba/tools/` | N/A (exec only) | **blocked** | Tools directory (outside workspace, protected by file tools) |
 
 ### Per-Agent Access Matrix
 

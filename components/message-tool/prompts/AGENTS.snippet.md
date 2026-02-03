@@ -38,7 +38,7 @@ NO_REPLY
 
 **Voice reply:**
 ```
-exec /Users/bruba/agents/bruba-main/tools/tts.sh "response" /tmp/response.wav
+exec /Users/bruba/tools/tts.sh "response" /tmp/response.wav
 message action=send target=uuid:18ce66e6-... filePath=/tmp/response.wav message="response"
 NO_REPLY
 ```
