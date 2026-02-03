@@ -1,5 +1,5 @@
 ---
-version: 3.5.3
+version: 3.6.0
 updated: 2026-02-03
 type: refdoc
 project: planning
@@ -635,14 +635,36 @@ OpenClaw has a built-in `isolation.postToMainPrefix` feature, but it's affected 
 
 | Job | Agent | Schedule | Status | Purpose |
 |-----|-------|----------|--------|---------|
-| pre-reset-continuity | bruba-main | 3:55am daily | ✅ Active | Write continuation packet before reset |
-| guru-pre-reset-continuity | bruba-guru | 3:55am daily | 📋 Proposed | Write Guru continuation before reset |
+| **nightly-reset-prep** | bruba-manager | 3:55am daily | ✅ Active | Tell agents to write continuation packets |
+| **nightly-reset-execute** | bruba-manager | 4:02am daily | ✅ Active | Send /reset to main and guru |
+| **nightly-reset-wake** | bruba-manager | 4:07am daily | ✅ Active | Initialize fresh sessions |
 | reminder-check | bruba-manager | 9am, 2pm, 6pm | ✅ Active | Detect overdue reminders |
 | staleness-check | bruba-manager | Monday 10am | 📋 Proposed | Flag stale projects (14+ days) |
 | calendar-prep | bruba-manager | 7am weekdays | 📋 Proposed | Surface prep-worthy meetings |
 | morning-briefing | bruba-manager | 7:15am weekdays | 📋 Proposed | Daily summary to Signal |
 
-**Note:** Main and Guru have matching reset schedules (4am daily). Their pre-reset cron jobs should be edited together to keep them synchronized.
+### Manager Coordination Pattern (Nightly Reset)
+
+**Important:** All nightly reset jobs route through bruba-manager, not directly to bruba-main.
+
+**Why:** OpenClaw has a bug/limitation where `systemEvent` + `main session` = always disabled. The working pattern is `agentTurn` + `isolated session`, which fits manager's role as proactive coordinator.
+
+```
+3:55 AM  nightly-reset-prep
+         └─→ Manager uses sessions_send to tell main/guru: "Write continuation packet"
+
+4:02 AM  nightly-reset-execute
+         └─→ Manager uses sessions_send to send "/reset" to main/guru
+
+4:07 AM  nightly-reset-wake
+         └─→ Manager uses sessions_send to ping main/guru/web: "Good morning"
+```
+
+**Benefits:**
+- Main stays reactive (user conversations only)
+- Each step can fail independently
+- Manager already has sessions_send capability
+- Uses `NO_REPLY` to avoid Signal spam
 
 ### Adding a Cron Job
 
@@ -1157,6 +1179,50 @@ docker exec openclaw-sandbox-bruba-web touch /workspace/tools/test.txt
 
 ## Part 8: Operations
 
+### ⚠️ Critical Operational Warning: Signal Rate Limits
+
+**NEVER repeatedly trigger Signal messages during testing.** Signal has strict rate limits and anti-spam detection that WILL get the account logged out.
+
+**Safe testing patterns:**
+- Use `NO_REPLY` in cron job messages to suppress unnecessary Signal delivery
+- Test with direct agent messages that don't go to Signal
+- Use isolated sessions that write to files instead of messaging
+- When testing post-reset-wake or similar multi-agent pings, do ONE test run, not repeated runs
+
+**Unsafe patterns (AVOID):**
+- Running cron job tests multiple times in quick succession
+- Triggering heartbeats repeatedly to "see if it works"
+- Using `cron run --force` repeatedly on Signal-delivering jobs
+- Any loop or script that sends multiple Signal messages
+
+**If logged out:** You'll need to re-link the Signal account via signal-cli. This requires the phone and is disruptive.
+
+### Signal-CLI Installation
+
+**Use the brew version, not OpenClaw's bundled version.**
+
+OpenClaw may auto-download signal-cli to `~/.openclaw/tools/signal-cli/`. On macOS ARM64 (Apple Silicon), this can download the wrong architecture (Linux x86-64), causing "exec format error" or "spawn ENOEXEC" errors.
+
+**Fix:**
+1. Install via brew: `brew install signal-cli`
+2. Update OpenClaw config to use brew version:
+   ```bash
+   jq '.channels.signal.cliPath = "/opt/homebrew/bin/signal-cli"' \
+     ~/.openclaw/openclaw.json > /tmp/oc.json && \
+     mv /tmp/oc.json ~/.openclaw/openclaw.json
+   ```
+3. Restart gateway: `openclaw gateway restart`
+4. Verify: `openclaw doctor | grep Signal`
+
+**Delete the broken bundled version** (optional but recommended):
+```bash
+rm -rf ~/.openclaw/tools/signal-cli
+```
+
+The brew version is preferred anyway — brew handles updates automatically.
+
+**Signal data location:** Account credentials and keys are stored in `~/.local/share/signal-cli/`, not in the installation directory. Deleting the binary doesn't affect your linked account.
+
 ### Prerequisites
 
 **remindctl** — CLI for Apple Reminders
@@ -1657,6 +1723,7 @@ Auto-recovery sometimes fails on context overflow.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.6.0 | 2026-02-03 | **Manager coordination pattern:** Nightly reset jobs now route through bruba-manager (isolated + agentTurn) instead of directly to bruba-main (systemEvent + main = disabled bug). Added Signal rate limit warning. |
 | 3.5.3 | 2026-02-03 | **Sandbox disabled:** Agent-to-agent session visibility broken in sandbox mode. Set `sandbox.mode: "off"` until OpenClaw fixes. Added `/wake` skill. |
 | 3.5.2 | 2026-02-03 | **Sandbox tool policy:** Documented tools.sandbox.tools.allow ceiling (message tool missing fix) |
 | 3.5.1 | 2026-02-03 | **Defense-in-depth:** ALL agents now have tools/:ro (not just bruba-main), updated access matrices and debugging commands |
