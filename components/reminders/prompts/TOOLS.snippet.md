@@ -32,6 +32,4 @@ Display indices don't match internal IDs. Using `remindctl edit 8` will edit the
 /Users/bruba/tools/whisper-clean.sh "/path/to/audio"
 ```
 
-**TTS:** `/Users/bruba/tools/tts.sh` (for voice replies)
-
 **⚠️ Check tools/ first** before running raw exec commands — there's usually a wrapper script that handles the details.

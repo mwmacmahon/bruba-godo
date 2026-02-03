@@ -6,6 +6,8 @@ project: planning
 tags: [bruba, prompts, assembly, components, budget, openclaw]
 ---
 
+# WARNING: NEEDS UPDATING
+
 # Bruba Prompt Management Reference
 
 How prompts are structured, assembled, and deployed. Covers the component system, character budgets, and best practices for keeping prompts effective without bloating.

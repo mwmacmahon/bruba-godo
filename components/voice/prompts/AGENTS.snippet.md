@@ -1,24 +1,28 @@
 <!-- COMPONENT: voice -->
 ## 🎤 Voice Messages
 
-### Voice Input → Voice Response Flow
+**Voice is automatic.** OpenClaw handles transcription and TTS — you don't need to call any tools.
 
-Media paths are relative — prepend `/Users/bruba/.openclaw/` (e.g., `media/inbound/xxx.mp3` → `/Users/bruba/.openclaw/media/inbound/xxx.mp3`)
+### What You See
 
-1. **Transcribe:** `exec /Users/bruba/tools/whisper-clean.sh "/Users/bruba/.openclaw/media/inbound/voice.m4a"`
-2. **Process** the transcribed content
-3. **Generate TTS:** `exec /Users/bruba/tools/tts.sh "response text" /tmp/response.wav`
-4. **Send:** `message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="response text"`
-5. **Prevent duplicate:** `NO_REPLY`
+When <REDACTED-NAME> sends a voice message, you receive:
+```
+[Audio] User audio message:
+<transcribed text here>
+```
 
-### Why NO_REPLY?
+### What You Do
 
-The `message` tool already delivered audio + text to Signal. Without `NO_REPLY`, your normal response would also send (duplicate).
+Just respond normally with text. OpenClaw automatically:
+1. Converts your response to voice (ElevenLabs)
+2. Sends both audio and text to Signal
 
-### When to Use Voice vs Text
+**No special handling needed.** No exec commands, no TTS tools, no `NO_REPLY`.
 
-**Voice response:** When <REDACTED-NAME> sent voice, response is conversational, natural as speech.
-**Text-only:** Simple inputs where text reply is fine — just respond normally, no TTS/NO_REPLY needed.
+### Text vs Voice Behavior
 
-**Voice + text must match** — the `message="..."` text should be exactly what TTS says.
+- **Voice in = voice out:** If <REDACTED-NAME> sent voice, your response goes as voice + text
+- **Text in = text out:** If <REDACTED-NAME> sent text, your response stays text-only
+
+This is controlled by `messages.tts.auto: "inbound"` in config.
 <!-- /COMPONENT: voice -->

@@ -1,5 +1,5 @@
 ---
-version: 3.6.0
+version: 3.8.0
 updated: 2026-02-03
 type: refdoc
 project: planning
@@ -383,46 +383,93 @@ Manager → Signal: "Heads up, I noticed X and let Bruba know"
 
 ### Siri Integration
 
-```
-Siri sync ("Hey Siri, ask Bruba..."):
-  Shortcut → HTTPS → bruba-manager
-  Manager answers directly (fast, Sonnet)
-  Manager → HTTP response → Siri speaks
+**Problem:** Siri has a 10-15 second HTTP timeout, but Main (Opus) can take 20-30 seconds to process. Manager acts as a fast HTTP front door.
 
-Siri async ("Hey Siri, tell Bruba..."):
-  Shortcut → HTTPS → bruba-main
-  Main processes, responds via Signal
-  Siri gets "Got it, I'll message you" acknowledgment
 ```
+Siri → HTTPS POST (model: openclaw:manager) → bruba-manager
+Manager: sessions_send to Main (timeoutSeconds=0, fire-and-forget)
+Manager → "✓" to HTTP → Siri says "Got it"
+[Meanwhile, async:]
+Main processes (20-30s, full Opus thinking)
+Main → message to Signal → Response appears in Signal
+```
+
+**Why Manager?** Even though `/v1/chat/completions` is synchronous, the HTTP response happens when the **agent** finishes. Manager finishes in ~2 seconds (just forwards and returns "✓"), beating Siri's timeout.
+
+**iOS Shortcut structure:**
+```
+1. Ask for input / accept Siri dictation
+2. Get Contents of URL
+   - URL: https://your-bruba.ts.net/v1/chat/completions
+   - Method: POST
+   - Headers: Content-Type: application/json
+   - Body: {
+       "model": "openclaw:manager",
+       "messages": [{
+         "role": "user",
+         "content": "[From Siri async] {{input}}"
+       }]
+     }
+3. Get response → parse JSON → get assistant message
+4. Speak Text: "Got it, I'll message you"
+```
+
+**Tag:** `[From Siri async]` — Manager forwards to Main, Main responds via Signal
+
+### Voice Messages (Automatic STT/TTS)
+
+OpenClaw handles voice transcription and text-to-speech automatically. Agents don't need to call whisper or TTS tools.
+
+**How it works:**
+
+1. **Inbound voice → automatic STT:** When a voice message arrives, OpenClaw transcribes it using Groq Whisper before delivering to the agent. The agent sees:
+   ```
+   [Audio] User audio message:
+   <transcribed text here>
+   ```
+
+2. **Agent responds with text:** Just respond normally — no special handling needed.
+
+3. **Automatic TTS (when inbound was voice):** OpenClaw converts the agent's text response to voice using ElevenLabs and sends both audio and text to Signal.
+
+**Configuration** (in openclaw.json):
+```json
+{
+  "tools.media.audio": {
+    "enabled": true,
+    "models": [{ "provider": "groq", "model": "whisper-large-v3-turbo" }]
+  },
+  "messages.tts": {
+    "auto": "inbound",  // Voice response only when user sent voice
+    "provider": "elevenlabs"
+  }
+}
+```
+
+**`auto` modes:**
+- `"inbound"` — Voice reply only when user sent voice (recommended)
+- `"always"` — Always reply with voice
+- `"off"` — Never auto-TTS (manual only)
+
+**Agent prompts are voice-agnostic:** The agent doesn't need to know about voice handling. It just sees transcribed text and responds with text.
 
 ### Message Tool (Media Attachments)
 
-The `message` tool sends media files (voice, images) to Signal. It's separate from regular text responses.
+The `message` tool sends media files (images, files) to Signal. For voice, prefer automatic TTS over manual message tool.
 
 **Tool syntax:**
 ```
 message action=send target=uuid:<recipient-uuid> filePath=/path/to/file message="optional text"
 ```
 
-**Voice response workflow:**
-```
-1. Transcribe incoming audio:
-   exec: /Users/bruba/agents/bruba-main/tools/whisper-clean.sh "/path/to/audio.m4a"
+**Use cases:**
+- Sending images or files
+- Manual voice when automatic TTS is disabled
+- Siri async replies (no inbound voice context)
 
-2. Generate TTS response:
-   exec: /Users/bruba/agents/bruba-main/tools/tts.sh "response text" /tmp/response.wav
+**Target format:** Use `uuid:<recipient-uuid>` from the incoming message's `From:` header.
 
-3. Send voice + text via message tool:
-   message action=send target=uuid:18ce66e6-... filePath=/tmp/response.wav message="response text"
-
-4. Reply with: NO_REPLY
-```
-
-**Critical:** After using the message tool, respond with `NO_REPLY` to prevent duplicate text. The message tool already delivers both the audio file and text message to Signal.
-
-**Target format:** Use `uuid:<recipient-uuid>` from the incoming message's `From:` header. Example: `target=uuid:<REDACTED-UUID>`
-
-**Setup requirement:** The user's Signal UUID must be in `USER.md` for Siri async replies (which don't include UUID in the message). Add:
+**Setup requirement:** The user's Signal UUID must be in `USER.md` for Siri async replies:
 ```markdown
 ## Signal Identity
 - **Signal UUID:** `uuid:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`
@@ -1650,7 +1697,7 @@ Auto-recovery sometimes fails on context overflow.
 | bruba-manager config | ✅ | Sonnet/Haiku heartbeat |
 | Agent-to-agent comms | ✅ | `agentToAgent.enabled` |
 | Directory structure | ✅ | Workspaces created |
-| Siri integration | ✅ | Via tailscale serve |
+| Siri integration | ✅ | Via tailscale serve; async routes through Manager |
 | bruba-godo tooling | ✅ | Multi-agent prompt assembly |
 | bruba-web agent | ✅ | Configured, auth setup, session primed |
 | Tool restriction cleanup | ✅ | Main/Manager deny web tools, use bruba-web |
@@ -1698,7 +1745,7 @@ Auto-recovery sometimes fails on context overflow.
 
 **Manager getting slow?** Context bloat. Reset session: `openclaw sessions reset --agent bruba-manager`.
 
-**Voice response not sending?** Check `message` in global `tools.allow`. Use `NO_REPLY` after message tool.
+**Voice response not sending?** Check `messages.tts.auto` config. For manual, use message tool with `NO_REPLY`.
 
 **Guru response too long for Main?** Guru should message directly via message tool, return summary only.
 
@@ -1723,6 +1770,8 @@ Auto-recovery sometimes fails on context overflow.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.8.0 | 2026-02-03 | **Siri async via Manager:** Manager acts as fast HTTP front door for Siri async requests. Uses `sessions_send timeoutSeconds=0` (fire-and-forget) to forward to Main. Beats Siri's 10-15s timeout. Added `siri-async` component for Manager. |
+| 3.7.0 | 2026-02-03 | **Automatic voice handling:** OpenClaw now handles STT (Groq Whisper) and TTS (ElevenLabs) automatically. Agents are voice-agnostic. Updated Part 4 voice documentation. |
 | 3.6.0 | 2026-02-03 | **Manager coordination pattern:** Nightly reset jobs now route through bruba-manager (isolated + agentTurn) instead of directly to bruba-main (systemEvent + main = disabled bug). Added Signal rate limit warning. |
 | 3.5.3 | 2026-02-03 | **Sandbox disabled:** Agent-to-agent session visibility broken in sandbox mode. Set `sandbox.mode: "off"` until OpenClaw fixes. Added `/wake` skill. |
 | 3.5.2 | 2026-02-03 | **Sandbox tool policy:** Documented tools.sandbox.tools.allow ceiling (message tool missing fix) |

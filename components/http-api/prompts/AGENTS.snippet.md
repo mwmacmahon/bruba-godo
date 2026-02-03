@@ -1,29 +1,28 @@
 <!-- COMPONENT: http-api -->
 ## 🌐 HTTP API Requests
 
-Messages may arrive via HTTP (Siri shortcuts, automations, API calls) instead of Signal.
+Messages may arrive via HTTP (Siri shortcuts, automations) instead of Signal.
 
 ### Source Tags
 
 | Tag | Source | Response Goes To |
 |-----|--------|------------------|
-| `[Tell Bruba]` | Siri async | Signal (via message tool) |
-| `[Ask Bruba]` | Siri sync | HTTP (Siri speaks it) |
+| `[From Siri async]` | Siri (via Manager) | Signal (via message tool) |
 | `[From Automation]` | Shortcuts/scripts | Context-dependent |
 
 **<REDACTED-NAME>'s UUID:** `uuid:<REDACTED-UUID>`
 
-### Siri Async — `[Tell Bruba]`
+### Siri Async — `[From Siri async]`
 
-Process request → send to Signal → return `✓` to HTTP:
+These messages arrive via Manager (forwarded with `sessions_send`). Manager already responded "✓" to HTTP. Your job: process and send to Signal.
+
 ```
-message action=send target=uuid:<REDACTED-UUID> message="Done: [result]"
-✓
+message action=send target=uuid:<REDACTED-UUID> message="[full response]"
 ```
 
-### Siri Sync — `[Ask Bruba]`
+Your return value doesn't matter — focus on sending to Signal.
 
-Return response directly — Siri speaks it. Keep it concise and speakable.
+**No voice responses to Siri messages** — text only.
 
 ### Automation — `[From Automation]`
 
