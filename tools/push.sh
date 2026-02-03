@@ -207,17 +207,36 @@ for agent in "${AGENTS[@]}"; do
         # Use agent's remote_path (defaults to 'memory')
         remote_path="${AGENT_REMOTE_PATH:-memory}"
 
-        # Sync content subdirectories FLAT to memory/
+        # Sync content subdirectories to memory/ preserving structure
+        # transcripts → memory/transcripts/, docs/cc_logs/summaries → memory/docs/
         for subdir in prompts transcripts refdocs docs artifacts cc_logs summaries; do
             if [[ -d "$AGENT_EXPORT_DIR/$subdir" ]]; then
                 SUBDIR_COUNT=$(find "$AGENT_EXPORT_DIR/$subdir" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
                 if [[ "$SUBDIR_COUNT" -gt 0 ]]; then
-                    log "Syncing $subdir/ flat to $SSH_HOST:$AGENT_WORKSPACE/$remote_path/ ($SUBDIR_COUNT files)"
+                    # Determine target directory based on content type
+                    case "$subdir" in
+                        transcripts)
+                            TARGET_DIR="$remote_path/transcripts"
+                            ;;
+                        docs|cc_logs|summaries|refdocs|artifacts)
+                            TARGET_DIR="$remote_path/docs"
+                            ;;
+                        prompts)
+                            TARGET_DIR="$remote_path/docs"
+                            ;;
+                        *)
+                            TARGET_DIR="$remote_path/docs"
+                            ;;
+                    esac
+
+                    log "Syncing $subdir/ to $SSH_HOST:$AGENT_WORKSPACE/$TARGET_DIR/ ($SUBDIR_COUNT files)"
                     if [[ "$DRY_RUN" == "true" ]]; then
                         log "[DRY RUN] Would sync $SUBDIR_COUNT $subdir files"
-                        rsync $RSYNC_OPTS "$AGENT_EXPORT_DIR/$subdir/" "$SSH_HOST:$AGENT_WORKSPACE/$remote_path/"
+                        rsync $RSYNC_OPTS "$AGENT_EXPORT_DIR/$subdir/" "$SSH_HOST:$AGENT_WORKSPACE/$TARGET_DIR/"
                     else
-                        rsync $RSYNC_OPTS "$AGENT_EXPORT_DIR/$subdir/" "$SSH_HOST:$AGENT_WORKSPACE/$remote_path/"
+                        # Ensure target directory exists
+                        ssh "$SSH_HOST" "mkdir -p $AGENT_WORKSPACE/$TARGET_DIR"
+                        rsync $RSYNC_OPTS "$AGENT_EXPORT_DIR/$subdir/" "$SSH_HOST:$AGENT_WORKSPACE/$TARGET_DIR/"
                         log "  Synced $SUBDIR_COUNT $subdir files"
                         echo "  $subdir: $SUBDIR_COUNT files"
                     fi

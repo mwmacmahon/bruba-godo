@@ -1,9 +1,9 @@
 ---
-version: 1.3.0
-updated: 2026-02-02
+version: 1.6.0
+updated: 2026-02-03
 type: refdoc
 project: planning
-tags: [bruba, filesystem, data-flow, bruba-godo, operations, guru]
+tags: [bruba, filesystem, data-flow, bruba-godo, operations, guru, message-tool]
 ---
 
 # Bruba Filesystem & Data Flow Guide
@@ -56,6 +56,10 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   │   └── SOUL.md
 │   │   ├── web/                # Web agent templates
 │   │   │   └── AGENTS.md
+│   │   ├── guru/               # Guru agent templates
+│   │   │   ├── AGENTS.md       # Technical specialist instructions
+│   │   │   ├── TOOLS.md        # Guru tools (includes message)
+│   │   │   └── IDENTITY.md     # Guru identity
 │   │   └── helper/
 │   │       └── README.md       # Documentation only (helpers are ephemeral)
 │   ├── config/
@@ -70,18 +74,23 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   └── prompts/AGENTS.snippet.md
 │   ├── memory/
 │   ├── distill/                # Full pipeline with setup, config, lib
-│   ├── http-api/
+│   ├── http-api/               # Siri async/sync routing
 │   ├── web-search/             # ⚠️ NEEDS UPDATE per v3.2
-│   ├── voice/
+│   ├── voice/                  # Voice message handling (message tool pattern)
 │   ├── reminders/
-│   ├── signal/
+│   ├── signal/                 # Signal UUID extraction
 │   ├── signal-media-filter/
 │   ├── workspace/
 │   ├── repo-reference/
 │   ├── group-chats/
 │   ├── cc-packets/
 │   ├── heartbeats/
-│   └── session/
+│   ├── session/
+│   ├── guru-routing/           # Main→Guru routing logic
+│   │   ├── README.md
+│   │   └── prompts/AGENTS.snippet.md
+│   └── message-tool/           # Direct Signal messaging patterns
+│       └── prompts/AGENTS.snippet.md
 │
 ├── reference/                   # Canonical content (source of truth)
 │   ├── transcripts/            # Canonicalized conversation transcripts
@@ -115,6 +124,9 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   ├── config/             # openclaw.json, exec-approvals.json
 │   │   ├── tools/              # Bot scripts
 │   │   └── state/              # (if applicable)
+│   ├── bruba-guru/
+│   │   ├── prompts/
+│   │   └── memory/
 │   └── bruba-manager/
 │       ├── prompts/
 │       └── state/
@@ -143,8 +155,7 @@ Complete reference for file locations, ownership, and data flow between operator
 │
 ├── docs/
 │   ├── architecture-masterdoc.md
-│   ├── bruba-multi-agent-spec.md  # ⚠️ STALE - use v3.2
-│   ├── bruba-cron-job-system.md
+│   ├── filesystem-guide.md     # This document
 │   └── cc_logs/
 │
 ├── logs/                        # Script execution logs
@@ -163,11 +174,11 @@ Complete reference for file locations, ownership, and data flow between operator
 ├── agents/
 │   ├── bruba-main/
 │   │   ├── AGENTS.md           # Assembled prompt (from bruba-godo)
-│   │   ├── TOOLS.md            # Assembled prompt
+│   │   ├── TOOLS.md            # Assembled prompt (includes message tool)
 │   │   ├── HEARTBEAT.md        # Assembled prompt
 │   │   ├── IDENTITY.md         # Pushed directly (not assembled)
 │   │   ├── SOUL.md             # Bot-managed
-│   │   ├── USER.md             # Bot-managed (user context)
+│   │   ├── USER.md             # Bot-managed (user context, includes Signal UUID)
 │   │   ├── MEMORY.md           # Bot-managed (long-term memory)
 │   │   ├── BOOTSTRAP.md        # Initial setup (pushed)
 │   │   │
@@ -181,8 +192,8 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   │   └── YYYY-MM-DD-*.md  # Daily logs
 │   │   │
 │   │   ├── tools/              # Scripts (read-only post-migration)
-│   │   │   ├── whisper-clean.sh
-│   │   │   ├── tts.sh
+│   │   │   ├── whisper-clean.sh    # Voice transcription
+│   │   │   ├── tts.sh              # Text-to-speech generation
 │   │   │   ├── web-search.sh
 │   │   │   ├── voice-status.sh
 │   │   │   ├── cleanup-reminders.sh
@@ -197,6 +208,15 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   ├── logs/               # Agent logs
 │   │   ├── media/              # Local media files
 │   │   └── intake/             # Bot-side intake (if used)
+│   │
+│   ├── bruba-guru/             # Technical specialist agent
+│   │   ├── AGENTS.md           # Assembled (includes direct-message pattern)
+│   │   ├── TOOLS.md            # Assembled (includes message, TTS, sessions_send)
+│   │   ├── IDENTITY.md         # Pushed directly
+│   │   │
+│   │   ├── workspace/          # Working files, analysis artifacts
+│   │   ├── memory/             # Persistent technical notes
+│   │   └── results/            # Technical analysis outputs
 │   │
 │   ├── bruba-manager/
 │   │   ├── AGENTS.md           # Assembled
@@ -225,49 +245,45 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   └── results/            # Research outputs (bruba-web writes here)
 │   │       └── YYYY-MM-DD-topic.md
 │   │
-│   ├── bruba-guru/             # Technical specialist agent
-│   │   ├── AGENTS.md           # Assembled prompt
-│   │   ├── TOOLS.md            # Assembled prompt
-│   │   ├── IDENTITY.md         # Pushed directly
-│   │   │
-│   │   ├── workspace/          # Working files, analysis artifacts
-│   │   ├── memory/             # Persistent notes
-│   │   └── results/            # Technical analysis outputs
-│   │
-│   └── bruba-shared/           # Shared resources (all agents)
-│       ├── repo/               # bruba-godo clone (read-only reference)
-│       ├── packets/            # Work handoff packets (CC ↔ Bruba, Guru ↔ Main)
-│       │   └── archive/        # Completed packets
+│   └── bruba-shared/           # Shared handoff zone (Main ↔ Guru)
+│       ├── packets/            # Work handoff packets
 │       └── context/            # Shared context files
 │
-└── .openclaw/
-    ├── openclaw.json           # Agent configs, tool policies
-    ├── exec-approvals.json     # Allowlisted commands
-    │
-    ├── agents/
-    │   ├── bruba-main/
-    │   │   └── sessions/       # Session transcripts (~90 JSONL files)
-    │   ├── bruba-guru/
-    │   │   └── sessions/
-    │   ├── bruba-manager/
-    │   │   └── sessions/
-    │   ├── bruba-web/
-    │   │   └── sessions/
-    │   └── main/               # Legacy (can be cleaned up)
-    │
-    ├── sandboxes/              # Runtime copies + installed skills
-    │   └── agent-main-main-{hash}/
-    │       ├── IDENTITY.md, SOUL.md, etc.
-    │       └── skills/
-    │           ├── nano-pdf/
-    │           ├── himalaya/
-    │           ├── openai-whisper/
-    │           ├── sherpa-onnx-tts/
-    │           └── [~17 more skills]
-    │
-    └── media/
-        ├── inbound/            # Voice messages in (~128 items)
-        └── outbound/           # Voice messages out (~56 items)
+├── .openclaw/
+│   ├── openclaw.json           # Agent configs, tool policies
+│   ├── exec-approvals.json     # Allowlisted commands
+│   │
+│   ├── agents/
+│   │   ├── bruba-main/
+│   │   │   └── sessions/       # Session transcripts (~90 JSONL files)
+│   │   ├── bruba-guru/
+│   │   │   └── sessions/
+│   │   ├── bruba-manager/
+│   │   │   └── sessions/
+│   │   ├── bruba-web/
+│   │   │   └── sessions/
+│   │   └── main/               # Legacy (can be cleaned up)
+│   │
+│   ├── sandboxes/              # Runtime copies + installed skills
+│   │   └── agent-main-main-{hash}/
+│   │       ├── IDENTITY.md, SOUL.md, etc.
+│   │       └── skills/
+│   │           └── [~20 skills]
+│   │
+│   └── media/
+│       ├── inbound/            # Voice messages in (~128 items)
+│       └── outbound/           # Voice messages out (~56 items)
+│
+└── .clawdbot/
+    └── agents/
+        ├── bruba-main/
+        │   └── auth-profiles.json
+        ├── bruba-guru/
+        │   └── auth-profiles.json   # Copied from bruba-main
+        ├── bruba-manager/
+        │   └── auth-profiles.json
+        └── bruba-web/
+            └── auth-profiles.json
 ```
 
 ---
@@ -286,6 +302,7 @@ config.yaml (agents.{agent}.{prompt}_sections)
 │    base         → templates/prompts/{NAME}.md                │
 │    manager-base → templates/prompts/manager/{NAME}.md        │
 │    web-base     → templates/prompts/web/{NAME}.md            │
+│    guru-base    → templates/prompts/guru/{NAME}.md           │
 │    bot:name     → mirror/{agent}/prompts/ (BOT-MANAGED)      │
 │    component    → components/{name}/prompts/{NAME}.snippet.md│
 │    section      → templates/prompts/sections/{name}.md       │
@@ -381,6 +398,7 @@ Bot Workspace (source of truth for bot-managed files)
 │    - config/*.json (tokens redacted)                         │
 │    - tools/*.sh                                              │
 │    - state/*.json (manager only)                             │
+│    - results/*.md (guru only)                                │
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
@@ -390,7 +408,93 @@ mirror/{agent}/
   config/     - openclaw.json, exec-approvals.json
   tools/      - Bot's tool scripts
   state/      - Manager state files
+  results/    - Guru analysis outputs
 ```
+
+### Pipeline 4: Guru Direct Response
+
+```
+User sends technical question via Signal
+       │
+       ▼
+bruba-main detects technical content
+       │
+       ├── Tracks: "Routing to Guru: [topic]"
+       │
+       ▼
+sessions_send to bruba-guru
+       │
+       ▼
+bruba-guru analyzes (may generate 40K+ tokens)
+       │
+       ├── message action=send target=uuid:... → Signal (direct to user)
+       │           │
+       │           └──────────────────────────────────► User sees full response
+       │
+       └── Returns to Main: "Summary: [one-liner]"
+               │
+               ▼
+bruba-main updates tracking (summary only, not payload)
+       │
+       └── Main's context stays lightweight
+```
+
+**Key insight:** Guru's full response goes directly to Signal via the `message` tool. Main only receives a one-sentence summary for context tracking. This prevents Main's context from bloating with technical payloads.
+
+### Pipeline 5: Voice Message Response
+
+```
+User sends voice message via Signal
+       │
+       ▼
+bruba-main receives [media attached: /path/to/audio.m4a]
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  1. Transcribe                                               │
+│     exec whisper-clean.sh "/path/to/audio.m4a"               │
+│                                                              │
+│  2. Process transcribed content                              │
+│                                                              │
+│  3. Generate TTS response                                    │
+│     exec tts.sh "response text" /tmp/response.wav            │
+│                                                              │
+│  4. Send voice + text                                        │
+│     message action=send target=uuid:... filePath=... msg=... │
+│                                                              │
+│  5. Respond: NO_REPLY (prevents duplicate)                   │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ▼
+User receives voice message with text caption in Signal
+```
+
+### Pipeline 6: Siri Async (HTTP → Signal)
+
+```
+Siri: "Tell Bruba to remind me about laundry"
+       │
+       ▼
+HTTP API → bruba-main
+       │
+       ├── Detects [From Siri async] or [Tell Bruba] tag
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  1. Process request (create reminder, look up info, etc.)    │
+│                                                              │
+│  2. Send to Signal                                           │
+│     message action=send target=uuid:... message="Done..."    │
+│                                                              │
+│  3. Return to HTTP: ✓                                        │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ├──► Signal: User sees response
+       │
+       └──► Siri: Gets minimal "✓" acknowledgment
+```
+
+**Note:** NO_REPLY not needed here — HTTP responses don't go to Signal.
 
 ---
 
@@ -416,7 +520,7 @@ mirror/{agent}/
 | `memory/*.md` | Export pipeline | push → bot | FLAT structure with prefix naming |
 | `state/*.json` | Bot runtime | ← mirror | Never pushed, bot-managed |
 | `inbox/*.json` | Cron jobs | Never synced | Ephemeral, deleted after processing |
-| `results/*.md` | bruba-web | Never synced | Read by Manager heartbeat |
+| `results/*.md` | bruba-web/guru | Never synced | Read by Manager heartbeat / direct output |
 
 ### Config Files
 
@@ -424,6 +528,15 @@ mirror/{agent}/
 |------|--------|----------------|-------|
 | `openclaw.json` | update-agent-tools.sh | push → bot | Tool permissions |
 | `exec-approvals.json` | update-allowlist.sh | push → bot | Command allowlist |
+
+### Tool Permissions (message tool)
+
+| Agent | message tool | Use Case |
+|-------|--------------|----------|
+| bruba-main | ✅ | Voice replies, Siri async routing |
+| bruba-guru | ✅ | Direct technical responses to Signal |
+| bruba-manager | ❌ | Routes via sessions_send to Main |
+| bruba-web | ❌ | Passive service, no outbound messaging |
 
 ---
 
@@ -434,6 +547,7 @@ mirror/{agent}/
 | `base` | `base` | `templates/prompts/{NAME}.md` | Full file copy |
 | `manager-base` | `manager-base` | `templates/prompts/manager/{NAME}.md` | Full file for manager |
 | `web-base` | `web-base` | `templates/prompts/web/{NAME}.md` | Full file for web agent |
+| `guru-base` | `guru-base` | `templates/prompts/guru/{NAME}.md` | Full file for guru agent |
 | `component` | `component-name` | `components/{name}/prompts/{NAME}.snippet.md` | Wrapped in `<!-- COMPONENT: name -->` |
 | `section` | `section-name` | `templates/prompts/sections/{name}.md` | Wrapped in `<!-- SECTION: name -->` |
 | `bot-managed` | `bot:section-name` | `mirror/{agent}/prompts/{NAME}.md` | Extracted from `<!-- BOT-MANAGED: name -->` |
@@ -443,10 +557,11 @@ mirror/{agent}/
 1. `base` → check `templates/prompts/{NAME}.md`
 2. `manager-base` → check `templates/prompts/manager/{NAME}.md`
 3. `web-base` → check `templates/prompts/web/{NAME}.md`
-4. `bot:*` → extract from mirror's BOT-MANAGED block
-5. Component → check `components/{entry}/prompts/{NAME}.snippet.md`
-6. Section → check `templates/prompts/sections/{entry}.md`
-7. Not found → log "missing" warning
+4. `guru-base` → check `templates/prompts/guru/{NAME}.md`
+5. `bot:*` → extract from mirror's BOT-MANAGED block
+6. Component → check `components/{entry}/prompts/{NAME}.snippet.md`
+7. Section → check `templates/prompts/sections/{entry}.md`
+8. Not found → log "missing" warning
 
 ---
 
@@ -476,6 +591,7 @@ agents_sections:
   - voice               # → components/voice/prompts/AGENTS.snippet.md
   - signal-media-filter # → components/signal-media-filter/prompts/AGENTS.snippet.md
   - signal              # → components/signal/prompts/AGENTS.snippet.md
+  - guru-routing        # → components/guru-routing/prompts/AGENTS.snippet.md
 ```
 
 ### bruba-main TOOLS.md
@@ -484,6 +600,22 @@ agents_sections:
 tools_sections:
   - base                # → templates/prompts/TOOLS.md
   - reminders           # → components/reminders/prompts/TOOLS.snippet.md
+  - message-tool        # → components/message-tool/prompts/TOOLS.snippet.md (if separate)
+```
+
+### bruba-guru AGENTS.md
+
+```yaml
+agents_sections:
+  - guru-base           # → templates/prompts/guru/AGENTS.md
+  - continuity          # → components/continuity/prompts/AGENTS.snippet.md
+```
+
+### bruba-guru TOOLS.md
+
+```yaml
+tools_sections:
+  - guru-base           # → templates/prompts/guru/TOOLS.md
 ```
 
 ### bruba-manager
@@ -506,9 +638,9 @@ agents_sections:
 
 ---
 
-## Part 8: Message Paths (File-Based Communication)
+## Part 8: Message Paths (File-Based & Direct)
 
-### Cron → Manager (via inbox/)
+### File-Based: Cron → Manager (via inbox/)
 
 ```
 Cron job runs
@@ -526,7 +658,7 @@ Read → Process → Deliver to Signal
 Delete inbox/reminder-check.json
 ```
 
-### Manager → bruba-web → Manager (via results/)
+### File-Based: Manager → bruba-web → Manager (via results/)
 
 ```
 Manager sends research request
@@ -556,6 +688,32 @@ Manager heartbeat (later)
     │
     └── Updates pending-tasks.json (marks complete)
 ```
+
+### Direct Signal Messaging (via message tool)
+
+Agents with the `message` tool can send directly to Signal, outside the normal response flow:
+
+**Syntax:**
+```
+message action=send target=uuid:<recipient-uuid> message="text"
+message action=send target=uuid:<recipient-uuid> filePath=/path/to/file message="caption"
+```
+
+**<REDACTED-NAME>'s Signal UUID:** `uuid:<REDACTED-UUID>`
+
+**Patterns:**
+
+| Source | Flow | NO_REPLY? |
+|--------|------|-----------|
+| Voice reply (Main) | whisper → tts → message tool → NO_REPLY | Yes |
+| Siri async (Main) | process → message tool → return `✓` to HTTP | No |
+| Guru response | message tool → return summary to Main | No |
+
+**Why NO_REPLY?**
+- Required when the agent is **bound to Signal** (bruba-main)
+- Without it, both the message tool delivery AND the normal response go to Signal (duplicate)
+- Not needed for Guru (returns to Main via sessions_send callback, not Signal)
+- Not needed for HTTP responses (HTTP doesn't go to Signal anyway)
 
 ### State Files
 
@@ -671,177 +829,282 @@ Bot memory uses **flat structure with prefix naming**:
 
 ---
 
-## Part 12: Node Host + Docker Sandboxing (PLANNED)
+## Part 12: Node Host + Docker Sandboxing
 
-**Status:** Planning — not yet implemented. Details may change during migration.
+**Status:** IMPLEMENTED (2026-02-03). All agents run in Docker containers via OpenClaw native sandbox mode.
 
-### Why This Migration
+### Security Model
 
-**Current security gap:** Bruba can theoretically edit `~/.openclaw/exec-approvals.json` to self-escalate permissions. The allowlist lives in the same filesystem the agent has write access to.
+**Security gap closed:** Agents cannot edit `~/.openclaw/exec-approvals.json` — the file exists only on the host filesystem, which containers cannot access.
 
-**Solution:** Docker container isolation + node host for exec:
-- Agents run in Docker container (can't access host filesystem)
-- Exec commands run via node host process (outside container)
-- Allowlist stays on host, out of agent's reach
+**Exec flow:**
+```
+Agent (container) → exec tool → Gateway → Node Host (on HOST) → checks allowlist → executes
+```
 
-### Mount Mapping
+### File Access Architecture
 
-| Host Path | Container Path | Access | Purpose |
+**Key principle:** All file access goes through `/workspace/`. Memory is at `/workspace/memory/` (synced by operator). Discovery via `memory_search`.
+
+**Directory Layout:**
+
+| Directory | Container Path | Access | Purpose |
 |-----------|----------------|--------|---------|
-| `/Users/bruba/agents/bruba-main/workspace/` | `/workspace` | rw | Working files |
-| `/Users/bruba/agents/bruba-main/memory/` | `/memory` | rw | PKM docs, transcripts |
-| `/Users/bruba/agents/bruba-main/tools/` | `/tools` | **ro** | Scripts (CC edits, agent reads) |
-| `/Users/bruba/.openclaw/media/` | `/media` | rw | Voice messages in/out |
-| `/Users/bruba/agents/bruba-manager/inbox/` | `/inbox` | rw | Cron outputs |
-| `/Users/bruba/agents/bruba-manager/state/` | `/state` | rw | Persistent tracking |
-| `/Users/bruba/agents/bruba-manager/results/` | `/results` | rw | Manager reads bruba-web output |
-| `/Users/bruba/agents/bruba-web/results/` | `/results` | rw | bruba-web writes research |
+| **Workspace root** | `/workspace/` | Read-write | Prompts, memory, working files |
+| **Memory** | `/workspace/memory/` | Read-write | Docs, transcripts, repos (synced by operator) |
+| **Tools** | `/workspace/tools/` | Read-only | Scripts (exec uses host paths) |
+| Shared packets | `/workspaces/shared/packets/` | Read-write | Main↔Guru handoff |
 
-### Deliberately NOT Mounted (Security Boundary)
-
-| Host Path | Why Excluded |
-|-----------|--------------|
-| `~/.openclaw/exec-approvals.json` | Prevents self-escalation |
-| `~/.openclaw/openclaw.json` | Agent config shouldn't be agent-writable |
-| `/Users/bruba/agents/*/tools/` | Read-only mount, not excluded but protected |
-
-### Path References in Prompts
-
-**Important:** After migration, prompts and agent code should reference **container paths**, not host paths.
-
-| Reference | Pre-Docker | Post-Docker |
-|-----------|------------|-------------|
-| Memory files | `/Users/bruba/agents/bruba-main/memory/` | `/memory/` |
-| Tool scripts | `/Users/bruba/agents/bruba-main/tools/` | `/tools/` |
-| Research results | `/Users/bruba/agents/bruba-web/results/` | `/results/` |
-| pending-tasks.json | Full host path in `expectedFile` | Container path |
-
-**bruba-godo impact:** `push.sh` continues pushing to host paths — Docker bind mounts handle the translation automatically. No changes needed to push scripts.
-
-### Per-Agent Container Strategy
-
-**Option A: Shared container (simpler)**
+**Memory Structure (`/workspace/memory/`):**
 ```
-┌─────────────────────────────────────┐
-│         Docker Container            │
-│  ┌─────────┐ ┌─────────┐ ┌───────┐ │
-│  │  Main   │ │ Manager │ │  Web  │ │
-│  └─────────┘ └─────────┘ └───────┘ │
-│         network: bridge             │
-└─────────────────────────────────────┘
-```
-- All agents share one container
-- bruba-web needs bridge network for internet → all get it
-- Simpler to manage
-
-**Option B: Separate containers (better isolation)**
-```
-┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│  Main Container  │  │ Manager Container│  │  Web Container   │
-│  network: none   │  │  network: none   │  │ network: bridge  │
-└──────────────────┘  └──────────────────┘  └──────────────────┘
-```
-- Main/Manager get `network: none` (use node host for exec, no direct internet)
-- bruba-web gets `network: bridge` (needs internet for web_search)
-- Better security isolation
-- More complex orchestration
-
-**Likely choice:** Option A initially, Option B if security review requires it.
-
-### bruba-godo Sync Behavior (Unchanged)
-
-```
-bruba-godo (operator)
-       │
-       │ push.sh (SSH + rsync)
-       ▼
-Host filesystem (/Users/bruba/agents/...)
-       │
-       │ Docker bind mount
-       ▼
-Container filesystem (/workspace, /memory, etc.)
+/workspace/memory/
+├── transcripts/          # Transcript - *.md
+├── docs/                 # Doc - *.md, Refdoc - *.md, CC Log - *.md
+├── repos/bruba-godo/     # bruba-godo mirror (updated on sync)
+└── workspace-snapshot/   # Copy of workspace/ at last sync
 ```
 
-- `push.sh` pushes to host paths as before
-- Bind mounts make files visible inside container
-- No changes needed to bruba-godo tooling
-
-### Session Storage (Open Question)
-
-**Question:** Where does `.openclaw/agents/*/sessions/` live?
-
-| Option | Pros | Cons |
-|--------|------|------|
-| Host (mounted) | Persists across container rebuilds, accessible to bruba-godo pull | Agent can see other agents' sessions |
-| Container volume | Better isolation | Lost on container rebuild unless volume persists |
-| Host (not mounted) | Agent can't access raw sessions | Gateway needs host access |
-
-**Likely:** Host filesystem, mounted read-only or via gateway process that runs on host.
-
-### Node Host Exec Flow
-
+**Workspace Structure (`/workspace/`):**
 ```
-Agent requests exec("whisper-clean.sh", args)
-       │
-       ▼
-Container → system.run → Node Host (port 18789)
-       │
-       ▼
-Node Host checks allowlist (on host, not mounted)
-       │
-       ├── Allowed → Execute on host → Return result
-       │
-       └── Denied → Return error
+/workspace/
+├── memory/              # Synced content (searchable via memory_search)
+├── output/              # Working outputs
+├── drafts/              # Work in progress
+├── temp/                # Temporary files
+└── continuation/        # CONTINUATION.md and archive/
 ```
 
-**Key:** Agent never directly executes commands. Node host is the gatekeeper.
+### File Tools vs Exec
 
-### Trash Pattern for Safe Deletion
+| Task | Tool to Use | Path Style | Example |
+|------|-------------|------------|---------|
+| **Discover files** | `memory_search` | N/A (query) | `memory_search "topic"` |
+| Read memory | `read` | Container (`/workspace/memory/...`) | `read /workspace/memory/docs/Doc - setup.md` |
+| Write file | `write` | Container (`/workspace/...`) | `write /workspace/output/result.md` |
+| Edit file | `edit` | Container (`/workspace/...`) | `edit /workspace/drafts/draft.md` |
+| Run a script | `exec` | Host (`/Users/bruba/...`) | `exec /Users/bruba/agents/bruba-main/tools/tts.sh` |
 
-With Docker sandbox, we can enable full delete permissions with a safety net:
+**Key distinction:**
+- **Read/write** `/workspace/...` → container paths
+- **Exec commands** → host paths (`/Users/bruba/...`)
 
+**File Discovery Pattern:**
 ```
-/Users/bruba/agents/bruba-main/
-├── workspace/     ← full control (rw)
-├── memory/        ← full control (rw)
-├── tools/         ← read-only
-└── .trash/        ← "deleted" files moved here
-    └── 2026-02-02/
-        └── old-file.md
+memory_search "topic"        → Returns paths like /workspace/memory/docs/Doc - setup.md
+read /workspace/memory/docs/Doc - setup.md  → File contents
 ```
 
-- Delete = move to `.trash/YYYY-MM-DD/`
-- Host cron purges files older than 7 days
-- Provides undo without blocking cleanup
+**Note:** `ls`, `find`, `grep` are NOT available in sandbox mode. Use `memory_search` for discovery.
 
-### Migration Checklist (Preview)
+### Configuration
 
-1. **Pre-migration**
-   - [ ] Backup openclaw.json and exec-approvals.json
-   - [ ] Document current allowlist entries
-   - [ ] Update prompts to use container paths
+**agents.defaults.sandbox** in `~/.openclaw/openclaw.json`:
 
-2. **Docker setup**
-   - [ ] Create docker-compose.yml or configure OpenClaw sandbox
-   - [ ] Define bind mounts per agent
-   - [ ] Test container starts
+```json
+{
+  "mode": "all",
+  "scope": "agent",
+  "workspaceAccess": "rw",
+  "docker": {
+    "readOnlyRoot": true,
+    "network": "none",
+    "memory": "512m",
+    "binds": [
+      "/Users/bruba/agents/bruba-shared/packets:/workspaces/shared/packets:rw",
+      "/Users/bruba/agents/bruba-shared/context:/workspaces/shared/context:rw",
+      "/Users/bruba/agents/bruba-shared/repo:/workspaces/shared/repo:ro"
+    ]
+  }
+}
+```
 
-3. **Node host**
-   - [ ] Install node host on dadmini
-   - [ ] Transfer allowlist entries
-   - [ ] Configure agents to use node host for exec
+**Per-agent config** (each agent needs `sandbox.workspaceRoot`):
 
-4. **Verification**
-   - [ ] Security boundary tests (agent can't reach allowlist)
-   - [ ] Functional tests (voice, web search, file ops)
-   - [ ] bruba-godo sync tests (push still works)
+```json
+{
+  "id": "bruba-main",
+  "workspace": "/Users/bruba/agents/bruba-main",
+  "sandbox": {
+    "workspaceRoot": "/Users/bruba/agents/bruba-main",
+    "docker": {
+      "binds": ["/Users/bruba/agents/bruba-main/tools:/workspace/tools:ro"]
+    }
+  }
+}
+```
 
-### Open Questions
+**Key settings:**
+- `sandbox.workspaceRoot` = agent's `workspace` path (tells OpenClaw file tools where `/workspace/` is)
+- `tools:/workspace/tools:ro` = read-only overlay prevents tool script modification
 
-1. **OpenClaw Docker support:** Built-in or docker-compose ourselves?
-2. **Node host CLI:** Verify `openclaw node install` syntax against current docs
-3. **Tailscale access:** Does gateway bind work inside container?
-4. **Multi-agent networking:** Can agents `sessions_send` across containers?
+**Per-agent overrides:**
+- `bruba-main`, `bruba-guru`, `bruba-manager`: `workspaceRoot` + `tools:ro` bind
+- `bruba-web`: `workspaceRoot` + bridge network for web access
+
+### Sandbox Tool Policy (IMPORTANT)
+
+**There's a sandbox-level tool ceiling** — tools must be allowed here for containerized agents:
+
+```json
+{
+  "tools": {
+    "sandbox": {
+      "tools": {
+        "allow": ["group:memory", "group:media", "group:sessions", "exec", "group:web", "message"]
+      }
+    }
+  }
+}
+```
+
+**Gotcha:** If a tool is allowed at global and agent level but NOT in `tools.sandbox.tools.allow`, containerized agents won't have it. After sandbox migration, check that all needed tools (especially `message`) are in this list.
+
+### Path Mapping (All Agents)
+
+| Host Path | Container Path | Access | Notes |
+|-----------|----------------|--------|-------|
+| `/Users/bruba/agents/{agent}/` | `/workspace/` | rw | Each agent's workspace |
+| `~/agents/bruba-shared/packets/` | `/workspaces/shared/packets/` | rw | All agents |
+| `~/agents/bruba-shared/context/` | `/workspaces/shared/context/` | rw | All agents |
+| `~/agents/bruba-shared/repo/` | `/workspaces/shared/repo/` | **ro** | All agents |
+| `~/agents/bruba-main/tools/` | `/workspace/tools/` | **ro** | bruba-main only (overlay) |
+
+### Per-Agent Access Matrix
+
+#### bruba-main Access
+
+| Resource | Container Path | Access | Notes |
+|----------|----------------|--------|-------|
+| Prompts (*.md) | `/workspace/*.md` | **rw** | AGENTS.md, TOOLS.md, etc. |
+| memory/ | `/workspace/memory/` | **rw** | PKM docs, transcripts (synced by operator) |
+| tools/ | `/workspace/tools/` | **ro** | Scripts (read-only overlay) |
+| workspace/ | `/workspace/workspace/` | **rw** | Working files |
+| artifacts/ | `/workspace/artifacts/` | **rw** | Generated artifacts |
+| output/ | `/workspace/output/` | **rw** | Script outputs |
+| Shared packets | `/workspaces/shared/packets/` | **rw** | Main↔Guru handoff |
+| Shared context | `/workspaces/shared/context/` | **rw** | Shared context |
+| Shared repo | `/workspaces/shared/repo/` | **ro** | bruba-godo reference |
+| exec-approvals.json | — | **none** | Not mounted |
+| openclaw.json | — | **none** | Not mounted |
+| Host filesystem | — | **none** | Not accessible |
+| Network | — | **none** | No outbound |
+
+#### bruba-guru Access
+
+| Resource | Container Path | Access | Notes |
+|----------|----------------|--------|-------|
+| Prompts (*.md) | `/workspace/*.md` | **rw** | AGENTS.md, TOOLS.md, etc. |
+| workspace/ | `/workspace/workspace/` | **rw** | Technical analysis |
+| memory/ | `/workspace/memory/` | **rw** | Persistent notes |
+| tools/ | `/workspace/tools/` | **ro** | Scripts (defense-in-depth) |
+| results/ | `/workspace/results/` | **rw** | Analysis outputs |
+| Shared packets | `/workspaces/shared/packets/` | **rw** | Main↔Guru handoff |
+| Shared context | `/workspaces/shared/context/` | **rw** | Shared context |
+| Shared repo | `/workspaces/shared/repo/` | **ro** | bruba-godo reference |
+| exec-approvals.json | — | **none** | Not mounted |
+| Host filesystem | — | **none** | Not accessible |
+| Network | — | **none** | No outbound |
+
+#### bruba-manager Access
+
+| Resource | Container Path | Access | Notes |
+|----------|----------------|--------|-------|
+| Prompts (*.md) | `/workspace/*.md` | **rw** | AGENTS.md, TOOLS.md, etc. |
+| inbox/ | `/workspace/inbox/` | **rw** | Cron job outputs |
+| state/ | `/workspace/state/` | **rw** | Persistent tracking (nag-history, etc.) |
+| tools/ | `/workspace/tools/` | **ro** | Scripts (defense-in-depth) |
+| results/ | `/workspace/results/` | **rw** | Research outputs |
+| memory/ | `/workspace/memory/` | **rw** | Agent memory |
+| Shared packets | `/workspaces/shared/packets/` | **rw** | Work packets |
+| Shared context | `/workspaces/shared/context/` | **rw** | Shared context |
+| Shared repo | `/workspaces/shared/repo/` | **ro** | bruba-godo reference |
+| exec-approvals.json | — | **none** | Not mounted |
+| Host filesystem | — | **none** | Not accessible |
+| Network | — | **none** | No outbound |
+
+#### bruba-web Access
+
+| Resource | Container Path | Access | Notes |
+|----------|----------------|--------|-------|
+| Prompts (*.md) | `/workspace/*.md` | **rw** | AGENTS.md only |
+| tools/ | `/workspace/tools/` | **ro** | Scripts (defense-in-depth) |
+| results/ | `/workspace/results/` | **rw** | Research outputs |
+| Shared packets | `/workspaces/shared/packets/` | **rw** | (rarely used) |
+| Shared context | `/workspaces/shared/context/` | **rw** | (rarely used) |
+| Shared repo | `/workspaces/shared/repo/` | **ro** | bruba-godo reference |
+| exec-approvals.json | — | **none** | Not mounted |
+| Host filesystem | — | **none** | Not accessible |
+| **Network** | via bridge | **yes** | **Only agent with internet** |
+
+### NOT Mounted (Security Boundary)
+
+These resources are explicitly excluded from ALL containers:
+
+| Host Path | Why Protected |
+|-----------|---------------|
+| `~/.openclaw/exec-approvals.json` | **Critical:** Prevents privilege self-escalation |
+| `~/.openclaw/openclaw.json` | Config shouldn't be agent-writable |
+| `~/.clawdbot/agents/*/auth-profiles.json` | API keys stay on host |
+| `/Users/bruba/` (general) | No arbitrary host filesystem access |
+| Other agents' workspaces | Cross-agent isolation |
+
+### Network Access Matrix
+
+| Agent | Network Mode | Can Reach |
+|-------|--------------|-----------|
+| bruba-main | none | Gateway only (internal) |
+| bruba-guru | none | Gateway only (internal) |
+| bruba-manager | none | Gateway only (internal) |
+| bruba-web | **bridge** | Internet + Gateway |
+
+### Security Verification
+
+From inside container, these should FAIL:
+```bash
+# Cannot access exec-approvals
+docker exec <container> cat ~/.openclaw/exec-approvals.json
+# → No such file
+
+# Cannot access host filesystem
+docker exec <container> ls /Users/bruba/
+# → No such file
+
+# Cannot write to tools (ALL agents have tools/:ro)
+docker exec openclaw-sandbox-bruba-main touch /workspace/tools/test.sh
+docker exec openclaw-sandbox-bruba-guru touch /workspace/tools/test.sh
+docker exec openclaw-sandbox-bruba-manager touch /workspace/tools/test.sh
+docker exec openclaw-sandbox-bruba-web touch /workspace/tools/test.sh
+# → All should fail: Read-only file system
+```
+
+### Container Lifecycle
+
+- Containers are created automatically on first agent use
+- Gateway LaunchAgent (`ai.openclaw.gateway.plist`) auto-starts on system boot
+- `openclaw sandbox recreate --all` to force container refresh
+- Containers auto-prune after 24h idle (configurable)
+
+### Debugging Commands
+
+```bash
+# Check sandbox status
+openclaw sandbox explain
+
+# List containers
+openclaw sandbox list
+
+# Recreate containers (after config change)
+openclaw sandbox recreate --all
+
+# Exec into container for debugging
+docker exec -it openclaw-sandbox-bruba-main /bin/sh
+
+# Run verification tests (from bruba-godo)
+./tools/test-sandbox.sh               # All tests
+./tools/test-sandbox.sh --security    # Security only
+./tools/test-sandbox.sh --functional  # Functional only
+./tools/test-sandbox.sh --status      # Container status
+```
 
 ---
 
@@ -849,7 +1112,13 @@ With Docker sandbox, we can enable full delete permissions with a safety net:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.3.0 | 2026-02-02 | Moved shared resources to bruba-shared (repo/, packets/) |
+| 1.6.0 | 2026-02-03 | **File access architecture:** `/memory/` read-only (docs, transcripts, repos), `/workspace/` read-write (outputs, continuation). Discovery via `memory_search`. Updated Part 12 with new structure. |
+| 1.5.2 | 2026-02-03 | Added sandbox tool policy ceiling documentation (tools.sandbox.tools.allow) |
+| 1.5.1 | 2026-02-03 | Defense-in-depth: ALL agents now have tools/:ro (not just bruba-main) |
+| 1.5.0 | 2026-02-03 | Part 12 expanded: per-agent access matrix, network access matrix, detailed security boundaries |
+| 1.4.1 | 2026-02-03 | Added test-sandbox.sh to debugging commands |
+| 1.4.0 | 2026-02-03 | Part 12 IMPLEMENTED: Docker sandbox enabled for all agents, exec/file path split documented |
+| 1.3.0 | 2026-02-03 | Added message tool patterns, guru direct response pipeline, voice/Siri pipelines, tool permissions matrix, guru assembly mapping |
 | 1.2.1 | 2026-02-02 | Added guru cron job, expanded cronjobs listing |
 | 1.2.0 | 2026-02-02 | Added bruba-guru and bruba-shared directories |
 | 1.1.0 | 2026-02-02 | Added Part 12: Node Host + Docker Sandboxing |

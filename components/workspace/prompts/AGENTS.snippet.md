@@ -1,13 +1,19 @@
 ## Generated Content
 
-**Workspace:** `~/.clawdbot/agents/${AGENT_ID}/workspace/`
+**Working Area:** `/workspace/`
 
-Everything you generate in sessions (scripts, tools, outputs) goes here. This is your persistent workspace for code and artifacts you create together with your human.
+Everything you generate in sessions goes here. This is your read-write space for outputs, drafts, and working files.
 
 **Subdirectories:**
-- `workspace/code/` — scripts and tools you create for review
-- `workspace/output/artifacts/` — misc docs and data generated in chat
+- `output/` — scripts, tools, analysis outputs
+- `drafts/` — work in progress
+- `temp/` — temporary files
+- `continuation/` — CONTINUATION.md and archive/
 
-Write permissions will be scoped to this directory.
+**Note:** Your memory is at `/workspace/memory/` (synced content from operator).
+- `/workspace/memory/` — docs, transcripts, repos (searchable via `memory_search`)
+- `/workspace/` — your working outputs
 
-Your human will review and manually move files to production locations (like `~/clawd/tools/`) after approval.
+After each sync, your working files are snapshotted to `/workspace/memory/workspace-snapshot/` so they become searchable.
+
+**Path Note:** Use `/workspace/...` for file operations (read/write/edit). These run inside the container.

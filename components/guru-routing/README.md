@@ -110,7 +110,7 @@ mkdir -p /Users/bruba/agents/bruba-shared/{packets,context}
 4. **Auth profile** copied:
 
 ```bash
-# Note: Auth profiles are in ~/.clawdbot, NOT ~/.openclaw
+# Note: Auth profiles are in ~/.openclaw, NOT ~/.openclaw
 mkdir -p /Users/bruba/.clawdbot/agents/bruba-guru
 cp /Users/bruba/.clawdbot/agents/bruba-main/auth-profiles.json \
    /Users/bruba/.clawdbot/agents/bruba-guru/

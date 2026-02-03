@@ -1,8 +1,8 @@
 ## 📂 bruba-godo Repository Access
 
-**Looking for the repo? It's at `/Users/bruba/agents/bruba-shared/repo/`**
+**Path:** `/workspace/memory/repos/bruba-godo/`
 
-This is a read-only snapshot of bruba-godo, synced so you can reference the codebase without asking where it is.
+This is a read-only snapshot of bruba-godo, synced to your memory so you can reference the codebase without asking where it is.
 
 ### What's Inside
 | Path | Contents |
@@ -16,14 +16,33 @@ This is a read-only snapshot of bruba-godo, synced so you can reference the code
 
 ### Rules
 - **Read freely** — understand the code, reference it in conversations
-- **Don't modify** — changes are overwritten on sync
+- **Don't modify** — changes get overwritten on sync
 - **To change something:** Write a packet → CC implements in the actual repo
 
-### Quick Commands
-```bash
-# Browse the repo
-ls /Users/bruba/agents/bruba-shared/repo/
+### Finding Files
 
-# Find something
-grep -r "search term" /Users/bruba/agents/bruba-shared/repo/
+Use `memory_search` to discover files in the repo:
 ```
+memory_search "guru-routing component"
+  → Returns: /workspace/memory/repos/bruba-godo/components/guru-routing/...
+```
+
+Then read:
+```
+read /workspace/memory/repos/bruba-godo/components/guru-routing/AGENTS.snippet.md
+```
+
+### Example Usage
+```
+# Read a file:
+read /workspace/memory/repos/bruba-godo/CLAUDE.md
+
+# Search for content:
+memory_search "exec-approvals"
+  → Returns relevant files
+
+# Read config:
+read /workspace/memory/repos/bruba-godo/config.yaml
+```
+
+**Note:** The repo snapshot is synced from the operator machine. You can read it, but don't modify — write a packet instead.

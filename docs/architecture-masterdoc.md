@@ -1,9 +1,9 @@
 ---
-version: 3.4.0
+version: 3.5.2
 updated: 2026-02-03
 type: refdoc
 project: planning
-tags: [bruba, openclaw, multi-agent, architecture, cron, operations, guru, direct-message]
+tags: [bruba, openclaw, multi-agent, architecture, cron, operations, guru, direct-message, docker, sandbox, security]
 ---
 
 # Bruba Multi-Agent Architecture Reference
@@ -767,58 +767,395 @@ ON HEARTBEAT:
 
 ## Part 7: Security Model
 
-### Current Gap
+### Security Gap (CLOSED)
 
-Bruba can theoretically edit `~/.openclaw/exec-approvals.json` to self-escalate permissions. The allowlist lives in the same filesystem the agent has write access to.
+**Status:** ✅ Resolved as of 2026-02-03 via Docker sandboxing.
 
-### Node Host Solution (Planned)
+Previously, agents could theoretically edit `~/.openclaw/exec-approvals.json` to self-escalate permissions. With sandbox mode enabled, containers cannot access the host filesystem where exec-approvals.json lives.
 
-**Architecture:**
+### Docker Sandbox Architecture (IMPLEMENTED)
+
+All four agents run in Docker containers via OpenClaw's native sandbox support. Exec commands route through the node host process on the host machine.
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Mac Host (dadmini)                          │
-│                                                                 │
-│  ~/.openclaw/exec-approvals.json  ←── Out of agent's reach     │
-│  ~/agents/bruba-main/tools/       ←── Read-only mount          │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              Node Host Process                          │   │
-│  │  • Executes allowlisted commands only                   │   │
-│  │  • Manages tool scripts                                 │   │
-│  └──────────────────────▲──────────────────────────────────┘   │
-│                         │ system.run                           │
-│  ┌──────────────────────┼──────────────────────────────────┐   │
-│  │              Docker Container                           │   │
-│  │  ┌───────────────────┴───────────────────────────────┐  │   │
-│  │  │              OpenClaw Gateway                      │  │   │
-│  │  │  ┌─────────────────────────────────────────────┐  │  │   │
-│  │  │  │  bruba-main, bruba-manager, bruba-web       │  │  │   │
-│  │  │  │  • Bind mounts only                         │  │  │   │
-│  │  │  │  • No host filesystem access                │  │  │   │
-│  │  │  └─────────────────────────────────────────────┘  │  │   │
-│  │  └───────────────────────────────────────────────────┘  │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          Mac Host (dadmini)                              │
+│                                                                          │
+│  PROTECTED (not mounted into containers):                                │
+│  ├── ~/.openclaw/exec-approvals.json   ← Exec allowlist                  │
+│  ├── ~/.openclaw/openclaw.json         ← Agent configs                   │
+│  └── ~/agents/bruba-main/tools/        ← Scripts (ro overlay only)       │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │                    Node Host Process (port 18789)                  │  │
+│  │  • Reads exec-approvals.json from HOST filesystem                  │  │
+│  │  • Validates commands against allowlist                            │  │
+│  │  • Executes approved commands ON THE HOST                          │  │
+│  │  • Returns results to gateway                                      │  │
+│  └────────────────────────────▲───────────────────────────────────────┘  │
+│                               │ exec requests                            │
+│  ┌────────────────────────────┼───────────────────────────────────────┐  │
+│  │                   Docker Containers                                │  │
+│  │  ┌─────────────────────────┴─────────────────────────────────────┐ │  │
+│  │  │                   OpenClaw Gateway                             │ │  │
+│  │  │                                                                │ │  │
+│  │  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐           │ │  │
+│  │  │  │ bruba-main   │ │ bruba-guru   │ │bruba-manager │           │ │  │
+│  │  │  │ network:none │ │ network:none │ │ network:none │           │ │  │
+│  │  │  └──────────────┘ └──────────────┘ └──────────────┘           │ │  │
+│  │  │                                                                │ │  │
+│  │  │  ┌──────────────┐                                              │ │  │
+│  │  │  │  bruba-web   │  ← Only agent with network access            │ │  │
+│  │  │  │network:bridge│                                              │ │  │
+│  │  │  └──────────────┘                                              │ │  │
+│  │  └────────────────────────────────────────────────────────────────┘ │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Bind Mounts
+### Critical: File Tools vs Exec
 
-| Host Path | Container Path | Access | Purpose |
-|-----------|---------------|--------|---------|
-| `~/agents/bruba-main/workspace/` | `/workspace` | read-write | Working files |
-| `~/agents/bruba-main/memory/` | `/memory` | read-write | PKM docs |
-| `~/agents/bruba-main/tools/` | `/tools` | **read-only** | Scripts |
-| `~/.openclaw/media/` | `/media` | read-write | Voice I/O |
+**Key principle:** Use native file tools for file operations. Reserve `exec` only for running scripts and CLI tools.
 
-### Defense in Depth
+**File System Layout:**
 
-| Layer | Protection |
-|-------|------------|
-| Tool restrictions | Agents can only use allowed tools |
-| Separate agents | Web access isolated in bruba-web |
-| Exec allowlist | Only approved commands run |
-| Docker sandbox | Agents can't reach host filesystem |
-| Node host | Exec runs outside container |
+| Directory | Container Path | Access | Purpose |
+|-----------|----------------|--------|---------|
+| **Workspace root** | `/workspace/` | Read-write | Prompts, memory, working files |
+| **Memory** | `/workspace/memory/` | Read-write | Docs, transcripts, repos (synced by operator) |
+| **Tools** | `/workspace/tools/` | Read-only | Scripts (exec uses host paths) |
+| Shared packets | `/workspaces/shared/packets/` | Read-write | Main↔Guru handoff |
+| Shared context | `/workspaces/shared/context/` | Read-write | Shared context files |
+
+**Memory Structure (`/workspace/memory/`):**
+```
+/workspace/memory/
+├── transcripts/          # Transcript - *.md
+├── docs/                 # Doc - *.md, Refdoc - *.md, CC Log - *.md
+├── repos/bruba-godo/     # bruba-godo mirror (updated on sync)
+└── workspace-snapshot/   # Copy of workspace/ at last sync
+```
+
+**Workspace Structure (`/workspace/`):**
+```
+/workspace/
+├── memory/              # Synced content (searchable via memory_search)
+├── output/              # Working outputs
+├── drafts/              # Work in progress
+├── temp/                # Temporary files
+└── continuation/        # CONTINUATION.md and archive/
+```
+
+| Task | Tool to Use | Path Style | Example |
+|------|-------------|------------|---------|
+| **Discover files** | `memory_search` | N/A (query) | `memory_search "topic"` |
+| Read memory | `read` | Container (`/workspace/memory/...`) | `read /workspace/memory/docs/Doc - setup.md` |
+| Read workspace | `read` | Container (`/workspace/...`) | `read /workspace/output/analysis.md` |
+| Write file | `write` | Container (`/workspace/...`) | `write /workspace/output/result.md` |
+| Edit file | `edit` | Container (`/workspace/...`) | `edit /workspace/drafts/draft.md` |
+| Run a script | `exec` | Host (`/Users/bruba/...`) | `exec /Users/bruba/agents/bruba-main/tools/tts.sh` |
+| Run a CLI tool | `exec` | Host (`/Users/bruba/...`) | `exec /opt/homebrew/bin/remindctl list` |
+
+**Key distinction:**
+- **Read/write** `/workspace/...` → container paths
+- **Exec commands** → host paths (`/Users/bruba/...`)
+
+**File Discovery Pattern:**
+```
+memory_search "topic"        → Returns paths like /workspace/memory/docs/Doc - setup.md
+read /workspace/memory/docs/Doc - setup.md  → File contents
+```
+
+**Why this matters:**
+1. `exec` runs on the HOST via node host — container paths don't exist there
+2. `/workspace/tools/` is read-only — write attempts fail with "read-only filesystem"
+3. `memory_search` is the discovery mechanism (no `ls`, `find` available)
+4. Workspace contents become searchable after sync via `workspace-snapshot/`
+
+**Correct examples:**
+- `read /workspace/memory/docs/Doc - setup.md` → Container reads from workspace → Works
+- `write /workspace/output/result.md` → Container writes to workspace → Works
+- `exec /Users/bruba/agents/bruba-main/tools/whisper.sh` → Node host executes on HOST → Works
+
+**Incorrect examples:**
+- `write /workspace/tools/new.sh` → Read-only tools directory → Fails
+- `exec ls /workspace/` → Node host looks for `/workspace/` on HOST → Fails
+- `read /Users/bruba/agents/bruba-main/memory/file.md` → Container can't see host path → Fails
+
+### Sandbox Configuration
+
+**Global defaults** (`agents.defaults.sandbox` in openclaw.json):
+
+```json
+{
+  "mode": "all",
+  "scope": "agent",
+  "workspaceAccess": "rw",
+  "docker": {
+    "readOnlyRoot": true,
+    "network": "none",
+    "memory": "512m",
+    "binds": [
+      "/Users/bruba/agents/bruba-shared/packets:/workspaces/shared/packets:rw",
+      "/Users/bruba/agents/bruba-shared/context:/workspaces/shared/context:rw",
+      "/Users/bruba/agents/bruba-shared/repo:/workspaces/shared/repo:ro"
+    ]
+  }
+}
+```
+
+**Per-agent config** (each agent needs `sandbox.workspaceRoot` to match their `workspace`):
+
+```json
+{
+  "id": "bruba-main",
+  "workspace": "/Users/bruba/agents/bruba-main",
+  "sandbox": {
+    "workspaceRoot": "/Users/bruba/agents/bruba-main",
+    "docker": {
+      "binds": ["/Users/bruba/agents/bruba-main/tools:/workspace/tools:ro"]
+    }
+  }
+}
+```
+
+**Key settings:**
+- `sandbox.workspaceRoot` = agent's `workspace` path (tells OpenClaw file tools where `/workspace/` is)
+- `tools:/workspace/tools:ro` = read-only overlay prevents tool script modification
+
+**Per-agent overrides:**
+
+| Agent | Override | Reason |
+|-------|----------|--------|
+| bruba-main | `workspaceRoot` + `tools:ro` bind | File tool validation + tool protection |
+| bruba-guru | `workspaceRoot` + `tools:ro` bind | Same |
+| bruba-manager | `workspaceRoot` + `tools:ro` bind | Same |
+| bruba-web | `workspaceRoot` + `network: "bridge"` | Needs internet for web_search |
+
+### Sandbox Tool Policy (IMPORTANT)
+
+**There's a sandbox-level tool ceiling** in addition to global and agent-level tool policies:
+
+```json
+{
+  "tools": {
+    "sandbox": {
+      "tools": {
+        "allow": [
+          "group:memory",
+          "group:media",
+          "group:sessions",
+          "exec",
+          "group:web",
+          "message"    // Must be here for containerized agents!
+        ]
+      }
+    }
+  }
+}
+```
+
+**Tool availability hierarchy (all must allow):**
+1. Global `tools.allow` → ceiling for all agents
+2. Agent `tools.allow` → ceiling for specific agent
+3. **Sandbox `tools.sandbox.tools.allow`** → ceiling for containerized agents
+
+**Gotcha:** If a tool is allowed at global and agent level but NOT in `tools.sandbox.tools.allow`, containerized agents won't have it. This caused the `message` tool to disappear after sandbox migration.
+
+### Container Path Mapping
+
+Each agent's workspace is mounted at `/workspace/` inside its container.
+
+| Host Path | Container Path | Notes |
+|-----------|----------------|-------|
+| `/Users/bruba/agents/bruba-main/` | `/workspace/` | bruba-main's container |
+| `/Users/bruba/agents/bruba-guru/` | `/workspace/` | bruba-guru's container |
+| `/Users/bruba/agents/bruba-manager/` | `/workspace/` | bruba-manager's container |
+| `/Users/bruba/agents/bruba-web/` | `/workspace/` | bruba-web's container |
+| `/Users/bruba/agents/bruba-shared/packets/` | `/workspaces/shared/packets/` | All containers |
+| `/Users/bruba/agents/bruba-shared/context/` | `/workspaces/shared/context/` | All containers |
+| `/Users/bruba/agents/bruba-shared/repo/` | `/workspaces/shared/repo/` | All containers (ro) |
+
+### Per-Agent Access Matrix
+
+#### bruba-main
+
+| Resource | Container Path | Access | Notes |
+|----------|----------------|--------|-------|
+| Workspace root | `/workspace/` | **rw** | Prompts, working files |
+| memory/ | `/workspace/memory/` | **rw** | PKM docs, transcripts (synced by operator) |
+| tools/ | `/workspace/tools/` | **ro** | Scripts (overlay mount, read-only) |
+| workspace/ | `/workspace/workspace/` | **rw** | Working files |
+| artifacts/ | `/workspace/artifacts/` | **rw** | Generated artifacts |
+| output/ | `/workspace/output/` | **rw** | Script outputs |
+| Shared packets | `/workspaces/shared/packets/` | **rw** | Main↔Guru handoff |
+| Shared context | `/workspaces/shared/context/` | **rw** | Shared context files |
+| Shared repo | `/workspaces/shared/repo/` | **ro** | bruba-godo reference |
+| Host filesystem | N/A | **none** | Cannot access |
+| exec-approvals.json | N/A | **none** | Cannot access |
+| openclaw.json | N/A | **none** | Cannot access |
+
+#### bruba-guru
+
+| Resource | Container Path | Access | Notes |
+|----------|----------------|--------|-------|
+| Workspace root | `/workspace/` | **rw** | Prompts, analysis |
+| workspace/ | `/workspace/workspace/` | **rw** | Technical analysis |
+| memory/ | `/workspace/memory/` | **rw** | Persistent notes |
+| tools/ | `/workspace/tools/` | **ro** | Scripts (defense-in-depth) |
+| results/ | `/workspace/results/` | **rw** | Analysis outputs |
+| Shared packets | `/workspaces/shared/packets/` | **rw** | Main↔Guru handoff |
+| Shared context | `/workspaces/shared/context/` | **rw** | Shared context files |
+| Shared repo | `/workspaces/shared/repo/` | **ro** | bruba-godo reference |
+| Host filesystem | N/A | **none** | Cannot access |
+
+#### bruba-manager
+
+| Resource | Container Path | Access | Notes |
+|----------|----------------|--------|-------|
+| Workspace root | `/workspace/` | **rw** | Prompts |
+| inbox/ | `/workspace/inbox/` | **rw** | Cron job outputs |
+| state/ | `/workspace/state/` | **rw** | Persistent tracking |
+| tools/ | `/workspace/tools/` | **ro** | Scripts (defense-in-depth) |
+| results/ | `/workspace/results/` | **rw** | Research outputs |
+| memory/ | `/workspace/memory/` | **rw** | Agent memory |
+| Shared packets | `/workspaces/shared/packets/` | **rw** | Work packets |
+| Shared context | `/workspaces/shared/context/` | **rw** | Shared context |
+| Shared repo | `/workspaces/shared/repo/` | **ro** | bruba-godo reference |
+| Host filesystem | N/A | **none** | Cannot access |
+
+#### bruba-web
+
+| Resource | Container Path | Access | Notes |
+|----------|----------------|--------|-------|
+| Workspace root | `/workspace/` | **rw** | Prompts only |
+| tools/ | `/workspace/tools/` | **ro** | Scripts (defense-in-depth) |
+| results/ | `/workspace/results/` | **rw** | Research outputs |
+| Shared packets | `/workspaces/shared/packets/` | **rw** | (rarely used) |
+| Shared context | `/workspaces/shared/context/` | **rw** | (rarely used) |
+| Shared repo | `/workspaces/shared/repo/` | **ro** | bruba-godo reference |
+| Host filesystem | N/A | **none** | Cannot access |
+| **Internet** | via bridge network | **yes** | Only agent with web access |
+
+### What Containers CANNOT Access
+
+These resources are explicitly NOT mounted into any container:
+
+| Resource | Why Protected |
+|----------|---------------|
+| `~/.openclaw/exec-approvals.json` | **Critical:** Prevents privilege self-escalation |
+| `~/.openclaw/openclaw.json` | Config shouldn't be agent-writable |
+| `~/.clawdbot/agents/*/auth-profiles.json` | API keys stay on host |
+| `/Users/bruba/` (general) | No arbitrary host filesystem access |
+| Other agents' workspaces | Cross-agent isolation |
+| `/tmp/` on host | Container has its own /tmp |
+
+### Security Implications
+
+#### Privilege Escalation Prevention
+
+**Before sandbox:** Agent could edit `exec-approvals.json` to allow any command.
+
+**After sandbox:**
+1. `exec-approvals.json` not mounted → agent cannot read or modify
+2. Even if agent somehow got the file content, it couldn't write changes back
+3. Node host reads allowlist from HOST filesystem, outside container
+
+#### Tool Script Integrity
+
+**Before sandbox:** Agent could modify its own tool scripts (e.g., make `whisper.sh` exfiltrate data).
+
+**After sandbox:**
+1. **ALL agents** have `tools/` mounted read-only (defense-in-depth)
+2. Write attempts fail with "Read-only file system"
+3. Original scripts on host remain unchanged
+4. Future tools are automatically protected when added
+
+#### Web Content Isolation
+
+**bruba-web's isolation:**
+1. Has internet access (bridge network)
+2. Has NO memory persistence (`memorySearch.enabled: false`)
+3. Cannot use `sessions_send` (can't initiate contact)
+4. Cannot modify other agents' files
+5. Web content stays in bruba-web's context
+6. Only structured summaries cross to other agents
+
+**Prompt injection defense:** If fetched web content contains "ignore previous instructions," it's processed in bruba-web's isolated context. bruba-web has no tools to affect other agents or the host.
+
+#### Network Isolation
+
+| Agent | Network | Can Reach |
+|-------|---------|-----------|
+| bruba-main | none | Only gateway (internal) |
+| bruba-guru | none | Only gateway (internal) |
+| bruba-manager | none | Only gateway (internal) |
+| bruba-web | bridge | Internet + gateway |
+
+**Implication:** Even if an agent were compromised, it cannot make outbound network connections (except bruba-web, which is already the web-facing agent).
+
+### Defense in Depth Summary
+
+| Layer | Protection | Threat Mitigated |
+|-------|------------|------------------|
+| Docker containers | Filesystem isolation | Host filesystem access |
+| Bind mount restrictions | Selective access only | Reading sensitive configs |
+| Read-only mounts | tools/ immutable | Tool script tampering |
+| Network isolation | No outbound (except web) | Data exfiltration |
+| Separate bruba-web | Web isolated from others | Prompt injection spread |
+| Node host exec | Allowlist enforced on host | Command injection |
+| exec-approvals.json on host | Not in container | Privilege escalation |
+| Per-agent containers | Workspace separation | Cross-agent contamination |
+
+### Container Lifecycle
+
+**Startup:**
+1. Gateway LaunchAgent starts on system boot (`ai.openclaw.gateway.plist`)
+2. Gateway creates containers on-demand when agents are first used
+3. No manual `docker start` required
+
+**Runtime:**
+- Containers persist while gateway runs
+- Each agent gets its own container (scope: agent)
+- Container state survives agent session resets
+
+**Shutdown:**
+- `openclaw gateway stop` gracefully stops containers
+- Containers auto-prune after 24h idle (configurable)
+
+**Verification:**
+```bash
+# From bruba-godo
+./tools/test-sandbox.sh           # All tests
+./tools/test-sandbox.sh --security    # Security only
+./tools/test-sandbox.sh --status      # Container status
+```
+
+### Debugging Sandbox Issues
+
+```bash
+# Check sandbox configuration
+openclaw sandbox explain
+
+# List running containers
+openclaw sandbox list
+
+# Recreate containers after config change
+openclaw sandbox recreate --all
+
+# Exec into container for debugging
+docker exec -it openclaw-sandbox-bruba-main /bin/sh
+
+# Verify isolation (should fail)
+docker exec openclaw-sandbox-bruba-main cat /root/.openclaw/exec-approvals.json
+docker exec openclaw-sandbox-bruba-main ls /Users/bruba/
+
+# Verify tools/:ro on ALL agents (should all fail)
+docker exec openclaw-sandbox-bruba-main touch /workspace/tools/test.txt
+docker exec openclaw-sandbox-bruba-guru touch /workspace/tools/test.txt
+docker exec openclaw-sandbox-bruba-manager touch /workspace/tools/test.txt
+docker exec openclaw-sandbox-bruba-web touch /workspace/tools/test.txt
+```
 
 ---
 
@@ -1324,6 +1661,9 @@ Auto-recovery sometimes fails on context overflow.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.5.2 | 2026-02-03 | **Sandbox tool policy:** Documented tools.sandbox.tools.allow ceiling (message tool missing fix) |
+| 3.5.1 | 2026-02-03 | **Defense-in-depth:** ALL agents now have tools/:ro (not just bruba-main), updated access matrices and debugging commands |
+| 3.5.0 | 2026-02-03 | **Part 7 major expansion:** Docker sandbox implementation details, per-agent access matrix (read/write/none for every resource), network isolation matrix, exec vs file path split, security implications, container lifecycle, debugging commands |
 | 3.4.0 | 2026-02-03 | **Guru direct response pattern:** Guru messages users directly via message tool, returns only summary to Main. Added message tool to bruba-guru. Updated topology notes, communication patterns, Quick Reference. |
 | 3.3.3 | 2026-02-02 | Added USER.md Signal UUID setup requirement for Siri async replies |
 | 3.3.2 | 2026-02-02 | Added message tool documentation: voice response workflow, NO_REPLY pattern, uuid target format |

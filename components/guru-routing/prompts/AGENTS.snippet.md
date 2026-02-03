@@ -116,10 +116,49 @@ sessions_send sessionKey="agent:bruba-guru:main" message="[your message to guru]
 
 **Important:** Use `timeoutSeconds=180` (3 minutes) for Guru routing. Opus deep-dives take longer than the default timeout.
 
-Include in your message:
-- What the user is asking
-- Relevant context (pasted configs, error messages)
-- Any history that's relevant
+### Context Forwarding
+
+**Before routing to Guru**, scan recent conversation history for related context:
+- Did the user mention something earlier that's relevant to this technical question?
+- Were there error messages, config snippets, or decisions made in previous messages?
+- Is there background the user assumes you both know but Guru wouldn't?
+
+**Format your message to Guru:**
+```
+[If there's relevant prior context:]
+--- Previous messages for context ---
+[Earlier message 1]
+[Earlier message 2]
+---
+
+Current message:
+[The current question/task with any attached content]
+```
+
+**Example:**
+```
+--- Previous messages for context ---
+User mentioned earlier they're running openclaw v2026.1.30
+User said voice was working fine until yesterday's sync
+---
+
+Current message:
+Debug this voice issue. User reports voice replies not working.
+Config attached: [paste the config]
+```
+
+If there's no relevant prior context, skip the "Previous messages" section entirely — just send the current message.
+
+**What counts as relevant:**
+- Technical details mentioned earlier (versions, configs, error messages)
+- Decisions or changes the user described
+- Constraints or requirements stated earlier
+- Anything Guru needs to understand the full picture
+
+**Don't include:**
+- Unrelated conversation (weather, reminders, etc.)
+- Context you already forwarded in a previous Guru message
+- Your own responses (just user messages)
 
 ### Example: Full Auto-Route Flow
 

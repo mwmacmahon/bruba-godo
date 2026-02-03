@@ -321,7 +321,7 @@ chmod +x ~/clawd/tools/tts.sh
 
 ### Add to Exec Allowlist
 
-If using exec allowlist mode, add entries to `~/.clawdbot/exec-approvals.json`:
+If using exec allowlist mode, add entries to `~/.openclaw/exec-approvals.json`:
 
 ```json
 {
@@ -537,8 +537,8 @@ scp -r oldmachine:~/clawd/tools/ ~/clawd/tools/
 
 | Item | Value |
 |------|-------|
-| Clawdbot config | `~/.clawdbot/clawdbot.json` |
-| Exec allowlist | `~/.clawdbot/exec-approvals.json` |
+| Clawdbot config | `~/.openclaw/openclaw.json` |
+| Exec allowlist | `~/.openclaw/exec-approvals.json` |
 | signal-cli data | `~/.local/share/signal-cli/` |
 | Attachments | `~/.local/share/signal-cli/attachments/` |
 | Default HTTP port | 8080 (recommend 8088) |
