@@ -369,6 +369,368 @@ test_rotate_log_small() {
 }
 
 # ============================================================
+# Test: get_openclaw_config returns settings
+# ============================================================
+test_get_openclaw_config() {
+    echo ""
+    echo "=== Test: get_openclaw_config returns settings ==="
+    setup
+
+    # Create config with openclaw section
+    cat > "$TEMP_DIR/config.yaml" << 'EOF'
+version: 3
+
+ssh:
+  host: testbot
+
+remote:
+  home: /Users/testuser
+  workspace: /Users/testuser/clawd
+  openclaw: /Users/testuser/.openclaw
+  agent_id: test-agent
+
+openclaw:
+  model:
+    primary: opus
+    fallbacks:
+      - anthropic/claude-sonnet-4-5
+  compaction:
+    mode: safeguard
+    reserve_tokens_floor: 20000
+  max_concurrent: 4
+EOF
+
+    # Copy parse-yaml.py helper
+    mkdir -p "$TEMP_DIR/tools/helpers"
+    cp "$ROOT_DIR/tools/helpers/parse-yaml.py" "$TEMP_DIR/tools/helpers/"
+
+    local result exit_code=0
+    result=$(
+        cd "$TEMP_DIR"
+        ROOT_DIR="$TEMP_DIR"
+        source "$TEMP_DIR/tools/lib.sh"
+        get_openclaw_config compaction
+    ) || exit_code=$?
+
+    # Check result contains mode and reserveTokensFloor (camelCase)
+    if [[ $exit_code -eq 0 ]] && echo "$result" | grep -q '"mode"' && echo "$result" | grep -q '"reserveTokensFloor"'; then
+        pass "get_openclaw_config returns settings with camelCase keys"
+    else
+        fail "get_openclaw_config failed or returned wrong keys"
+        log "Result: $result"
+    fi
+
+    teardown
+}
+
+# ============================================================
+# Test: get_agent_model returns agent model
+# ============================================================
+test_get_agent_model() {
+    echo ""
+    echo "=== Test: get_agent_model returns agent model ==="
+    setup
+
+    # Create config with agent model
+    cat > "$TEMP_DIR/config.yaml" << 'EOF'
+version: 3
+
+ssh:
+  host: testbot
+
+remote:
+  home: /Users/testuser
+  workspace: /Users/testuser/clawd
+  openclaw: /Users/testuser/.openclaw
+  agent_id: test-agent
+
+agents:
+  test-main:
+    workspace: /Users/testuser/agents/test-main
+    model: sonnet
+  test-manager:
+    workspace: /Users/testuser/agents/test-manager
+    model:
+      primary: anthropic/claude-sonnet-4-5
+      fallbacks:
+        - anthropic/claude-haiku-4-5
+EOF
+
+    # Copy parse-yaml.py helper
+    mkdir -p "$TEMP_DIR/tools/helpers"
+    cp "$ROOT_DIR/tools/helpers/parse-yaml.py" "$TEMP_DIR/tools/helpers/"
+
+    local result exit_code=0
+    result=$(
+        cd "$TEMP_DIR"
+        ROOT_DIR="$TEMP_DIR"
+        source "$TEMP_DIR/tools/lib.sh"
+        get_agent_model test-main
+    ) || exit_code=$?
+
+    if [[ $exit_code -eq 0 ]] && [[ "$result" == "sonnet" ]]; then
+        pass "get_agent_model returns string model"
+    else
+        fail "get_agent_model failed for string model"
+        log "Result: $result"
+    fi
+
+    teardown
+}
+
+# ============================================================
+# Test: get_agent_heartbeat returns heartbeat config
+# ============================================================
+test_get_agent_heartbeat() {
+    echo ""
+    echo "=== Test: get_agent_heartbeat returns config ==="
+    setup
+
+    # Create config with agent heartbeat
+    cat > "$TEMP_DIR/config.yaml" << 'EOF'
+version: 3
+
+ssh:
+  host: testbot
+
+remote:
+  home: /Users/testuser
+  workspace: /Users/testuser/clawd
+  openclaw: /Users/testuser/.openclaw
+  agent_id: test-agent
+
+agents:
+  test-manager:
+    workspace: /Users/testuser/agents/test-manager
+    heartbeat:
+      every: 15m
+      model: anthropic/claude-haiku-4-5
+      target: signal
+      active_hours:
+        start: "07:00"
+        end: "22:00"
+EOF
+
+    # Copy parse-yaml.py helper
+    mkdir -p "$TEMP_DIR/tools/helpers"
+    cp "$ROOT_DIR/tools/helpers/parse-yaml.py" "$TEMP_DIR/tools/helpers/"
+
+    local result exit_code=0
+    result=$(
+        cd "$TEMP_DIR"
+        ROOT_DIR="$TEMP_DIR"
+        source "$TEMP_DIR/tools/lib.sh"
+        get_agent_heartbeat test-manager
+    ) || exit_code=$?
+
+    # Check result contains activeHours (camelCase)
+    if [[ $exit_code -eq 0 ]] && echo "$result" | grep -q '"activeHours"'; then
+        pass "get_agent_heartbeat returns config with camelCase keys"
+    else
+        fail "get_agent_heartbeat failed or returned wrong keys"
+        log "Result: $result"
+    fi
+
+    teardown
+}
+
+# ============================================================
+# Test: has_openclaw_config detects section
+# ============================================================
+test_has_openclaw_config() {
+    echo ""
+    echo "=== Test: has_openclaw_config detects section ==="
+    setup
+
+    # Create config WITHOUT openclaw section
+    cat > "$TEMP_DIR/config.yaml" << 'EOF'
+version: 2
+
+ssh:
+  host: testbot
+
+remote:
+  home: /Users/testuser
+  workspace: /Users/testuser/clawd
+  openclaw: /Users/testuser/.openclaw
+  agent_id: test-agent
+EOF
+
+    # Copy parse-yaml.py helper
+    mkdir -p "$TEMP_DIR/tools/helpers"
+    cp "$ROOT_DIR/tools/helpers/parse-yaml.py" "$TEMP_DIR/tools/helpers/"
+
+    local exit_code=0
+    (
+        cd "$TEMP_DIR"
+        ROOT_DIR="$TEMP_DIR"
+        source "$TEMP_DIR/tools/lib.sh"
+        has_openclaw_config
+    ) || exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        pass "has_openclaw_config returns false when missing"
+    else
+        fail "has_openclaw_config should return false when section missing"
+    fi
+
+    # Now add openclaw section
+    cat >> "$TEMP_DIR/config.yaml" << 'EOF'
+
+openclaw:
+  max_concurrent: 4
+EOF
+
+    exit_code=0
+    (
+        cd "$TEMP_DIR"
+        ROOT_DIR="$TEMP_DIR"
+        source "$TEMP_DIR/tools/lib.sh"
+        has_openclaw_config
+    ) || exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        pass "has_openclaw_config returns true when present"
+    else
+        fail "has_openclaw_config should return true when section present"
+    fi
+
+    teardown
+}
+
+# ============================================================
+# Test: get_voice_config returns voice settings
+# ============================================================
+test_get_voice_config() {
+    echo ""
+    echo "=== Test: get_voice_config returns voice settings ==="
+    setup
+
+    # Create config with voice section
+    cat > "$TEMP_DIR/config.yaml" << 'EOF'
+version: 3
+
+ssh:
+  host: testbot
+
+remote:
+  home: /Users/testuser
+  workspace: /Users/testuser/clawd
+  openclaw: /Users/testuser/.openclaw
+  agent_id: test-agent
+
+openclaw:
+  voice:
+    stt:
+      enabled: true
+      max_bytes: 20971520
+      timeout_seconds: 120
+      language: en
+      models:
+        - provider: groq
+          model: whisper-large-v3-turbo
+    tts:
+      auto: inbound
+      provider: elevenlabs
+      max_text_length: 4000
+      timeout_ms: 30000
+      elevenlabs:
+        voice_id: "test-voice-id"
+        model_id: "eleven_multilingual_v2"
+        voice_settings:
+          stability: 0.5
+          similarity_boost: 0.75
+          speed: 1.0
+EOF
+
+    # Copy parse-yaml.py helper
+    mkdir -p "$TEMP_DIR/tools/helpers"
+    cp "$ROOT_DIR/tools/helpers/parse-yaml.py" "$TEMP_DIR/tools/helpers/"
+
+    local result exit_code=0
+    result=$(
+        cd "$TEMP_DIR"
+        ROOT_DIR="$TEMP_DIR"
+        source "$TEMP_DIR/tools/lib.sh"
+        get_voice_config stt
+    ) || exit_code=$?
+
+    # Check result contains camelCase keys
+    if [[ $exit_code -eq 0 ]] && echo "$result" | grep -q '"maxBytes"' && echo "$result" | grep -q '"timeoutSeconds"'; then
+        pass "get_voice_config stt returns settings with camelCase keys"
+    else
+        fail "get_voice_config stt failed or returned wrong keys"
+        log "Result: $result"
+    fi
+
+    # Test TTS section
+    result=$(
+        cd "$TEMP_DIR"
+        ROOT_DIR="$TEMP_DIR"
+        source "$TEMP_DIR/tools/lib.sh"
+        get_voice_config tts
+    ) || exit_code=$?
+
+    # Check TTS result contains camelCase keys
+    if [[ $exit_code -eq 0 ]] && echo "$result" | grep -q '"maxTextLength"' && echo "$result" | grep -q '"timeoutMs"' && echo "$result" | grep -q '"voiceId"'; then
+        pass "get_voice_config tts returns settings with camelCase keys"
+    else
+        fail "get_voice_config tts failed or returned wrong keys"
+        log "Result: $result"
+    fi
+
+    teardown
+}
+
+# ============================================================
+# Test: get_voice_config returns empty when missing
+# ============================================================
+test_get_voice_config_missing() {
+    echo ""
+    echo "=== Test: get_voice_config returns empty when missing ==="
+    setup
+
+    # Create config WITHOUT voice section
+    cat > "$TEMP_DIR/config.yaml" << 'EOF'
+version: 3
+
+ssh:
+  host: testbot
+
+remote:
+  home: /Users/testuser
+  workspace: /Users/testuser/clawd
+  openclaw: /Users/testuser/.openclaw
+  agent_id: test-agent
+
+openclaw:
+  max_concurrent: 4
+EOF
+
+    # Copy parse-yaml.py helper
+    mkdir -p "$TEMP_DIR/tools/helpers"
+    cp "$ROOT_DIR/tools/helpers/parse-yaml.py" "$TEMP_DIR/tools/helpers/"
+
+    local result exit_code=0
+    result=$(
+        cd "$TEMP_DIR"
+        ROOT_DIR="$TEMP_DIR"
+        source "$TEMP_DIR/tools/lib.sh"
+        get_voice_config stt
+    ) || exit_code=$?
+
+    # Should return empty (not error)
+    if [[ -z "$result" || "$result" == "" ]]; then
+        pass "get_voice_config returns empty when voice section missing"
+    else
+        fail "get_voice_config should return empty when section missing"
+        log "Result: $result"
+    fi
+
+    teardown
+}
+
+# ============================================================
 # Run all tests
 # ============================================================
 
@@ -384,6 +746,12 @@ test_require_commands_success
 test_require_commands_missing
 test_rotate_log
 test_rotate_log_small
+test_get_openclaw_config
+test_get_agent_model
+test_get_agent_heartbeat
+test_has_openclaw_config
+test_get_voice_config
+test_get_voice_config_missing
 
 # Summary
 echo ""

@@ -477,7 +477,7 @@ Siri: "Tell Bruba to remind me about laundry"
        ▼
 HTTP API → bruba-main
        │
-       ├── Detects [From Siri async] or [Tell Bruba] tag
+       ├── Detects [From Siri async] or [From Siri async] tag
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐

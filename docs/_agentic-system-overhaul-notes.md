@@ -241,7 +241,7 @@ When <REDACTED-NAME> sends a voice note:
 
 Messages may arrive via HTTP (Siri, automations) instead of Signal.
 
-### Siri Async — `[Tell Bruba]`
+### Siri Async — `[From Siri async]`
 
 User already heard "Got it, I'll message you" from Siri. They expect the response in Signal.
 
@@ -266,7 +266,7 @@ User is waiting for Siri to speak the response.
 
 | Tag | Source | Response Destination |
 |-----|--------|---------------------|
-| `[Tell Bruba]` | Siri "tell" shortcut | Signal (via message tool) |
+| `[From Siri async]` | Siri "tell" shortcut | Signal (via message tool) |
 | `[Ask Bruba]` | Siri "ask" shortcut | HTTP → Siri speaks |
 | No tag + Signal header | Normal Signal | Normal response |
 

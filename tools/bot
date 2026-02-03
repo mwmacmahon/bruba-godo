@@ -1,26 +1,25 @@
 #!/bin/bash
-# SSH wrapper for running commands on the bot
+# Bot command wrapper with transport abstraction
 #
 # Usage:
-#   ./tools/bot <command>           # Run command on bot
+#   ./tools/bot <command>           # Run command as bot user
 #   ./tools/bot clawdbot status     # Example: check status
 #   ./tools/bot cat ~/clawd/FILE    # Example: read a file
 #
-# This wrapper exists to simplify Claude Code permission whitelisting.
-# Non-destructive commands can be pre-approved via .claude/settings.json
+# Transport is controlled by BOT_TRANSPORT env var:
+#   sudo          - Same machine, different user (fastest)
+#   tailscale-ssh - Tailscale SSH (no key management)
+#   ssh           - Regular SSH with multiplexing (default)
 #
-# Configuration is read from config.yaml (ssh.host)
+# Example:
+#   BOT_TRANSPORT=sudo ./tools/bot ls ~/agents
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+source "$SCRIPT_DIR/lib.sh"
 
-# Read host from config.yaml
-if [[ -f "$ROOT_DIR/config.yaml" ]]; then
-    HOST=$(grep "^  host:" "$ROOT_DIR/config.yaml" 2>/dev/null | awk '{print $2}' | tr -d '"')
-fi
-HOST="${HOST:-bruba}"
+load_config
 
 if [[ $# -eq 0 ]]; then
     echo "Usage: bot <command>"
@@ -30,9 +29,10 @@ if [[ $# -eq 0 ]]; then
     echo "  bot cat ~/clawd/AGENTS.md"
     echo "  bot 'ls -la ~/clawd/'"
     echo ""
-    echo "Host: $HOST (from config.yaml)"
+    echo "Transport: $BOT_TRANSPORT"
+    echo "User: $BOT_USER"
+    echo "Host: $BOT_HOST"
     exit 1
 fi
 
-# Join all arguments as the remote command
-ssh "$HOST" "$*"
+bot_exec "$@"

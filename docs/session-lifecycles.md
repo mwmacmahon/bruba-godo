@@ -1,6 +1,6 @@
 ---
-version: 1.1.1
-updated: 2026-02-03 00:15
+version: 1.2.0
+updated: 2026-02-03 17:30
 type: refdoc
 project: planning
 tags: [bruba, openclaw, sessions, compaction, memoryflush, continuity]
@@ -128,7 +128,9 @@ The summary replaces detailed history. Nuance is lost — exact phrasing, reason
 Auto-compaction when: currentTokens >= contextWindow - reserveTokensFloor - softThresholdTokens
 ```
 
-With defaults on 200K window: `200,000 - 20,000 - 8,000 = 172,000 tokens`
+With our config on 200K window: `200,000 - 20,000 - 40,000 = 140,000 tokens`
+
+**Note:** softThresholdTokens was increased from 8K to 40K (2026-02-03) to give more warning before compaction and reduce surprise compaction frequency.
 
 ### Compaction Modes
 
@@ -332,7 +334,7 @@ WITH isolation (--session isolated):
 
 ## Part 8: Complete Configuration
 
-### openclaw.json
+### openclaw.json (Simplified, Session-Relevant Portions)
 
 ```json
 {
@@ -349,11 +351,12 @@ WITH isolation (--session isolated):
         "reserveTokensFloor": 20000,
         "memoryFlush": {
           "enabled": true,
-          "softThresholdTokens": 8000,
+          "softThresholdTokens": 40000,
           "systemPrompt": "CRITICAL: Session nearing compaction. Save all important context NOW.",
           "prompt": "Write to memory/CONTINUATION.md immediately:\n1. Session summary\n2. In-progress work with status\n3. Open questions\n4. Next steps\n5. Relevant files\n\nReply NO_REPLY when done."
         }
-      }
+      },
+      "sandbox": { "mode": "off" }
     },
     "list": [
       {
@@ -361,13 +364,10 @@ WITH isolation (--session isolated):
         "name": "Bruba",
         "default": true,
         "workspace": "/Users/bruba/agents/bruba-main",
-        "model": {
-          "primary": "anthropic/claude-opus-4-5",
-          "fallbacks": ["anthropic/claude-sonnet-4-5"]
-        },
-        "heartbeat": { "every": "0m" },
+        "model": "sonnet",
+        "heartbeat": { "every": "1h" },
         "tools": {
-          "deny": ["web_search", "web_fetch", "browser", "canvas", 
+          "deny": ["web_search", "web_fetch", "browser", "canvas",
                    "cron", "gateway", "sessions_spawn"]
         }
       },
@@ -397,16 +397,6 @@ WITH isolation (--session isolated):
         "model": "anthropic/claude-sonnet-4-5",
         "memorySearch": { "enabled": false },
         "heartbeat": { "every": "0m" },
-        "sandbox": {
-          "mode": "all",
-          "scope": "agent",
-          "workspaceAccess": "none",
-          "docker": {
-            "network": "bridge",
-            "readOnlyRoot": true,
-            "memory": "512m"
-          }
-        },
         "tools": {
           "allow": ["web_search", "web_fetch", "read", "write"],
           "deny": ["exec", "edit", "apply_patch",
@@ -414,30 +404,33 @@ WITH isolation (--session isolated):
                    "sessions_spawn", "sessions_send",
                    "browser", "canvas", "cron", "gateway"]
         }
+      },
+      {
+        "id": "bruba-guru",
+        "name": "Guru",
+        "workspace": "/Users/bruba/agents/bruba-guru",
+        "model": "opus",
+        "heartbeat": { "every": "0m" },
+        "tools": {
+          "deny": ["web_search", "web_fetch", "browser", "canvas",
+                   "cron", "gateway", "sessions_spawn"]
+        }
       }
     ]
   },
-  "bindings": [
-    { "agentId": "bruba-main", "match": { "channel": "signal" } }
-  ],
   "tools": {
     "agentToAgent": {
       "enabled": true,
-      "allow": ["bruba-main", "bruba-manager", "bruba-web"]
+      "allow": ["bruba-main", "bruba-manager", "bruba-web", "bruba-guru"]
     }
-  },
-  "channels": {
-    "signal": {
-      "enabled": true,
-      "dmPolicy": "pairing"
-    }
-  },
-  "gateway": {
-    "port": 18789,
-    "bind": "loopback"
   }
 }
 ```
+
+**Model notes:**
+- **bruba-main:** Uses Sonnet directly (previously Opus with Sonnet fallback, but mid-session model switching caused compaction issues)
+- **bruba-guru:** Uses Opus for deep research tasks
+- **bruba-manager/bruba-web:** Sonnet (cost-effective for coordination/web tasks)
 
 ### Pre-Reset Continuity Cron
 
@@ -588,8 +581,18 @@ memoryFlush depends on agent compliance — the agent can ignore the prompt. Com
 |---------|-------|------------|
 | Daily reset | 4am | All agents |
 | Compaction mode | safeguard | All agents |
-| memoryFlush | Enabled, 8K threshold | All agents |
-| Context pruning | Disabled | All agents |
+| reserveTokensFloor | 20,000 tokens | All agents |
+| memoryFlush | Enabled, 40K threshold | All agents |
+| Sandbox | Off | All agents |
+
+### Agent Model Summary
+
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| bruba-main | Sonnet | Primary conversation (was Opus, changed due to fallback-induced compaction) |
+| bruba-manager | Sonnet (Haiku fallback) | Coordination, heartbeats |
+| bruba-web | Sonnet | Web research |
+| bruba-guru | Opus | Deep research tasks |
 
 ---
 
@@ -597,6 +600,7 @@ memoryFlush depends on agent compliance — the agent can ignore the prompt. Com
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2.0 | 2026-02-03 | **Model and compaction updates:** bruba-main switched to Sonnet (Opus fallback caused mid-session compaction). softThresholdTokens increased 8K→40K. Added bruba-guru to agent list. Sandbox mode now "off" for all agents. |
 | 1.1.1 | 2026-02-02 | Fixed pre-reset cron syntax: `--system-event` not `--message` for main session jobs. Added temp file approach for multiline prompts. |
 | 1.1.0 | 2026-02-02 | Corrected config scope: session/compaction/pruning are global-only, not per-agent. Removed contextPruning (would affect main). Added known limitations section. |
 | 1.0.0 | 2026-02-02 | Initial version (had incorrect per-agent configs) |

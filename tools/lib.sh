@@ -50,8 +50,16 @@ load_config() {
     # Derived remote paths
     REMOTE_SESSIONS="$REMOTE_OPENCLAW/agents/$REMOTE_AGENT_ID/sessions"
 
-    # SSH multiplexing options for faster connections
+    # SSH multiplexing options for faster connections (used for ssh transport)
     SSH_OPTS="-o ControlMaster=auto -o ControlPath=/tmp/ssh-%r@%h:%p -o ControlPersist=60"
+
+    # Bot transport configuration
+    # Options: sudo (same machine), tailscale-ssh, ssh (default)
+    # Read from config.yaml, can be overridden by environment variable BOT_TRANSPORT
+    CONFIG_TRANSPORT=$(grep "^transport:" "$config_file" | awk '{print $2}' | tr -d '"')
+    BOT_TRANSPORT="${BOT_TRANSPORT:-${CONFIG_TRANSPORT:-ssh}}"
+    BOT_USER="${BOT_USER:-bruba}"
+    BOT_HOST="${BOT_HOST:-$SSH_HOST}"
 }
 
 # Get list of configured agents (excludes agents with null workspace or empty prompts)
@@ -119,7 +127,7 @@ get_agent_tools_allow() {
     local config_file="$ROOT_DIR/config.yaml"
     local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
 
-    "$helper" "$config_file" "agents.$agent.tools_allow" 2>/dev/null
+    "$helper" "$config_file" "agents.$agent.tools_allow" 2>/dev/null || true
 }
 
 # Get tools_deny list for an agent from config.yaml
@@ -130,7 +138,7 @@ get_agent_tools_deny() {
     local config_file="$ROOT_DIR/config.yaml"
     local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
 
-    "$helper" "$config_file" "agents.$agent.tools_deny" 2>/dev/null
+    "$helper" "$config_file" "agents.$agent.tools_deny" 2>/dev/null || true
 }
 
 # Get subagents config from config.yaml
@@ -141,6 +149,75 @@ get_subagents_config() {
     local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
 
     "$helper" "$config_file" "subagents" 2>/dev/null
+}
+
+# Get openclaw global config from config.yaml
+# Usage: get_openclaw_config [section]
+# Returns: JSON object with openclaw settings (with camelCase keys)
+# Examples:
+#   get_openclaw_config              # All openclaw settings
+#   get_openclaw_config compaction   # Just compaction section
+get_openclaw_config() {
+    local section="${1:-}"
+    local config_file="$ROOT_DIR/config.yaml"
+    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
+
+    if [[ -n "$section" ]]; then
+        "$helper" "$config_file" --to-json "openclaw.$section" 2>/dev/null || true
+    else
+        "$helper" "$config_file" --to-json "openclaw" 2>/dev/null || true
+    fi
+}
+
+# Get agent model config from config.yaml
+# Usage: get_agent_model "bruba-main"
+# Returns: JSON (string or object with primary/fallbacks)
+get_agent_model() {
+    local agent="$1"
+    local config_file="$ROOT_DIR/config.yaml"
+    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
+
+    "$helper" "$config_file" "agents.$agent.model" 2>/dev/null || true
+}
+
+# Get agent heartbeat config from config.yaml
+# Usage: get_agent_heartbeat "bruba-manager"
+# Returns: JSON object with heartbeat settings (camelCase keys)
+get_agent_heartbeat() {
+    local agent="$1"
+    local config_file="$ROOT_DIR/config.yaml"
+    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
+
+    "$helper" "$config_file" --to-json "agents.$agent.heartbeat" 2>/dev/null || true
+}
+
+# Check if openclaw section exists in config.yaml
+# Usage: has_openclaw_config
+# Returns: 0 if exists, 1 if not
+has_openclaw_config() {
+    local config_file="$ROOT_DIR/config.yaml"
+    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
+
+    "$helper" "$config_file" "openclaw" >/dev/null 2>&1
+}
+
+# Get voice config from config.yaml
+# Usage: get_voice_config [section]
+# Returns: JSON object with voice settings (with camelCase keys)
+# Examples:
+#   get_voice_config              # All voice settings
+#   get_voice_config stt          # Just STT section
+#   get_voice_config tts          # Just TTS section
+get_voice_config() {
+    local section="${1:-}"
+    local config_file="$ROOT_DIR/config.yaml"
+    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
+
+    if [[ -n "$section" ]]; then
+        "$helper" "$config_file" --to-json "openclaw.voice.$section" 2>/dev/null || true
+    else
+        "$helper" "$config_file" --to-json "openclaw.voice" 2>/dev/null || true
+    fi
 }
 
 # Cross-platform sed in-place
@@ -212,16 +289,54 @@ rotate_log() {
     mv "$log_file" "${log_file}.1"
 }
 
-# Run command on remote bot
-# Usage: bot_cmd "command"
-bot_cmd() {
-    ssh $SSH_OPTS "$SSH_HOST" "$*"
+# Run command as bot user (supports multiple transports)
+# Usage: bot_exec "command"
+# Transport is controlled by BOT_TRANSPORT env var or config
+bot_exec() {
+    local cmd="$*"
+
+    case "$BOT_TRANSPORT" in
+        sudo)
+            # Same machine, different user
+            # Use login shell (-i) to get proper ~ expansion for target user
+            sudo -u "$BOT_USER" -i bash -c "$cmd"
+            ;;
+        tailscale-ssh)
+            # Tailscale SSH (faster, no key management)
+            tailscale ssh "$BOT_USER@$BOT_HOST" "$cmd"
+            ;;
+        ssh|*)
+            # Default: regular SSH with multiplexing
+            ssh $SSH_OPTS "$BOT_USER@$BOT_HOST" "$cmd"
+            ;;
+    esac
 }
 
-# Copy file from remote bot
+# Legacy alias for compatibility
+bot_cmd() {
+    bot_exec "$@"
+}
+
+# Copy file from bot user's filesystem
 # Usage: bot_scp "remote_path" "local_path"
 bot_scp() {
-    scp $SSH_OPTS -q "$SSH_HOST:$1" "$2"
+    local remote_path="$1"
+    local local_path="$2"
+
+    case "$BOT_TRANSPORT" in
+        sudo)
+            # Same machine - just copy with sudo
+            sudo -u "$BOT_USER" cat "$remote_path" > "$local_path"
+            ;;
+        tailscale-ssh)
+            # Use rsync over tailscale ssh
+            rsync -e "tailscale ssh" -q "$BOT_USER@$BOT_HOST:$remote_path" "$local_path"
+            ;;
+        ssh|*)
+            # Default: regular scp
+            scp $SSH_OPTS -q "$BOT_USER@$BOT_HOST:$remote_path" "$local_path"
+            ;;
+    esac
 }
 
 # Parse common arguments

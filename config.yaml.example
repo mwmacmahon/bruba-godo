@@ -1,6 +1,10 @@
 # bruba-godo configuration
 # Copy this file to config.yaml and customize for your setup
-version: 2
+version: 3
+
+# Bot transport: how to run commands as the bot user
+# Options: sudo (same machine), tailscale-ssh, ssh (default)
+transport: ssh
 
 ssh:
   host: <your-ssh-host>            # SSH host alias from ~/.ssh/config
@@ -24,13 +28,84 @@ local:
 # Read-only reference - bot can read to understand codebase, not execute
 clone_repo_code: false
 
+# OpenClaw global defaults (synced to openclaw.json via sync-openclaw-config.sh)
+# These settings apply to all agents unless overridden per-agent
+openclaw:
+  # Model defaults: primary model and fallbacks for all agents
+  model:
+    primary: opus                              # Main model (alias or full ID)
+    fallbacks:
+      - anthropic/claude-sonnet-4-5            # First fallback
+      - anthropic/claude-haiku-4-5             # Second fallback
+
+  # Compaction: how to handle context window limits
+  compaction:
+    mode: safeguard                            # safeguard, aggressive, or off
+    reserve_tokens_floor: 20000                # Minimum tokens to keep after compaction
+    memory_flush:
+      enabled: true
+      soft_threshold_tokens: 40000             # Trigger memory flush at this threshold
+      prompt: |                                # Prompt sent to agent before compaction
+        Write to memory/CONTINUATION.md immediately:
+        1. Session summary
+        2. In-progress work with status
+        3. Open questions
+        4. Next steps
+        5. Relevant files
+
+        Reply NO_REPLY when done.
+      system_prompt: "CRITICAL: Session nearing compaction. Save all important context NOW."
+
+  # Context pruning: how to prune old context
+  context_pruning:
+    mode: cache-ttl                            # cache-ttl, aggressive, or off
+    ttl: 1h                                    # Time-to-live for cached context
+
+  # Sandbox: Docker isolation settings
+  sandbox:
+    mode: "off"                                # all, off, or specific agents
+
+  # Maximum concurrent agent sessions (global limit)
+  max_concurrent: 4
+
+  # Voice settings (synced to tools.media.audio + messages.tts)
+  # API keys stay in openclaw.json env.vars (not synced from config.yaml)
+  voice:
+    # STT: Speech-to-text configuration
+    stt:
+      enabled: true                              # Enable automatic transcription
+      max_bytes: 20971520                        # Max audio file size (20MB)
+      timeout_seconds: 120                       # Transcription timeout
+      language: en                               # Language hint for accuracy
+      models:
+        - provider: groq                         # STT provider (groq recommended)
+          model: whisper-large-v3-turbo          # Whisper model variant
+
+    # TTS: Text-to-speech configuration
+    tts:
+      auto: inbound                              # When to auto-TTS: inbound, always, off
+      provider: elevenlabs                       # TTS provider
+      max_text_length: 4000                      # Truncate responses longer than this
+      timeout_ms: 30000                          # TTS generation timeout
+      elevenlabs:
+        voice_id: "<your-voice-id>"              # From ElevenLabs dashboard
+        model_id: "eleven_multilingual_v2"       # ElevenLabs model
+        voice_settings:
+          stability: 0.5                         # 0-1: lower = more expressive
+          similarity_boost: 0.75                 # 0-1: how closely to match original
+          speed: 1.0                             # 0.5-2.0: playback speed
+
 # Multi-agent configuration
 # Each agent has its own workspace and prompt assembly config
 agents:
   <agent-id>-main:
     workspace: /Users/<bot-username>/agents/<agent-id>-main
     prompts: [agents, tools]  # Which prompt files to assemble
-    # Tool permissions (synced to openclaw.json via update-agent-tools.sh)
+    # Model: string alias or object with primary/fallbacks
+    model: sonnet                              # Override global default
+    # Heartbeat: false to disable, or object for proactive mode
+    heartbeat: false                           # Main is reactive, no heartbeat
+    # Tool permissions (synced to openclaw.json via sync-openclaw-config.sh)
     # Main agent: full capabilities except web (delegated to -web agent)
     tools_allow:
       - read
@@ -104,6 +179,19 @@ agents:
   <agent-id>-manager:
     workspace: /Users/<bot-username>/agents/<agent-id>-manager
     prompts: [agents, tools, heartbeat]
+    # Model: sonnet for normal ops, haiku for heartbeats
+    model:
+      primary: anthropic/claude-sonnet-4-5
+      fallbacks:
+        - anthropic/claude-haiku-4-5
+    # Heartbeat: proactive monitoring configuration
+    heartbeat:
+      every: 15m                               # Check every 15 minutes
+      model: anthropic/claude-haiku-4-5        # Cheap model for heartbeats
+      target: signal                           # Where to deliver alerts
+      active_hours:
+        start: "07:00"                         # Start at 7am
+        end: "22:00"                           # End at 10pm
     # Tool permissions (synced to openclaw.json)
     # Manager: coordinator agent, needs exec for CLI tools (remindctl, icalBuddy)
     # Note: exec NOT denied - manager needs it for heartbeat checks
@@ -134,6 +222,12 @@ agents:
   <agent-id>-web:
     workspace: /Users/<bot-username>/agents/<agent-id>-web
     prompts: [agents]  # Uses agents assembly path with web-base template
+    # Model: sonnet (stateless, no fallback needed)
+    model: anthropic/claude-sonnet-4-5
+    # Heartbeat disabled (passive service)
+    heartbeat: false
+    # Memory disabled (stateless for security isolation)
+    memory_search: false
     # Web research service agent (peer, not helper)
     # Receives tasks via sessions_send from Main or Manager
     # Stateless, passive, write-only - security isolation for web content
@@ -160,6 +254,10 @@ agents:
   <agent-id>-guru:
     workspace: /Users/<bot-username>/agents/<agent-id>-guru
     prompts: [agents, tools]
+    # Model: opus for thorough technical reasoning
+    model: opus
+    # Heartbeat disabled (reactive specialist)
+    heartbeat: false
     # Technical specialist agent (peer)
     # Receives deep-dive tasks via sessions_send from Main
     # Opus model for thorough reasoning

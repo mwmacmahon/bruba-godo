@@ -1,5 +1,5 @@
 ---
-version: 3.8.0
+version: 3.8.3
 updated: 2026-02-03
 type: refdoc
 project: planning
@@ -18,7 +18,7 @@ Bruba uses a **four-agent architecture** with three peer agents and one service 
 
 | Agent | Model | Role | Web Access |
 |-------|-------|------|------------|
-| **bruba-main** | Opus | Reactive — user conversations, file ops, routing | ❌ via bruba-web |
+| **bruba-main** | Sonnet | Reactive — user conversations, file ops, routing | ❌ via bruba-web |
 | **bruba-guru** | Opus | Specialist — technical deep-dives, debugging, architecture | ❌ via bruba-web |
 | **bruba-manager** | Sonnet/Haiku | Proactive — heartbeat, cron coordination, monitoring | ❌ via bruba-web |
 | **bruba-web** | Sonnet | Service — stateless web search, prompt injection barrier | ✅ Direct |
@@ -1270,6 +1270,34 @@ The brew version is preferred anyway — brew handles updates automatically.
 
 **Signal data location:** Account credentials and keys are stored in `~/.local/share/signal-cli/`, not in the installation directory. Deleting the binary doesn't affect your linked account.
 
+### Bot Transport Abstraction
+
+The `./tools/bot` wrapper (and `bot_exec()` in lib.sh) supports multiple transports for running commands as the bot user:
+
+| Transport | `BOT_TRANSPORT=` | Use Case |
+|-----------|------------------|----------|
+| **sudo** | `sudo` | Same machine, different user (fastest) |
+| **Tailscale SSH** | `tailscale-ssh` | Remote via Tailscale's SSH server |
+| **SSH** | `ssh` | Remote via regular SSH with multiplexing (default) |
+
+**Configuration in config.yaml:**
+```yaml
+transport: sudo  # Options: sudo, tailscale-ssh, ssh
+```
+
+Override per-command if needed: `BOT_TRANSPORT=ssh ./tools/bot ls ~/agents`
+
+**For same-machine setups** (bruba is a local account on the operator machine):
+1. Add sudoers entry: `dadbook ALL=(bruba) NOPASSWD: ALL` in `/etc/sudoers.d/bruba-admin`
+2. Set `transport: sudo` in config.yaml
+3. Commands execute instantly without SSH overhead
+
+**For remote setups:**
+- Default `ssh` transport uses multiplexing for faster subsequent connections
+- `tailscale-ssh` requires `sudo tailscale set --ssh` on the bot machine
+
+**Scripts using lib.sh** (mirror.sh, push.sh, etc.) automatically use the configured transport via `bot_exec()`.
+
 ### Prerequisites
 
 **remindctl** — CLI for Apple Reminders
@@ -1524,6 +1552,74 @@ cp ~/.clawdbot/agents/bruba-main/auth-profiles.json \
 
 ## Part 10: Configuration Reference
 
+### config.yaml (Operator Source of Truth)
+
+As of v3.8.3, `config.yaml` is the source of truth for OpenClaw settings. The operator controls configuration locally, then syncs to the bot via `sync-openclaw-config.sh`.
+
+**Key sections:**
+
+```yaml
+# Global defaults (synced to agents.defaults in openclaw.json)
+openclaw:
+  model:
+    primary: opus
+    fallbacks: [anthropic/claude-sonnet-4-5, anthropic/claude-haiku-4-5]
+  compaction:
+    mode: safeguard
+    reserve_tokens_floor: 20000
+    memory_flush:
+      enabled: true
+      soft_threshold_tokens: 40000
+      prompt: |-
+        Write to memory/CONTINUATION.md immediately...
+  context_pruning:
+    mode: cache-ttl
+    ttl: 1h
+  sandbox:
+    mode: "off"
+  max_concurrent: 4
+
+# Per-agent settings (synced to agents.list[] in openclaw.json)
+agents:
+  bruba-main:
+    model: sonnet                    # String alias or object
+    heartbeat: false                 # false = disabled (every: "0m")
+    tools_allow: [...]
+    tools_deny: [...]
+
+  bruba-manager:
+    model:
+      primary: anthropic/claude-sonnet-4-5
+      fallbacks: [anthropic/claude-haiku-4-5]
+    heartbeat:
+      every: 15m
+      model: anthropic/claude-haiku-4-5
+      target: signal
+      active_hours:
+        start: "07:00"
+        end: "22:00"
+
+  bruba-web:
+    model: anthropic/claude-sonnet-4-5
+    heartbeat: false
+    memory_search: false             # Stateless (memorySearch.enabled)
+```
+
+**Syncing:**
+
+```bash
+./tools/sync-openclaw-config.sh --check      # Show discrepancies
+./tools/sync-openclaw-config.sh              # Apply changes
+./tools/sync-openclaw-config.sh --dry-run    # Preview without applying
+```
+
+**What's NOT managed by config.yaml:**
+- `auth.profiles` - API keys/tokens
+- `channels` - Signal/Telegram secrets
+- `gateway` - Port/auth config
+- `env.vars` - API keys
+- `plugins`, `skills`, `messages` - Runtime config
+
 ### openclaw.json (Target State)
 
 ```json
@@ -1693,7 +1789,7 @@ Auto-recovery sometimes fails on context overflow.
 | Item | Status | Notes |
 |------|--------|-------|
 | OpenClaw migration | ✅ | v2026.1.30 |
-| bruba-main config | ✅ | Opus, no web |
+| bruba-main config | ✅ | Sonnet (was Opus, changed due to fallback-induced compaction), no web |
 | bruba-manager config | ✅ | Sonnet/Haiku heartbeat |
 | Agent-to-agent comms | ✅ | `agentToAgent.enabled` |
 | Directory structure | ✅ | Workspaces created |
@@ -1770,6 +1866,9 @@ Auto-recovery sometimes fails on context overflow.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.8.3 | 2026-02-03 | **OpenClaw config migration:** config.yaml is now source of truth for openclaw.json settings. New `openclaw:` section for global defaults, per-agent model/heartbeat config. New `sync-openclaw-config.sh` replaces `update-agent-tools.sh`. Extended `parse-yaml.py` with `--to-json` mode for snake_case→camelCase conversion. |
+| 3.8.2 | 2026-02-03 | **Compaction fixes:** bruba-main switched from Opus to Sonnet (mid-session fallback was triggering compaction). softThresholdTokens increased 8K→40K. bruba-guru retains Opus. |
+| 3.8.1 | 2026-02-03 | **Bot transport abstraction:** `./tools/bot` and `bot_exec()` now support multiple transports (sudo, tailscale-ssh, ssh). Enables same-machine operation without SSH overhead when bruba is a local account. |
 | 3.8.0 | 2026-02-03 | **Siri async via Manager:** Manager acts as fast HTTP front door for Siri async requests. Uses `sessions_send timeoutSeconds=0` (fire-and-forget) to forward to Main. Beats Siri's 10-15s timeout. Added `siri-async` component for Manager. |
 | 3.7.0 | 2026-02-03 | **Automatic voice handling:** OpenClaw now handles STT (Groq Whisper) and TTS (ElevenLabs) automatically. Agents are voice-agnostic. Updated Part 4 voice documentation. |
 | 3.6.0 | 2026-02-03 | **Manager coordination pattern:** Nightly reset jobs now route through bruba-manager (isolated + agentTurn) instead of directly to bruba-main (systemEvent + main = disabled bug). Added Signal rate limit warning. |

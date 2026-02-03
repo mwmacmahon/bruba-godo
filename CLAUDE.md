@@ -125,30 +125,59 @@ exports:
 
 ## Bot Commands
 
-**Always try `./tools/bot` first.** It reads config.yaml for the host.
+**Always use `./tools/bot`** — it handles transport abstraction automatically.
 
-Two rules:
-1. **NEVER use `~`** — expands locally to YOUR home. Always use full paths like `/Users/bruba`
-2. **No quotes around the command** — breaks whitelist matching
+### Transport Options
+
+Transport is configured in `config.yaml`:
+
+```yaml
+transport: sudo  # Options: sudo, tailscale-ssh, ssh
+```
+
+| Transport | Use Case | Speed |
+|-----------|----------|-------|
+| `sudo` | Same machine, different user | Fastest |
+| `tailscale-ssh` | Remote via Tailscale SSH | Fast |
+| `ssh` | Remote via regular SSH (default) | Normal |
+
+Override per-command if needed: `BOT_TRANSPORT=ssh ./tools/bot ...`
+
+### Rules
+
+1. **Use full paths** — `/Users/bruba/...` not `~`
+2. **Or quote for tilde** — `'ls ~/agents'` works (tilde expands on bot side)
+3. **No quotes around full paths** — breaks whitelist matching
 
 ```bash
-# Good — full paths, no quotes
+# Good — full paths
 ./tools/bot ls /Users/bruba/.openclaw/agents/bruba-main/sessions/
 ./tools/bot cat /Users/bruba/agents/bruba-main/MEMORY.md
 
-# Bad — tilde expands locally
-./tools/bot ls ~/.openclaw/...
+# Good — quoted tilde (expands on bot side)
+./tools/bot 'ls ~/agents/'
 
-# Bad — quotes break whitelist
-./tools/bot 'ls /Users/bruba/...'
+# Bad — unquoted tilde (expands locally to YOUR home)
+./tools/bot ls ~/.openclaw/...
 ```
 
-Common paths (on bot machine):
+### Common Paths
+
 - `/Users/bruba/agents/bruba-main/` — workspace root
 - `/Users/bruba/.openclaw/` — openclaw config/state
 - `/Users/bruba/.openclaw/agents/bruba-main/sessions/` — conversation transcripts
 
-**Only use `ssh bruba` for:** multi-line scripts, pipes, or jq. That's it.
+**Always use `./tools/bot`** — never use `ssh bruba` directly. The wrapper handles transport (sudo vs SSH) automatically based on config.yaml.
+
+For multi-line scripts:
+```bash
+./tools/bot 'cd ~/agents && ls -la && cat AGENTS.md'
+```
+
+For pipes/jq, run jq locally on the output:
+```bash
+./tools/bot 'cat ~/.openclaw/config.json' | jq '.agents'
+```
 
 ## Skills Reference
 

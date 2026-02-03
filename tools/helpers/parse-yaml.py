@@ -6,12 +6,14 @@ Usage:
     parse-yaml.py <file> <key>           # Get a specific key
     parse-yaml.py <file> --json          # Output as JSON
     parse-yaml.py <file> --frontmatter   # Extract YAML frontmatter from markdown
+    parse-yaml.py <file> --to-json <key> # Output key as JSON with camelCase keys
 
 Examples:
     parse-yaml.py config.yaml ssh.host
     parse-yaml.py config.yaml local --json
     parse-yaml.py config.yaml agents.bruba-main.tools_allow
     parse-yaml.py document.md --frontmatter
+    parse-yaml.py config.yaml --to-json openclaw.compaction
 """
 
 import sys
@@ -154,6 +156,51 @@ def get_nested_value(data, key_path):
     return current
 
 
+# Key mapping from snake_case YAML to camelCase JSON (for openclaw.json)
+SNAKE_TO_CAMEL = {
+    'context_pruning': 'contextPruning',
+    'memory_search': 'memorySearch',
+    'reserve_tokens_floor': 'reserveTokensFloor',
+    'memory_flush': 'memoryFlush',
+    'soft_threshold_tokens': 'softThresholdTokens',
+    'system_prompt': 'systemPrompt',
+    'workspace_access': 'workspaceAccess',
+    'max_concurrent': 'maxConcurrent',
+    'archive_after_minutes': 'archiveAfterMinutes',
+    'active_hours': 'activeHours',
+    'tools_allow': 'allow',  # Nested under .tools
+    'tools_deny': 'deny',    # Nested under .tools
+    # Voice settings (STT + TTS)
+    'max_bytes': 'maxBytes',
+    'timeout_seconds': 'timeoutSeconds',
+    'timeout_ms': 'timeoutMs',
+    'max_text_length': 'maxTextLength',
+    'voice_id': 'voiceId',
+    'model_id': 'modelId',
+    'voice_settings': 'voiceSettings',
+    'similarity_boost': 'similarityBoost',
+}
+
+
+def snake_to_camel(key):
+    """Convert snake_case key to camelCase using mapping, fallback to conversion."""
+    if key in SNAKE_TO_CAMEL:
+        return SNAKE_TO_CAMEL[key]
+    # Fallback: convert snake_case to camelCase
+    components = key.split('_')
+    return components[0] + ''.join(x.title() for x in components[1:])
+
+
+def transform_keys_to_camel(obj):
+    """Recursively transform all keys from snake_case to camelCase."""
+    if isinstance(obj, dict):
+        return {snake_to_camel(k): transform_keys_to_camel(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [transform_keys_to_camel(item) for item in obj]
+    else:
+        return obj
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__, file=sys.stderr)
@@ -175,6 +222,19 @@ def main():
     elif operation == '--frontmatter':
         data = extract_frontmatter(content)
         print(json.dumps(data, indent=2))
+    elif operation == '--to-json':
+        # Output as JSON with camelCase keys
+        if len(sys.argv) < 4:
+            print("Error: --to-json requires a key path", file=sys.stderr)
+            sys.exit(1)
+        key_path = sys.argv[3]
+        data = parse_yaml(content)
+        value = get_nested_value(data, key_path)
+        if value is None:
+            sys.exit(1)
+        # Transform keys to camelCase
+        transformed = transform_keys_to_camel(value)
+        print(json.dumps(transformed, indent=2))
     else:
         # Get specific key
         data = parse_yaml(content)

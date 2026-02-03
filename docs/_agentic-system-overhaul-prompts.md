@@ -127,14 +127,14 @@ HTTP messages have tags indicating their origin:
 
 | Tag in Message | Source | Where Response Goes |
 |----------------|--------|---------------------|\
-| `[Tell Bruba]` | Siri "tell" shortcut | Signal (you send it) |
+| `[From Siri async]` | Siri "tell" shortcut | Signal (you send it) |
 | `[Ask Bruba]` | Siri "ask" shortcut | HTTP response (Siri speaks) |
 | `[From Automation]` | Shortcuts automation | Depends on context |
 | No tag, has Signal header | Normal Signal message | Normal response |
 
 ---
 
-### Siri Async Pattern — `[Tell Bruba]`
+### Siri Async Pattern — `[From Siri async]`
 
 Siri already told <REDACTED-NAME> "Got it, I'll message you." He expects the response in **Signal**, not spoken by Siri.
 
@@ -151,7 +151,7 @@ Siri already told <REDACTED-NAME> "Got it, I'll message you." He expects the res
 
 **Example:**
 ```
-Input: [Tell Bruba] remind me to water the plants in 2 hours
+Input: [From Siri async] remind me to water the plants in 2 hours
 
 You:
 exec remindctl add --list "Immediate" --title "Water the plants" --due "2 hours"
@@ -196,7 +196,7 @@ Response: You have 3 meetings today: standup at 9, design review at 2, and your 
 For Siri async, you can also send a voice response:
 
 ```
-Input: [Tell Bruba] what's the weather like
+Input: [From Siri async] what's the weather like
 
 You:
 [check weather however you do]

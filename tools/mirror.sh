@@ -91,72 +91,69 @@ for agent in "${AGENTS[@]}"; do
         mkdir -p "$AGENT_MIRROR_DIR"/{prompts,memory,config,tools}
     fi
 
-    # Core prompt files
+    # Core prompt files - single SSH call to list all existing .md files
     log ""
     log "Prompts ($AGENT_WORKSPACE/*.md):"
     CORE_FILES="AGENTS.md MEMORY.md USER.md IDENTITY.md SOUL.md TOOLS.md HEARTBEAT.md BOOTSTRAP.md"
-    for file in $CORE_FILES; do
-        if bot_cmd "test -f $AGENT_WORKSPACE/$file" 2>/dev/null; then
-            if [[ "$DRY_RUN" == "true" ]]; then
-                log "  Would mirror: prompts/$file"
-            else
-                bot_scp "$AGENT_WORKSPACE/$file" "$AGENT_MIRROR_DIR/prompts/$file"
-                log "  + prompts/$file"
-            fi
-            AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
+    EXISTING_PROMPTS=$(bot_cmd "cd $AGENT_WORKSPACE && ls $CORE_FILES 2>/dev/null" || true)
+    for file in $EXISTING_PROMPTS; do
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log "  Would mirror: prompts/$file"
+        else
+            bot_scp "$AGENT_WORKSPACE/$file" "$AGENT_MIRROR_DIR/prompts/$file"
+            log "  + prompts/$file"
         fi
+        AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
     done
 
-    # Memory files (date-prefixed only) - only for agents with memory/
-    if bot_cmd "test -d $AGENT_WORKSPACE/memory" 2>/dev/null; then
-        log ""
-        log "Memory ($AGENT_WORKSPACE/memory/):"
-        MEMORY_COUNT=0
-        while IFS= read -r remote_file; do
-            [[ -z "$remote_file" ]] && continue
-            filename=$(basename "$remote_file")
+    # Memory files (date-prefixed only) - single find call (returns empty if dir doesn't exist)
+    log ""
+    log "Memory ($AGENT_WORKSPACE/memory/):"
+    MEMORY_COUNT=0
+    while IFS= read -r remote_file; do
+        [[ -z "$remote_file" ]] && continue
+        filename=$(basename "$remote_file")
 
-            # Only pull files starting with YYYY-MM-DD
-            if [[ "$filename" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2} ]]; then
-                if [[ "$DRY_RUN" == "true" ]]; then
-                    log "  Would mirror: memory/$filename"
-                else
-                    bot_scp "$remote_file" "$AGENT_MIRROR_DIR/memory/$filename"
-                    log "  + memory/$filename"
-                fi
-                AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
-                MEMORY_COUNT=$((MEMORY_COUNT + 1))
+        # Only pull files starting with YYYY-MM-DD
+        if [[ "$filename" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2} ]]; then
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log "  Would mirror: memory/$filename"
+            else
+                bot_scp "$remote_file" "$AGENT_MIRROR_DIR/memory/$filename"
+                log "  + memory/$filename"
             fi
-        done < <(bot_cmd "find $AGENT_WORKSPACE/memory -maxdepth 1 -name '*.md' 2>/dev/null" || true)
-
-        if [[ $MEMORY_COUNT -eq 0 ]]; then
-            log "  (no memory files)"
+            AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
+            MEMORY_COUNT=$((MEMORY_COUNT + 1))
         fi
+    done < <(bot_cmd "find $AGENT_WORKSPACE/memory -maxdepth 1 -name '*.md' 2>/dev/null" || true)
+
+    if [[ $MEMORY_COUNT -eq 0 ]]; then
+        log "  (no memory files)"
     fi
 
     # Config files - only for main agent (has openclaw config)
     if [[ "$agent" == "bruba-main" ]]; then
         log ""
         log "Config ($REMOTE_OPENCLAW/*.json):"
-        for config_file in openclaw.json exec-approvals.json; do
-            if bot_cmd "test -f $REMOTE_OPENCLAW/$config_file" 2>/dev/null; then
-                if [[ "$DRY_RUN" == "true" ]]; then
-                    log "  Would mirror: config/$config_file"
+        CONFIG_FILES="openclaw.json exec-approvals.json"
+        EXISTING_CONFIGS=$(bot_cmd "cd $REMOTE_OPENCLAW && ls $CONFIG_FILES 2>/dev/null" || true)
+        for config_file in $EXISTING_CONFIGS; do
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log "  Would mirror: config/$config_file"
+            else
+                if [[ "$config_file" == "openclaw.json" ]]; then
+                    # Redact sensitive tokens
+                    bot_cmd "cat $REMOTE_OPENCLAW/$config_file" 2>/dev/null | \
+                        sed 's/"botToken"[[:space:]]*:[[:space:]]*"[^"]*"/"botToken": "[REDACTED]"/g' | \
+                        sed 's/"token"[[:space:]]*:[[:space:]]*"[^"]*"/"token": "[REDACTED]"/g' \
+                        > "$AGENT_MIRROR_DIR/config/$config_file"
+                    log "  + config/$config_file (tokens redacted)"
                 else
-                    if [[ "$config_file" == "openclaw.json" ]]; then
-                        # Redact sensitive tokens
-                        bot_cmd "cat $REMOTE_OPENCLAW/$config_file" 2>/dev/null | \
-                            sed 's/"botToken"[[:space:]]*:[[:space:]]*"[^"]*"/"botToken": "[REDACTED]"/g' | \
-                            sed 's/"token"[[:space:]]*:[[:space:]]*"[^"]*"/"token": "[REDACTED]"/g' \
-                            > "$AGENT_MIRROR_DIR/config/$config_file"
-                        log "  + config/$config_file (tokens redacted)"
-                    else
-                        bot_scp "$REMOTE_OPENCLAW/$config_file" "$AGENT_MIRROR_DIR/config/$config_file"
-                        log "  + config/$config_file"
-                    fi
+                    bot_scp "$REMOTE_OPENCLAW/$config_file" "$AGENT_MIRROR_DIR/config/$config_file"
+                    log "  + config/$config_file"
                 fi
-                AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
             fi
+            AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
         done
     fi
 
@@ -183,43 +180,49 @@ for agent in "${AGENTS[@]}"; do
         fi
     fi
 
-    # State files - for manager
+    # State files - for manager (single find call)
     if [[ "$agent" == "bruba-manager" ]]; then
-        if bot_cmd "test -d $AGENT_WORKSPACE/state" 2>/dev/null; then
-            log ""
-            log "State ($AGENT_WORKSPACE/state/):"
+        log ""
+        log "State ($AGENT_WORKSPACE/state/):"
+        STATE_COUNT=0
+        while IFS= read -r remote_file; do
+            [[ -z "$remote_file" ]] && continue
             mkdir -p "$AGENT_MIRROR_DIR/state" 2>/dev/null || true
-            while IFS= read -r remote_file; do
-                [[ -z "$remote_file" ]] && continue
-                filename=$(basename "$remote_file")
-                if [[ "$DRY_RUN" == "true" ]]; then
-                    log "  Would mirror: state/$filename"
-                else
-                    bot_scp "$remote_file" "$AGENT_MIRROR_DIR/state/$filename"
-                    log "  + state/$filename"
-                fi
-                AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
-            done < <(bot_cmd "find $AGENT_WORKSPACE/state -maxdepth 1 -name '*.json' 2>/dev/null" || true)
+            filename=$(basename "$remote_file")
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log "  Would mirror: state/$filename"
+            else
+                bot_scp "$remote_file" "$AGENT_MIRROR_DIR/state/$filename"
+                log "  + state/$filename"
+            fi
+            AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
+            STATE_COUNT=$((STATE_COUNT + 1))
+        done < <(bot_cmd "find $AGENT_WORKSPACE/state -maxdepth 1 -name '*.json' 2>/dev/null" || true)
+        if [[ $STATE_COUNT -eq 0 ]]; then
+            log "  (no state files)"
         fi
     fi
 
-    # Results files - for guru (technical analysis outputs)
+    # Results files - for guru (single find call)
     if [[ "$agent" == "bruba-guru" ]]; then
-        if bot_cmd "test -d $AGENT_WORKSPACE/results" 2>/dev/null; then
-            log ""
-            log "Results ($AGENT_WORKSPACE/results/):"
+        log ""
+        log "Results ($AGENT_WORKSPACE/results/):"
+        RESULTS_COUNT=0
+        while IFS= read -r remote_file; do
+            [[ -z "$remote_file" ]] && continue
             mkdir -p "$AGENT_MIRROR_DIR/results" 2>/dev/null || true
-            while IFS= read -r remote_file; do
-                [[ -z "$remote_file" ]] && continue
-                filename=$(basename "$remote_file")
-                if [[ "$DRY_RUN" == "true" ]]; then
-                    log "  Would mirror: results/$filename"
-                else
-                    bot_scp "$remote_file" "$AGENT_MIRROR_DIR/results/$filename"
-                    log "  + results/$filename"
-                fi
-                AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
-            done < <(bot_cmd "find $AGENT_WORKSPACE/results -maxdepth 1 -name '*.md' 2>/dev/null" || true)
+            filename=$(basename "$remote_file")
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log "  Would mirror: results/$filename"
+            else
+                bot_scp "$remote_file" "$AGENT_MIRROR_DIR/results/$filename"
+                log "  + results/$filename"
+            fi
+            AGENT_MIRRORED=$((AGENT_MIRRORED + 1))
+            RESULTS_COUNT=$((RESULTS_COUNT + 1))
+        done < <(bot_cmd "find $AGENT_WORKSPACE/results -maxdepth 1 -name '*.md' 2>/dev/null" || true)
+        if [[ $RESULTS_COUNT -eq 0 ]]; then
+            log "  (no results files)"
         fi
     fi
 
