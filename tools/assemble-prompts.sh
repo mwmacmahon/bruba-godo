@@ -198,7 +198,22 @@ resolve_section() {
     fi
 
     # Check if component exists for this prompt file
-    local component_file="$ROOT_DIR/components/$entry/prompts/${prompt_upper}.snippet.md"
+    # Parse component:variant syntax
+    local component="$entry"
+    local variant=""
+    if [[ "$entry" == *:* ]]; then
+        component="${entry%%:*}"
+        variant="${entry#*:}"
+    fi
+
+    # Resolve to exactly one file (no fallback)
+    local component_file
+    if [[ -n "$variant" ]]; then
+        component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.${variant}.snippet.md"
+    else
+        component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.snippet.md"
+    fi
+
     if [[ -f "$component_file" ]]; then
         echo "<!-- COMPONENT: $entry -->"
         # Substitute ${WORKSPACE} with agent's workspace path
@@ -255,12 +270,30 @@ get_section_type() {
         fi
     elif [[ "$entry" =~ ^bot: ]]; then
         echo "bot"
-    elif [[ -f "$ROOT_DIR/components/$entry/prompts/${prompt_upper}.snippet.md" ]]; then
-        echo "component"
-    elif [[ "$prompt_name" == "agents" && -f "$ROOT_DIR/templates/prompts/sections/$entry.md" ]]; then
-        echo "section"
     else
-        echo "missing"
+        # Parse component:variant syntax
+        local component="$entry"
+        local variant=""
+        if [[ "$entry" == *:* ]]; then
+            component="${entry%%:*}"
+            variant="${entry#*:}"
+        fi
+
+        # Resolve to exactly one file (no fallback)
+        local component_file
+        if [[ -n "$variant" ]]; then
+            component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.${variant}.snippet.md"
+        else
+            component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.snippet.md"
+        fi
+
+        if [[ -f "$component_file" ]]; then
+            echo "component"
+        elif [[ "$prompt_name" == "agents" && -f "$ROOT_DIR/templates/prompts/sections/$entry.md" ]]; then
+            echo "section"
+        else
+            echo "missing"
+        fi
     fi
 }
 

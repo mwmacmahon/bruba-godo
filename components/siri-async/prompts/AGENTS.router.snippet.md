@@ -1,4 +1,3 @@
-<!-- COMPONENT: siri-async -->
 ## Siri Async Routing
 
 When you receive a message tagged `[From Siri async]`:
@@ -15,4 +14,3 @@ When you receive a message tagged `[From Siri async]`:
 Main will process independently and send the response to Signal using the message tool.
 
 **Why this pattern?** Siri has a 10-15 second HTTP timeout. Main (Opus) can take 20-30 seconds. You act as a fast front door — accept the request, forward async, return immediately.
-<!-- /COMPONENT: siri-async -->

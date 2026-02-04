@@ -220,10 +220,21 @@ if [[ -n "$SHOW_DIFF" ]]; then
     SHOW_FILE="${SHOW_FILE:-agents}"
     prompt_upper=$(echo "$SHOW_FILE" | tr '[:lower:]' '[:upper:]')
     mirror_file="$AGENT_MIRROR_DIR/prompts/${prompt_upper}.md"
-    component_file="$ROOT_DIR/components/$SHOW_DIFF/prompts/${prompt_upper}.snippet.md"
+
+    # Parse component:variant syntax
+    component="${SHOW_DIFF%%:*}"
+    variant=""
+    [[ "$SHOW_DIFF" == *:* ]] && variant="${SHOW_DIFF#*:}"
+
+    # Resolve to exactly one file (no fallback)
+    if [[ -n "$variant" ]]; then
+        component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.${variant}.snippet.md"
+    else
+        component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.snippet.md"
+    fi
 
     if [[ ! -f "$component_file" ]]; then
-        echo "Component not found: $SHOW_DIFF (${prompt_upper}.snippet.md)"
+        echo "Component not found: $SHOW_DIFF ($(basename "$component_file"))"
         exit 1
     fi
 
@@ -314,22 +325,32 @@ for agent in "${AGENTS[@]}"; do
 
         # 3. Check if components were edited by bot (only for agents using components)
         if [[ "$agent" == "bruba-main" ]]; then
-            for component in $(get_config_sections "$prompt_name" "$agent" | grep -v "^bot:" | grep -v "^base$" | grep -v "^manager-base$"); do
-                component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.snippet.md"
+            for entry in $(get_config_sections "$prompt_name" "$agent" | grep -v "^bot:" | grep -v "^base$" | grep -v "^manager-base$"); do
+                # Parse component:variant syntax
+                component="${entry%%:*}"
+                variant=""
+                [[ "$entry" == *:* ]] && variant="${entry#*:}"
+
+                # Resolve to exactly one file (no fallback)
+                if [[ -n "$variant" ]]; then
+                    component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.${variant}.snippet.md"
+                else
+                    component_file="$ROOT_DIR/components/$component/prompts/${prompt_upper}.snippet.md"
+                fi
 
                 if [[ ! -f "$component_file" ]]; then
                     continue
                 fi
 
-                # Get content from mirror
-                mirror_content=$(get_component_content_from_mirror "$component" "$mirror_file" 2>/dev/null) || continue
+                # Get content from mirror (using full entry for marker matching)
+                mirror_content=$(get_component_content_from_mirror "$entry" "$mirror_file" 2>/dev/null) || continue
 
                 # Get source content
                 source_content=$(cat "$component_file")
 
                 # Compare
                 if ! diff -q <(printf '%s\n' "$mirror_content") <(printf '%s\n' "$source_content") >/dev/null 2>&1; then
-                    EDITED_COMPONENTS+=("$component")
+                    EDITED_COMPONENTS+=("$entry")
                     FILE_CONFLICTS=$((FILE_CONFLICTS + 1))
                 fi
             done

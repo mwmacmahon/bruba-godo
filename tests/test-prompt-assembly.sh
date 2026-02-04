@@ -714,6 +714,85 @@ test_config_sync_roundtrip() {
 }
 
 # ============================================================
+# Test 12: Component Variant Support
+# ============================================================
+test_component_variant_support() {
+    log ""
+    log "=== Test 12: Component Variant Support ==="
+
+    # Create a test variant component
+    TEST_COMPONENT_DIR="components/test-variant/prompts"
+    TEST_VARIANT_FILE="$TEST_COMPONENT_DIR/AGENTS.router.snippet.md"
+    CONFIG_BACKUP="config.yaml.variant-test-backup"
+
+    mkdir -p "$TEST_COMPONENT_DIR"
+
+    # Create variant snippet
+    cat > "$TEST_VARIANT_FILE" << 'VARIANTEOF'
+## Test Variant Component
+
+This is a router variant for testing.
+VARIANTEOF
+
+    # Backup config
+    cp config.yaml "$CONFIG_BACKUP"
+
+    cleanup_variant_test() {
+        rm -rf "components/test-variant"
+        mv "$CONFIG_BACKUP" config.yaml 2>/dev/null || true
+    }
+    trap cleanup_variant_test EXIT
+
+    # Add variant to bruba-main config (after http-api)
+    sed -i.bak 's/- http-api$/- http-api\n      - test-variant:router/' config.yaml
+    rm -f config.yaml.bak
+
+    # Run assembly
+    output=$(./tools/assemble-prompts.sh --agent=bruba-main --force 2>&1)
+
+    if [[ "$VERBOSE" == "true" ]]; then
+        echo "$output"
+    fi
+
+    # Verify component was added
+    if echo "$output" | grep -q "Component: test-variant:router"; then
+        pass "Variant component assembled"
+    else
+        fail "Variant component not assembled: $output"
+        cleanup_variant_test
+        trap - EXIT
+        return 1
+    fi
+
+    # Verify marker in output file
+    ASSEMBLED_FILE="exports/bot/bruba-main/core-prompts/AGENTS.md"
+    if grep -q '<!-- COMPONENT: test-variant:router -->' "$ASSEMBLED_FILE"; then
+        pass "Variant marker includes full entry (test-variant:router)"
+    else
+        fail "Variant marker missing or incorrect"
+        cleanup_variant_test
+        trap - EXIT
+        return 1
+    fi
+
+    if grep -q "router variant for testing" "$ASSEMBLED_FILE"; then
+        pass "Variant content included"
+    else
+        fail "Variant content missing"
+        cleanup_variant_test
+        trap - EXIT
+        return 1
+    fi
+
+    # Cleanup
+    trap - EXIT
+    cleanup_variant_test
+
+    # Re-assemble with original config
+    ./tools/assemble-prompts.sh --agent=bruba-main --force >/dev/null 2>&1
+}
+
+# ============================================================
 # Main
 # ============================================================
 log "Prompt Assembly Test Suite (Multi-Agent)"
@@ -733,6 +812,7 @@ test_config_parsing || true
 test_agent_tools_sync_dry_run || true
 test_agent_tools_check || true
 test_config_sync_roundtrip || true
+test_component_variant_support || true
 
 log ""
 log "========================================"

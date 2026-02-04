@@ -1,6 +1,6 @@
 ---
-version: 3.8.4
-updated: 2026-02-03
+version: 3.10.0
+updated: 2026-02-04
 type: refdoc
 project: planning
 tags: [bruba, openclaw, multi-agent, architecture, cron, operations, guru, direct-message, docker, sandbox, security]
@@ -300,10 +300,10 @@ bruba-manager/
 |------|--------|-------|
 | web_search | ✅ | Core function |
 | web_fetch | ✅ | Core function |
-| read | ✅ | Read task instructions |
-| write | ✅ | Write results to results/ directory |
+| read | ❌ | No file access |
+| write | ❌ | No file creation |
 | exec | ❌ | No command execution |
-| edit | ❌ | No file modification (write-only) |
+| edit | ❌ | No file modification |
 | memory_* | ❌ | Stateless — no memory |
 | sessions_send | ❌ | Can't initiate communication |
 | sessions_spawn | ❌ | Can't create subagents |
@@ -313,7 +313,7 @@ bruba-manager/
 
 **Memory:** Disabled (`memorySearch.enabled: false`)
 
-**Sandbox:** Full Docker isolation (bridge network for web access)
+**Sandbox:** ✅ **Enabled** — Docker container with `network: bridge` for web access
 
 **Security Properties:**
 - Raw web content stays in bruba-web's context
@@ -336,11 +336,13 @@ bruba-web/
 
 ### Main Requests Web Search
 
+bruba-main has instructions (via `web-search` component) for using bruba-web:
+
 ```
 User → Signal → bruba-main
 Main: "I'll look that up"
 Main → sessions_send("Search for X, summarize findings") → bruba-web
-bruba-web: [searches, fetches, processes in sandbox]
+bruba-web: [searches, fetches, processes in Docker sandbox]
 bruba-web → returns structured summary
 Main → receives summary (no raw web content exposure)
 Main → Signal: "Here's what I found..."
@@ -838,24 +840,31 @@ ON HEARTBEAT:
 
 ## Part 7: Security Model
 
-### Security Gap (OPEN - Sandbox Disabled)
+### Security Status
 
-**Status:** ⚠️ Sandbox DISABLED as of 2026-02-03 due to agent-to-agent session visibility issues.
+**Status:** ✅ bruba-web runs in Docker sandbox (as of 2026-02-04, OpenClaw 2026.2.1)
 
-**Problem:** With `sandbox.scope: "agent"`, `sessions_send` cannot see other agents' sessions. Error: "Session not visible from this sandboxed agent session: agent:bruba-guru:main". This breaks guru routing.
+**Previous issue (resolved):** With `sandbox.scope: "agent"`, `sessions_send` could not see other agents' sessions. This was fixed in OpenClaw 2026.2.1 — cross-agent routing now works with per-agent sandbox.
 
-**Current mitigation:** `sandbox.mode: "off"` — agents run directly on host. Security relies on:
-- `exec-approvals.json` allowlist (still enforced)
-- `tools.allow/deny` lists per agent (still enforced)
+**Current state:**
+- **bruba-web:** Docker sandbox enabled (`mode: "all"`, `network: "bridge"`)
+- **Other agents:** Running directly on host (`sandbox.mode: "off"` globally)
+
+**Why only bruba-web sandboxed:**
+- bruba-web handles untrusted web content — highest risk for prompt injection
+- Other agents don't need network access, so tool-level restrictions suffice
+- Can enable sandbox for other agents later if needed
+
+**Remaining mitigations for non-sandboxed agents:**
+- `exec-approvals.json` allowlist (enforced)
+- `tools.allow/deny` lists per agent (enforced)
 - Workspace isolation via separate directories
 
-**TODO:** Re-enable sandbox once OpenClaw fixes cross-agent session visibility in sandboxed mode.
+**Container auto-start:** `~/bin/bruba-start` warms the bruba-web sandbox container. A LaunchAgent attempts to run this on login (may require manual run after reboot).
 
-Previously, agents could theoretically edit `~/.openclaw/exec-approvals.json` to self-escalate permissions. This risk is currently accepted until sandbox is re-enabled.
+### Docker Sandbox Architecture
 
-### Docker Sandbox Architecture (DISABLED)
-
-When sandbox is re-enabled, all four agents would run in Docker containers via OpenClaw's native sandbox support. Exec commands route through the node host process on the host machine.
+bruba-web runs in a Docker container via OpenClaw's native sandbox support. Other agents run directly on host. Exec commands route through the node host process on the host machine.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -1832,6 +1841,8 @@ This binary blob causes massive token inflation (~50K+ tokens for a short voice 
 | bruba-godo tooling | ✅ | Multi-agent prompt assembly |
 | bruba-web agent | ✅ | Configured, auth setup, session primed |
 | Tool restriction cleanup | ✅ | Main/Manager deny web tools, use bruba-web |
+| bruba-web Docker sandbox | ✅ | Enabled with bridge network (2026-02-04) |
+| web-search component | ✅ | Prompts for Main to use bruba-web |
 
 ### In Progress
 
@@ -1844,9 +1855,136 @@ This binary blob causes massive token inflation (~50K+ tokens for a short voice 
 | Item | Priority | Notes |
 |------|----------|-------|
 | Cron: reminder-check | High | First proactive job |
-| Node host migration | High | Security fix |
+| Full agent sandboxing | Medium | Enable Docker sandbox for all agents (optional) |
 | Cron: other jobs | Medium | After reminder-check stable |
-| Workspace permissions | Medium | After node host |
+
+---
+
+## Part 13: Prompt Assembly and Components
+
+Prompts (AGENTS.md, TOOLS.md, etc.) are assembled from config-driven section lists. The operator manages templates and components in bruba-godo, then pushes assembled prompts to the bot.
+
+### Assembly Pipeline
+
+```
+templates/prompts/         → Base prompts (committed)
+components/*/prompts/      → Component snippets (committed)
+user/prompts/              → User customizations (gitignored)
+mirror/*/prompts/          → Bot state (gitignored)
+        ↓
+   assemble-prompts.sh
+        ↓
+exports/bot/*/core-prompts/ → Assembled output
+        ↓
+      push.sh
+        ↓
+   Bot workspace
+```
+
+### Section Types
+
+| Type | Syntax | Resolves To |
+|------|--------|-------------|
+| Base template | `base` | `templates/prompts/{NAME}.md` |
+| Manager base | `manager-base` | `templates/prompts/manager/{NAME}.md` |
+| Component | `name` | `components/{name}/prompts/{NAME}.snippet.md` |
+| Component variant | `name:variant` | `components/{name}/prompts/{NAME}.{variant}.snippet.md` |
+| Template section | `name` | `templates/prompts/sections/{name}.md` |
+| Bot-managed | `bot:name` | Preserved from mirror (`<!-- BOT-MANAGED: name -->`) |
+
+### Component Variants
+
+Components can provide multiple prompt snippets for different agents or roles using the `component:variant` syntax.
+
+**Why variants?** Some capabilities need different prompts depending on the agent's role:
+
+| Component | Variant | Agent | Purpose |
+|-----------|---------|-------|---------|
+| `siri-async` | `:router` | bruba-manager | Receives HTTP, forwards to Main |
+| `siri-async` | `:handler` | bruba-main | Processes forwarded requests |
+| `web-search` | `:consumer` | bruba-main | How to use bruba-web |
+| `web-search` | `:service` | bruba-web | How to be bruba-web (planned) |
+
+**File naming:**
+- Default: `components/{name}/prompts/{NAME}.snippet.md`
+- Variant: `components/{name}/prompts/{NAME}.{variant}.snippet.md`
+
+**Config example:**
+```yaml
+agents:
+  bruba-main:
+    agents_sections:
+      - siri-async:handler    # → AGENTS.handler.snippet.md
+      - web-search            # → AGENTS.snippet.md (default)
+
+  bruba-manager:
+    agents_sections:
+      - siri-async:router     # → AGENTS.router.snippet.md
+```
+
+**No fallback rule:** If you specify `:variant`, that exact file must exist. The system won't fall back to the default file — this prevents silent misconfiguration.
+
+### Allowlist Variants
+
+Allowlist files can also have variants for component-specific exec permissions:
+
+- Default: `components/{name}/allowlist.json`
+- Variant: `components/{name}/allowlist.{variant}.json`
+
+### Component Organization
+
+```
+components/
+├── siri-async/
+│   ├── README.md
+│   └── prompts/
+│       ├── AGENTS.router.snippet.md   # Manager: forward to Main
+│       └── AGENTS.handler.snippet.md  # Main: handle forwarded
+├── web-search/
+│   ├── README.md
+│   ├── allowlist.json
+│   └── prompts/
+│       └── AGENTS.snippet.md          # Default (no variant)
+├── reminders/
+│   ├── README.md
+│   ├── allowlist.json
+│   └── prompts/
+│       ├── AGENTS.snippet.md
+│       └── TOOLS.snippet.md
+└── ...
+```
+
+### Assembly Commands
+
+```bash
+# Assemble all agents
+./tools/assemble-prompts.sh
+
+# Single agent
+./tools/assemble-prompts.sh --agent=bruba-main
+
+# Preview without writing
+./tools/assemble-prompts.sh --dry-run --verbose
+
+# Skip conflict check
+./tools/assemble-prompts.sh --force
+```
+
+### Conflict Detection
+
+Before pushing, the system detects if the bot has made changes that would be overwritten:
+
+```bash
+# Check for conflicts
+./tools/detect-conflicts.sh
+
+# Show specific component diff
+./tools/detect-conflicts.sh --diff siri-async:handler
+```
+
+**Conflict types:**
+1. New bot-managed sections (bot created a new `<!-- BOT-MANAGED: x -->`)
+2. Edited components (bot modified content inside a `<!-- COMPONENT: x -->`)
 
 ---
 
@@ -1901,6 +2039,8 @@ This binary blob causes massive token inflation (~50K+ tokens for a short voice 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.10.0 | 2026-02-04 | **Component variant support:** Added `component:variant` syntax for components that need different prompts per agent. Merged `http-api` and `siri-async` components into `siri-async` with `:router` (Manager) and `:handler` (Main) variants. Added Part 13 documenting prompt assembly and component organization. |
+| 3.9.0 | 2026-02-04 | **Docker sandbox enabled for bruba-web:** Cross-agent session visibility bug fixed in OpenClaw 2026.2.1. bruba-web now runs in Docker container (`sandbox.mode: "all"`, `network: "bridge"`). Added `web-search` component to bruba-main prompts (instructions for using bruba-web via `sessions_send`). Added `~/bin/bruba-start` script and LaunchAgent for container auto-warm. |
 | 3.8.4 | 2026-02-03 | **Voice compaction bug documented:** Added known issue for voice messages causing silent context compaction (binary audio data in context). Also documented compactionCount mismatch bug. |
 | 3.8.3 | 2026-02-03 | **OpenClaw config migration:** config.yaml is now source of truth for openclaw.json settings. New `openclaw:` section for global defaults, per-agent model/heartbeat config. New `sync-openclaw-config.sh` replaces `update-agent-tools.sh`. Extended `parse-yaml.py` with `--to-json` mode for snake_case→camelCase conversion. |
 | 3.8.2 | 2026-02-03 | **Compaction fixes:** bruba-main switched from Opus to Sonnet (mid-session fallback was triggering compaction). softThresholdTokens increased 8K→40K. bruba-guru retains Opus. |
@@ -1908,7 +2048,7 @@ This binary blob causes massive token inflation (~50K+ tokens for a short voice 
 | 3.8.0 | 2026-02-03 | **Siri async via Manager:** Manager acts as fast HTTP front door for Siri async requests. Uses `sessions_send timeoutSeconds=0` (fire-and-forget) to forward to Main. Beats Siri's 10-15s timeout. Added `siri-async` component for Manager. |
 | 3.7.0 | 2026-02-03 | **Automatic voice handling:** OpenClaw now handles STT (Groq Whisper) and TTS (ElevenLabs) automatically. Agents are voice-agnostic. Updated Part 4 voice documentation. |
 | 3.6.0 | 2026-02-03 | **Manager coordination pattern:** Nightly reset jobs now route through bruba-manager (isolated + agentTurn) instead of directly to bruba-main (systemEvent + main = disabled bug). Added Signal rate limit warning. |
-| 3.5.3 | 2026-02-03 | **Sandbox disabled:** Agent-to-agent session visibility broken in sandbox mode. Set `sandbox.mode: "off"` until OpenClaw fixes. Added `/wake` skill. |
+| 3.5.3 | 2026-02-03 | **Sandbox disabled:** Agent-to-agent session visibility broken in sandbox mode. Set `sandbox.mode: "off"` until OpenClaw fixes. Added `/wake` skill. *(Fixed in 3.9.0)* |
 | 3.5.2 | 2026-02-03 | **Sandbox tool policy:** Documented tools.sandbox.tools.allow ceiling (message tool missing fix) |
 | 3.5.1 | 2026-02-03 | **Defense-in-depth:** ALL agents now have tools/:ro (not just bruba-main), updated access matrices and debugging commands |
 | 3.5.0 | 2026-02-03 | **Part 7 major expansion:** Docker sandbox implementation details, per-agent access matrix (read/write/none for every resource), network isolation matrix, exec vs file path split, security implications, container lifecycle, debugging commands |

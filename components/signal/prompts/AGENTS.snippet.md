@@ -1,4 +1,3 @@
-<!-- COMPONENT: signal -->
 ## 📱 Signal Integration
 
 ### Message Format
@@ -32,4 +31,3 @@ Incoming media paths are relative. Prepend `/Users/bruba/.openclaw/`:
 ```
 media/inbound/xxx.mp3 → /Users/bruba/.openclaw/media/inbound/xxx.mp3
 ```
-<!-- /COMPONENT: signal -->

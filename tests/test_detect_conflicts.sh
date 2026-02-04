@@ -365,6 +365,128 @@ EOF
 }
 
 # =============================================================================
+# Test: Component variant support (component:variant syntax)
+# =============================================================================
+test_component_variant_support() {
+    echo ""
+    echo "=== Test: Component variant support (component:variant syntax) ==="
+    setup
+
+    # Create variant component file
+    mkdir -p "$TEMP_DIR/components/http-api/prompts"
+    cat > "$TEMP_DIR/components/http-api/prompts/AGENTS.router.snippet.md" << 'EOF'
+## HTTP API Router
+Handle routing for Siri requests.
+EOF
+
+    # Update config to use variant syntax
+    cat > "$TEMP_DIR/config.yaml" << 'EOF'
+ssh:
+  host: test
+remote:
+  home: /test
+  workspace: /test/clawd
+local:
+  mirror: mirror
+exports:
+  bot:
+    agents_sections:
+      - header
+      - http-api:router
+      - bot:exec-approvals
+EOF
+
+    # Create mirror AGENTS.md with variant component
+    cat > "$TEMP_DIR/mirror/prompts/AGENTS.md" << 'EOF'
+<!-- SECTION: header -->
+# Header Section
+<!-- /SECTION: header -->
+
+<!-- COMPONENT: http-api:router -->
+## HTTP API Router
+Handle routing for Siri requests.
+<!-- /COMPONENT: http-api:router -->
+
+<!-- BOT-MANAGED: exec-approvals -->
+Bot managed content here
+<!-- /BOT-MANAGED: exec-approvals -->
+EOF
+
+    cd "$TEMP_DIR"
+    output=$(TEST_ROOT_DIR="$TEMP_DIR" bash "$TEMP_DIR/tools/detect-conflicts.sh" 2>&1)
+    exit_code=$?
+
+    log "Output: $output"
+
+    assert_exit_code 0 $exit_code "Should exit 0 when variant component matches"
+    assert_contains "$output" "No conflicts detected" "Should report no conflicts with variant"
+
+    teardown
+}
+
+# =============================================================================
+# Test: Detects edited variant component
+# =============================================================================
+test_detects_edited_variant_component() {
+    echo ""
+    echo "=== Test: Detects edited variant component ==="
+    setup
+
+    # Create variant component file
+    mkdir -p "$TEMP_DIR/components/http-api/prompts"
+    cat > "$TEMP_DIR/components/http-api/prompts/AGENTS.router.snippet.md" << 'EOF'
+## HTTP API Router
+Handle routing for Siri requests.
+EOF
+
+    # Update config to use variant syntax
+    cat > "$TEMP_DIR/config.yaml" << 'EOF'
+ssh:
+  host: test
+remote:
+  home: /test
+  workspace: /test/clawd
+local:
+  mirror: mirror
+exports:
+  bot:
+    agents_sections:
+      - header
+      - http-api:router
+      - bot:exec-approvals
+EOF
+
+    # Create mirror with MODIFIED variant component
+    cat > "$TEMP_DIR/mirror/prompts/AGENTS.md" << 'EOF'
+<!-- SECTION: header -->
+# Header Section
+<!-- /SECTION: header -->
+
+<!-- COMPONENT: http-api:router -->
+## HTTP API Router
+Handle routing for Siri requests.
+BOT ADDED THIS LINE!
+<!-- /COMPONENT: http-api:router -->
+
+<!-- BOT-MANAGED: exec-approvals -->
+Bot managed content here
+<!-- /BOT-MANAGED: exec-approvals -->
+EOF
+
+    cd "$TEMP_DIR"
+    output=$(TEST_ROOT_DIR="$TEMP_DIR" bash "$TEMP_DIR/tools/detect-conflicts.sh" 2>&1)
+    exit_code=$?
+
+    log "Output: $output"
+
+    assert_exit_code 1 $exit_code "Should exit 1 when variant component edited"
+    assert_contains "$output" "http-api:router" "Should identify edited variant component"
+    assert_contains "$output" "EDITED COMPONENTS" "Should categorize as edited"
+
+    teardown
+}
+
+# =============================================================================
 # Run all tests
 # =============================================================================
 echo "Running detect-conflicts.sh tests..."
@@ -374,6 +496,8 @@ test_detects_new_bot_section
 test_detects_new_component_section
 test_detects_edited_component
 test_multiple_conflicts
+test_component_variant_support
+test_detects_edited_variant_component
 
 echo ""
 echo "================================"

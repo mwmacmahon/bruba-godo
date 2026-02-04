@@ -72,35 +72,128 @@ LOG_FILE="$LOG_DIR/allowlist.log"
 mkdir -p "$LOG_DIR"
 
 log "=== Updating Exec-Approvals Allowlist ==="
-log "Agent ID: $REMOTE_AGENT_ID"
-log "Workspace: $REMOTE_WORKSPACE"
 
-# Collect required entries from all component allowlist.json files
+# Get allowlist_sections for an agent from config.yaml
+# Usage: get_allowlist_sections "bruba-main"
+# Outputs: component names, one per line
+get_allowlist_sections() {
+    local agent_name="$1"
+    local config_file="$ROOT_DIR/config.yaml"
+
+    python3 -c "
+import yaml
+import sys
+try:
+    with open('$config_file') as f:
+        config = yaml.safe_load(f)
+    sections = config.get('agents', {}).get('$agent_name', {}).get('allowlist_sections', [])
+    for s in sections:
+        print(s)
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
+}
+
+# Get all agents that have allowlist_sections defined
+# Usage: get_agents_with_allowlists
+# Outputs: agent names, one per line
+get_agents_with_allowlists() {
+    local config_file="$ROOT_DIR/config.yaml"
+
+    python3 -c "
+import yaml
+import sys
+try:
+    with open('$config_file') as f:
+        config = yaml.safe_load(f)
+    for name, cfg in config.get('agents', {}).items():
+        if cfg and cfg.get('allowlist_sections'):
+            print(name)
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
+}
+
+# Get workspace for an agent from config.yaml
+# Usage: get_agent_workspace "bruba-main"
+get_agent_workspace() {
+    local agent_name="$1"
+    local config_file="$ROOT_DIR/config.yaml"
+
+    python3 -c "
+import yaml
+import sys
+try:
+    with open('$config_file') as f:
+        config = yaml.safe_load(f)
+    workspace = config.get('agents', {}).get('$agent_name', {}).get('workspace', '')
+    print(workspace or '')
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
+}
+
+# Collect required entries from configured component allowlist.json files
+# Usage: collect_required_entries "bruba-main" "/Users/bruba/agents/bruba-main"
 collect_required_entries() {
+    local agent_name="$1"
+    local workspace="$2"
     local entries="[]"
 
-    for allowlist_file in "$ROOT_DIR/components"/*/allowlist.json; do
+    # Get configured components for this agent
+    local components
+    components=$(get_allowlist_sections "$agent_name")
+
+    if [[ -z "$components" ]]; then
+        echo "[]"
+        return
+    fi
+
+    while IFS= read -r entry; do
+        [[ -z "$entry" ]] && continue
+
+        # Parse component:variant syntax
+        local component="$entry"
+        local variant=""
+        if [[ "$entry" == *:* ]]; then
+            component="${entry%%:*}"
+            variant="${entry#*:}"
+        fi
+
+        # Resolve to exactly one file (no fallback)
+        local allowlist_file
+        if [[ -n "$variant" ]]; then
+            allowlist_file="$ROOT_DIR/components/$component/allowlist.${variant}.json"
+        else
+            allowlist_file="$ROOT_DIR/components/$component/allowlist.json"
+        fi
+
         if [[ -f "$allowlist_file" ]]; then
-            local component
-            component=$(basename "$(dirname "$allowlist_file")")
             # Log to stderr to avoid capturing in subshell output
-            echo "  Found: $component/allowlist.json" >&2
+            echo "  Found: $entry → $(basename "$allowlist_file")" >&2
 
             # Read entries and expand ${WORKSPACE} placeholder
             local component_entries
             component_entries=$(jq -c '.entries' "$allowlist_file" | \
-                sed "s|\${WORKSPACE}|$REMOTE_WORKSPACE|g")
+                sed "s|\${WORKSPACE}|$workspace|g")
 
             # Merge into entries array using jq properly
             entries=$(jq -n --argjson a "$entries" --argjson b "$component_entries" '$a + $b')
+        else
+            echo "  Warning: $entry has no allowlist file" >&2
         fi
-    done
+    done <<< "$components"
 
     echo "$entries"
 }
 
-# Get current allowlist from bot
+# Get current allowlist from bot for an agent
+# Usage: get_current_allowlist "bruba-main"
 get_current_allowlist() {
+    local agent_name="$1"
     local current
     current=$(bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json" 2>/dev/null) || {
         log "Warning: Could not read exec-approvals.json from bot"
@@ -109,7 +202,7 @@ get_current_allowlist() {
     }
 
     # Extract allowlist for this agent
-    echo "$current" | jq -r ".agents[\"$REMOTE_AGENT_ID\"].allowlist // []"
+    echo "$current" | jq -r ".agents[\"$agent_name\"].allowlist // []"
 }
 
 # Find entries that are required but not present (need to add)
@@ -129,9 +222,11 @@ find_missing_entries() {
 
 # Find entries on bot that are not in required list (orphans to remove)
 # Only considers entries matching component tool paths (~/clawd/tools/*)
+# Usage: find_orphan_entries "$required" "$current" "$workspace"
 find_orphan_entries() {
     local required="$1"
     local current="$2"
+    local workspace="$3"
 
     # Get list of required patterns
     local required_patterns
@@ -140,7 +235,7 @@ find_orphan_entries() {
     # Filter current entries to those:
     # 1. Match component tool path pattern (*/clawd/tools/*)
     # 2. Not in required list
-    echo "$current" | jq --arg patterns "$required_patterns" --arg workspace "$REMOTE_WORKSPACE" '
+    echo "$current" | jq --arg patterns "$required_patterns" --arg workspace "$workspace" '
         map(select(
             (.pattern | contains("/clawd/tools/") or contains($workspace + "/tools/")) and
             (.pattern as $p | ($patterns | split("\n") | map(select(. != "")) | index($p)) == null)
@@ -148,137 +243,233 @@ find_orphan_entries() {
     '
 }
 
-log "Collecting required entries from components..."
-REQUIRED=$(collect_required_entries)
-REQUIRED_COUNT=$(echo "$REQUIRED" | jq 'length')
-log "Required entries: $REQUIRED_COUNT"
+# Get list of agents with allowlist_sections
+AGENTS_WITH_ALLOWLISTS=$(get_agents_with_allowlists)
 
-log "Fetching current allowlist from bot..."
-CURRENT=$(get_current_allowlist)
-CURRENT_COUNT=$(echo "$CURRENT" | jq 'length')
-log "Current entries: $CURRENT_COUNT"
-
-log "Finding discrepancies..."
-MISSING=$(find_missing_entries "$REQUIRED" "$CURRENT")
-MISSING_COUNT=$(echo "$MISSING" | jq 'length')
-
-ORPHANS=$(find_orphan_entries "$REQUIRED" "$CURRENT")
-ORPHAN_COUNT=$(echo "$ORPHANS" | jq 'length')
-
-log "Missing entries: $MISSING_COUNT"
-log "Orphan entries: $ORPHAN_COUNT"
-
-# Check if everything is in sync
-if [[ "$MISSING_COUNT" -eq 0 && "$ORPHAN_COUNT" -eq 0 ]]; then
-    log "Allowlist is in sync"
-    echo "Allowlist: in sync ($REQUIRED_COUNT component entries)"
+if [[ -z "$AGENTS_WITH_ALLOWLISTS" ]]; then
+    log "No agents have allowlist_sections configured"
+    echo "No agents have allowlist_sections configured in config.yaml"
     exit 0
 fi
 
-# Show discrepancies
-if [[ "$MISSING_COUNT" -gt 0 ]]; then
-    echo ""
-    echo "Missing entries (need to add):"
-    echo "$MISSING" | jq -r '.[] | "  + \(.id): \(.pattern)"'
-fi
-
-if [[ "$ORPHAN_COUNT" -gt 0 ]]; then
-    echo ""
-    echo "Orphan entries (not in components):"
-    echo "$ORPHANS" | jq -r '.[] | "  - \(.id // "unknown"): \(.pattern)"'
-fi
-echo ""
-
-# Exit if check only
-if [[ "$CHECK_ONLY" == "true" ]]; then
-    echo "Allowlist status:"
-    [[ "$MISSING_COUNT" -gt 0 ]] && echo "  $MISSING_COUNT entries to add"
-    [[ "$ORPHAN_COUNT" -gt 0 ]] && echo "  $ORPHAN_COUNT orphan entries"
-    exit 0
-fi
-
-# Exit if dry run
-if [[ "$DRY_RUN" == "true" ]]; then
-    [[ "$MISSING_COUNT" -gt 0 ]] && echo "[DRY RUN] Would add $MISSING_COUNT entries"
-    [[ "$ORPHAN_COUNT" -gt 0 ]] && echo "[DRY RUN] Would remove $ORPHAN_COUNT orphan entries"
-    exit 0
-fi
-
-# Backup before any changes
-BACKUP_FILE="$REMOTE_OPENCLAW/exec-approvals.json.backup"
-log "Backing up to $BACKUP_FILE..."
-bot_cmd "cp $REMOTE_OPENCLAW/exec-approvals.json $BACKUP_FILE"
-
+# Track overall state
+TOTAL_MISSING=0
+TOTAL_ORPHANS=0
+TOTAL_REQUIRED=0
+BACKUP_DONE=false
 CHANGES_MADE=0
+ADDED_COUNT=0
+REMOVED_COUNT=0
 
-# Add missing entries (unless --remove-only)
-if [[ "$MISSING_COUNT" -gt 0 && "$REMOVE_ONLY" != "true" ]]; then
-    log "Adding missing entries to exec-approvals.json..."
-    MISSING_JSON=$(echo "$MISSING" | jq -c '.')
+# Process each agent - collect info, show discrepancies, and update in one pass
+process_agent() {
+    local agent="$1"
+    local workspace
 
-    # Do the jq update locally, then push the result
-    current_json=$(bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json")
-    updated_json=$(echo "$current_json" | jq --arg agent "$REMOTE_AGENT_ID" --argjson new "$MISSING_JSON" '.agents[$agent].allowlist += $new')
+    workspace=$(get_agent_workspace "$agent")
+    if [[ -z "$workspace" ]]; then
+        log "Warning: $agent has no workspace configured, skipping"
+        return
+    fi
 
-    # Write to temp file and copy to bot
-    tmp_file="/tmp/exec-approvals-$$.json"
-    echo "$updated_json" > "$tmp_file"
+    local components
+    components=$(get_allowlist_sections "$agent")
+    local component_count
+    component_count=$(echo "$components" | grep -c . 2>/dev/null || echo "0")
 
-    case "$BOT_TRANSPORT" in
-        sudo)
-            # Copy via sudo as bot user
-            cat "$tmp_file" | sudo -u "$BOT_USER" tee "$REMOTE_OPENCLAW/exec-approvals.json" > /dev/null
-            ;;
-        *)
-            scp $SSH_OPTS -q "$tmp_file" "$BOT_USER@$BOT_HOST:$REMOTE_OPENCLAW/exec-approvals.json"
-            ;;
-    esac
-    rm -f "$tmp_file"
+    log ""
+    log "Agent: $agent ($component_count components)"
+    log "Workspace: $workspace"
 
-    log "Added $MISSING_COUNT entries"
-    CHANGES_MADE=1
+    log "Collecting required entries..."
+    local required
+    required=$(collect_required_entries "$agent" "$workspace")
+    local required_count
+    required_count=$(echo "$required" | jq 'length')
+    TOTAL_REQUIRED=$((TOTAL_REQUIRED + required_count))
+    log "Required entries: $required_count"
+
+    log "Fetching current allowlist..."
+    local current
+    current=$(get_current_allowlist "$agent")
+    local current_count
+    current_count=$(echo "$current" | jq 'length')
+    log "Current entries: $current_count"
+
+    log "Finding discrepancies..."
+    local missing
+    missing=$(find_missing_entries "$required" "$current")
+    local missing_count
+    missing_count=$(echo "$missing" | jq 'length')
+    TOTAL_MISSING=$((TOTAL_MISSING + missing_count))
+
+    local orphans
+    orphans=$(find_orphan_entries "$required" "$current" "$workspace")
+    local orphan_count
+    orphan_count=$(echo "$orphans" | jq 'length')
+    TOTAL_ORPHANS=$((TOTAL_ORPHANS + orphan_count))
+
+    log "Missing: $missing_count, Orphans: $orphan_count"
+
+    # Show discrepancies for this agent
+    if [[ "$missing_count" -gt 0 || "$orphan_count" -gt 0 ]]; then
+        echo ""
+        echo "Agent: $agent"
+
+        if [[ "$missing_count" -gt 0 ]]; then
+            echo "  Missing entries (need to add):"
+            echo "$missing" | jq -r '.[] | "    + \(.id): \(.pattern)"'
+        fi
+
+        if [[ "$orphan_count" -gt 0 ]]; then
+            echo "  Orphan entries (not in components):"
+            echo "$orphans" | jq -r '.[] | "    - \(.id // "unknown"): \(.pattern)"'
+        fi
+    fi
+
+    # If check-only or dry-run, don't make changes
+    if [[ "$CHECK_ONLY" == "true" ]]; then
+        return
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        return
+    fi
+
+    # Backup before first change
+    if [[ "$BACKUP_DONE" != "true" && ("$missing_count" -gt 0 || "$orphan_count" -gt 0) ]]; then
+        BACKUP_FILE="$REMOTE_OPENCLAW/exec-approvals.json.backup"
+        log "Backing up to $BACKUP_FILE..."
+        bot_cmd "cp $REMOTE_OPENCLAW/exec-approvals.json $BACKUP_FILE"
+        BACKUP_DONE=true
+    fi
+
+    # Add missing entries (unless --remove-only)
+    if [[ "$missing_count" -gt 0 && "$REMOVE_ONLY" != "true" ]]; then
+        log "Adding $missing_count entries for $agent..."
+        local missing_json
+        missing_json=$(echo "$missing" | jq -c '.')
+
+        # Do the jq update locally, then push the result
+        local current_json
+        current_json=$(bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json")
+        local updated_json
+        updated_json=$(echo "$current_json" | jq --arg agent "$agent" --argjson new "$missing_json" '.agents[$agent].allowlist += $new')
+
+        # Write to temp file and copy to bot
+        local tmp_file="/tmp/exec-approvals-$$.json"
+        echo "$updated_json" > "$tmp_file"
+
+        case "$BOT_TRANSPORT" in
+            sudo)
+                # Copy via sudo as bot user
+                cat "$tmp_file" | sudo -u "$BOT_USER" tee "$REMOTE_OPENCLAW/exec-approvals.json" > /dev/null
+                ;;
+            *)
+                scp $SSH_OPTS -q "$tmp_file" "$BOT_USER@$BOT_HOST:$REMOTE_OPENCLAW/exec-approvals.json"
+                ;;
+        esac
+        rm -f "$tmp_file"
+
+        ADDED_COUNT=$((ADDED_COUNT + missing_count))
+        CHANGES_MADE=1
+    fi
+
+    # Remove orphan entries (unless --add-only)
+    if [[ "$orphan_count" -gt 0 && "$ADD_ONLY" != "true" ]]; then
+        log "Removing $orphan_count orphan entries for $agent..."
+        # Get patterns to remove
+        local orphan_patterns
+        orphan_patterns=$(echo "$orphans" | jq -c '[.[].pattern]')
+
+        # Do the jq update locally, then push the result
+        local current_json
+        current_json=$(bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json")
+        local updated_json
+        updated_json=$(echo "$current_json" | jq --arg agent "$agent" --argjson remove "$orphan_patterns" '.agents[$agent].allowlist |= map(select(.pattern as $p | ($remove | index($p)) == null))')
+
+        # Write to temp file and copy to bot
+        local tmp_file="/tmp/exec-approvals-$$.json"
+        echo "$updated_json" > "$tmp_file"
+
+        case "$BOT_TRANSPORT" in
+            sudo)
+                # Copy via sudo as bot user
+                cat "$tmp_file" | sudo -u "$BOT_USER" tee "$REMOTE_OPENCLAW/exec-approvals.json" > /dev/null
+                ;;
+            *)
+                scp $SSH_OPTS -q "$tmp_file" "$BOT_USER@$BOT_HOST:$REMOTE_OPENCLAW/exec-approvals.json"
+                ;;
+        esac
+        rm -f "$tmp_file"
+
+        REMOVED_COUNT=$((REMOVED_COUNT + orphan_count))
+        CHANGES_MADE=1
+    fi
+}
+
+# Process each agent
+while IFS= read -r agent; do
+    [[ -z "$agent" ]] && continue
+    process_agent "$agent"
+done <<< "$AGENTS_WITH_ALLOWLISTS"
+
+# Handle check-only and dry-run exits
+if [[ "$CHECK_ONLY" == "true" ]]; then
+    echo ""
+    if [[ "$TOTAL_MISSING" -eq 0 && "$TOTAL_ORPHANS" -eq 0 ]]; then
+        echo "Allowlists: in sync ($TOTAL_REQUIRED total component entries)"
+        while IFS= read -r agent; do
+            [[ -z "$agent" ]] && continue
+            components=$(get_allowlist_sections "$agent")
+            component_list=$(echo "$components" | tr '\n' ',' | sed 's/,$//')
+            echo "  $agent: $component_list"
+        done <<< "$AGENTS_WITH_ALLOWLISTS"
+    else
+        echo "Allowlist status:"
+        [[ "$TOTAL_MISSING" -gt 0 ]] && echo "  $TOTAL_MISSING entries to add"
+        [[ "$TOTAL_ORPHANS" -gt 0 ]] && echo "  $TOTAL_ORPHANS orphan entries"
+    fi
+    exit 0
 fi
 
-# Remove orphan entries (unless --add-only)
-if [[ "$ORPHAN_COUNT" -gt 0 && "$ADD_ONLY" != "true" ]]; then
-    log "Removing orphan entries from exec-approvals.json..."
-    # Get patterns to remove
-    ORPHAN_PATTERNS=$(echo "$ORPHANS" | jq -c '[.[].pattern]')
+if [[ "$DRY_RUN" == "true" ]]; then
+    echo ""
+    if [[ "$TOTAL_MISSING" -eq 0 && "$TOTAL_ORPHANS" -eq 0 ]]; then
+        echo "Allowlists: in sync ($TOTAL_REQUIRED total component entries)"
+    else
+        [[ "$TOTAL_MISSING" -gt 0 ]] && echo "[DRY RUN] Would add $TOTAL_MISSING entries"
+        [[ "$TOTAL_ORPHANS" -gt 0 ]] && echo "[DRY RUN] Would remove $TOTAL_ORPHANS orphan entries"
+    fi
+    exit 0
+fi
 
-    # Do the jq update locally, then push the result
-    current_json=$(bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json")
-    updated_json=$(echo "$current_json" | jq --arg agent "$REMOTE_AGENT_ID" --argjson remove "$ORPHAN_PATTERNS" '.agents[$agent].allowlist |= map(select(.pattern as $p | ($remove | index($p)) == null))')
-
-    # Write to temp file and copy to bot
-    tmp_file="/tmp/exec-approvals-$$.json"
-    echo "$updated_json" > "$tmp_file"
-
-    case "$BOT_TRANSPORT" in
-        sudo)
-            # Copy via sudo as bot user
-            cat "$tmp_file" | sudo -u "$BOT_USER" tee "$REMOTE_OPENCLAW/exec-approvals.json" > /dev/null
-            ;;
-        *)
-            scp $SSH_OPTS -q "$tmp_file" "$BOT_USER@$BOT_HOST:$REMOTE_OPENCLAW/exec-approvals.json"
-            ;;
-    esac
-    rm -f "$tmp_file"
-
-    log "Removed $ORPHAN_COUNT entries"
-    CHANGES_MADE=1
+# Check if everything was already in sync
+if [[ "$TOTAL_MISSING" -eq 0 && "$TOTAL_ORPHANS" -eq 0 ]]; then
+    log ""
+    log "All allowlists are in sync"
+    echo ""
+    echo "Allowlists: in sync ($TOTAL_REQUIRED total component entries)"
+    while IFS= read -r agent; do
+        [[ -z "$agent" ]] && continue
+        components=$(get_allowlist_sections "$agent")
+        component_list=$(echo "$components" | tr '\n' ',' | sed 's/,$//')
+        echo "  $agent: $component_list"
+    done <<< "$AGENTS_WITH_ALLOWLISTS"
+    exit 0
 fi
 
 log "=== Update Complete ==="
 
 echo ""
 echo "Allowlist updated:"
-[[ "$MISSING_COUNT" -gt 0 && "$REMOVE_ONLY" != "true" ]] && echo "  Added $MISSING_COUNT entries"
-[[ "$ORPHAN_COUNT" -gt 0 && "$ADD_ONLY" != "true" ]] && echo "  Removed $ORPHAN_COUNT orphan entries"
+[[ "$ADDED_COUNT" -gt 0 ]] && echo "  Added $ADDED_COUNT entries"
+[[ "$REMOVED_COUNT" -gt 0 ]] && echo "  Removed $REMOVED_COUNT orphan entries"
 echo "Backup saved to: $BACKUP_FILE"
 
 if [[ "$CHANGES_MADE" -eq 1 ]]; then
     echo ""
     echo "IMPORTANT: Restart daemon to apply changes:"
-    echo "  ssh $SSH_HOST 'clawdbot daemon restart'"
+    echo "  openclaw gateway restart"
 fi
 echo ""

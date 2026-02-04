@@ -2,35 +2,78 @@
 
 Re-enable OpenClaw's native Docker sandbox for bruba-web with network access.
 
+## Status
+
+**✅ COMPLETED (Partial):** 2026-02-04
+
+Implemented **bruba-web only** sandboxing instead of full agent sandboxing:
+- bruba-web: Docker sandbox with `network: bridge`
+- Other agents: Running directly on host (`sandbox.mode: "off"` globally)
+
+This provides prompt injection isolation for web content while avoiding complexity of full sandboxing.
+
 ## Background
 
 **Disabled:** 2026-02-03
 **Reason:** `sessions_send` cannot see other agents' sessions when `sandbox.scope: "agent"`. Error: "Session not visible from this sandboxed agent session: agent:bruba-guru:main"
 
-**Current state:** `sandbox.mode: "off"` — all agents run directly on host
+**Fix confirmed:** OpenClaw 2026.2.1 — cross-agent `sessions_send` works with per-agent sandbox
+
+## What Was Done (2026-02-04)
+
+### 1. Per-Agent Sandbox for bruba-web Only
+
+Instead of global sandbox defaults, we enabled sandbox only for bruba-web:
+
+```json
+{
+  "id": "bruba-web",
+  "sandbox": {
+    "mode": "all",
+    "scope": "agent",
+    "workspaceRoot": "/Users/bruba/agents/bruba-web",
+    "docker": {
+      "network": "bridge"
+    }
+  }
+}
+```
+
+Global `agents.defaults.sandbox.mode` remains `"off"`.
+
+### 2. Container Auto-Warm
+
+Created `~/bin/bruba-start` script and LaunchAgent to warm the container on login:
+- Script: `/Users/bruba/bin/bruba-start`
+- LaunchAgent: `~/Library/LaunchAgents/ai.openclaw.sandbox-warm.plist`
+
+### 3. Verification Performed
+
+```bash
+# bruba-web responds in container
+openclaw agent --agent bruba-web -m "ping"
+# Result: PONG
+
+# Web search works from container
+openclaw agent --agent bruba-web -m "Search for OpenClaw AI"
+# Result: Returns search results with sources
+
+# Cross-agent routing works (Main → Web)
+openclaw agent --agent bruba-main -m "Use sessions_send to ask bruba-web to search for weather"
+# Result: Main successfully routed to bruba-web and got results
+```
+
+## Future: Full Agent Sandboxing (Optional)
+
+If desired, the original plan below can still be implemented to sandbox all agents.
+
+---
+
+## Original Plan: Full Sandbox (Not Implemented)
 
 **Goal:** All agents containerized; bruba-web gets `network: bridge` for web access, others get `network: none`
 
-## Pre-requisites
-
-1. OpenClaw version with sandbox bugfix (cross-agent session visibility)
-2. Docker running on bot host
-
-### Verify the Fix
-
-Before migrating, test that `sessions_send` works across agents in sandbox mode:
-
-```bash
-# Send from bruba-main to bruba-guru (should not error)
-openclaw agent --agent bruba-main -m "route to guru: ping"
-
-# Expected: Message routes successfully
-# Broken: "Session not visible from this sandboxed agent session: agent:bruba-guru:main"
-```
-
-## Configuration Changes
-
-### 1. Global Sandbox Defaults
+### Global Sandbox Defaults
 
 In `~/.openclaw/openclaw.json`, add sandbox defaults:
 
@@ -47,22 +90,7 @@ In `~/.openclaw/openclaw.json`, add sandbox defaults:
 }
 ```
 
-### 2. bruba-web Network Access
-
-In the bruba-web agent config, add network override:
-
-```json
-{
-  "id": "bruba-web",
-  "sandbox": {
-    "docker": {
-      "network": "bridge"
-    }
-  }
-}
-```
-
-### 3. Full Example
+### Full Example (All Agents Sandboxed)
 
 ```json
 {
@@ -123,7 +151,7 @@ In the bruba-web agent config, add network override:
 }
 ```
 
-## Migration Steps
+### Full Migration Steps (If Implementing)
 
 1. **Stop the daemon**
    ```bash
@@ -160,16 +188,7 @@ In the bruba-web agent config, add network override:
    openclaw-sandbox-bruba-web   Up ...
    ```
 
-## Verification
-
-### Quick Check
-
-```bash
-# From operator machine
-./tools/test-sandbox.sh --all
-```
-
-### Manual Tests
+### Verification (Full Sandbox)
 
 1. **Ping test** — verify agent responds in container
    ```bash
@@ -202,11 +221,36 @@ In the bruba-web agent config, add network override:
    docker exec openclaw-sandbox-bruba-main touch /workspace/tools/test.txt
    ```
 
-## Container Architecture
+---
+
+## Reference: Architecture Diagrams
+
+### Current State (bruba-web Only)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          Mac Host (dadmini)                              │
+│                          Mac Host (bruba)                                │
+│                                                                          │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                     │
+│  │ bruba-main   │ │ bruba-guru   │ │bruba-manager │  ← Direct on host   │
+│  │  (direct)    │ │  (direct)    │ │  (direct)    │                     │
+│  └──────────────┘ └──────────────┘ └──────────────┘                     │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │                   Docker Container                                 │  │
+│  │  ┌──────────────┐                                                  │  │
+│  │  │  bruba-web   │  ← Only agent in container                       │  │
+│  │  │network:bridge│                                                  │  │
+│  │  └──────────────┘                                                  │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### Full Sandbox (Future Option)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          Mac Host (bruba)                                │
 │                                                                          │
 │  PROTECTED (not mounted into containers):                                │
 │  ├── ~/.openclaw/exec-approvals.json   ← Exec allowlist                  │
@@ -240,7 +284,7 @@ In the bruba-web agent config, add network override:
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Container Path Mapping
+## Container Path Mapping (Full Sandbox)
 
 | Host Path | Container Path | Notes |
 |-----------|----------------|-------|
@@ -249,6 +293,8 @@ In the bruba-web agent config, add network override:
 | `/Users/bruba/agents/bruba-shared/packets/` | `/workspaces/shared/packets/` | All containers |
 | `/Users/bruba/agents/bruba-shared/context/` | `/workspaces/shared/context/` | All containers |
 | `/Users/bruba/agents/bruba-shared/repo/` | `/workspaces/shared/repo/` | All containers (ro) |
+
+---
 
 ## Rollback
 
@@ -291,36 +337,51 @@ docker ps -a --filter "name=openclaw"
 
 # View container logs
 docker logs openclaw-sandbox-bruba-web
+
+# Check sandbox config
+openclaw sandbox explain --agent bruba-web
 ```
+
+### Container not running after reboot
+
+The container starts on-demand. Either:
+1. Run `~/bin/bruba-start` manually
+2. Send any message to bruba-web: `openclaw agent --agent bruba-web -m "ping"`
 
 ### Cross-agent routing fails
 
-This is the bug that caused sandbox to be disabled. If you see:
+**Fixed in OpenClaw 2026.2.1.** If you still see:
 ```
 Session not visible from this sandboxed agent session: agent:bruba-guru:main
 ```
 
-**Rollback immediately** and wait for OpenClaw fix.
+Check OpenClaw version: `openclaw --version`
 
 ### Network issues on bruba-web
 
 ```bash
 # Verify network mode
-docker inspect openclaw-sandbox-bruba-web | jq '.[0].NetworkSettings.Networks'
+docker inspect openclaw-sbx-agent-bruba-web-* | jq '.[0].NetworkSettings.Networks'
 
 # Should show "bridge" network, not "none"
+
+# Test from inside container
+docker exec openclaw-sbx-agent-bruba-web-* ping -c 1 google.com
 ```
 
-### tools/ is writable (security failure)
+### Rollback bruba-web to direct mode
+
+If sandbox causes issues, disable it:
 
 ```bash
-# Check bind mount
-docker inspect openclaw-sandbox-bruba-main | jq '.[0].Mounts[] | select(.Destination=="/workspace/tools")'
+# Edit openclaw.json - remove sandbox.mode from bruba-web
+# Or set sandbox.mode: "off" for bruba-web
 
-# Should show "ro" (read-only) in Mode
+# Restart gateway
+openclaw gateway restart
 ```
 
 ## References
 
 - `docs/architecture-masterdoc.md` — Full Docker architecture documentation
-- `tools/test-sandbox.sh` — Automated verification script
+- `components/web-search/README.md` — Web search component using bruba-web

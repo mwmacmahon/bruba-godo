@@ -1,4 +1,3 @@
-<!-- COMPONENT: http-api -->
 ## 🌐 HTTP API Requests
 
 Messages may arrive via HTTP (Siri shortcuts, automations) instead of Signal.
@@ -27,5 +26,3 @@ Your return value doesn't matter — focus on sending to Signal.
 ### Automation — `[From Automation]`
 
 Use judgment. When unclear, respond to both Signal and HTTP.
-
-<!-- /COMPONENT: http-api -->
