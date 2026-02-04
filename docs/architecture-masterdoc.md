@@ -1,5 +1,5 @@
 ---
-version: 3.8.3
+version: 3.8.4
 updated: 2026-02-03
 type: refdoc
 project: planning
@@ -1743,6 +1743,41 @@ Auto-recovery sometimes fails on context overflow.
 
 **Impact:** Not relevant for our architecture — we use separate agents instead of subagents for capability isolation.
 
+### Bug: Voice Messages Cause Silent Compaction
+
+**Status:** Open — needs OpenClaw fix
+
+**Symptoms:**
+- Bruba loses context mid-conversation after receiving a voice message
+- Session claims "0 compactions" but context is clearly truncated
+- Earlier messages disappear, replaced by a summary
+
+**Root cause:** Voice messages include **raw audio binary data inline** in the context:
+
+```
+[Audio] User text: ... <media:audio> Transcript: Hello
+<file name="abc123.mp3" mime="text/plain">
+[MASSIVE BINARY BLOB - null bytes and garbage data]
+</file>
+```
+
+This binary blob causes massive token inflation (~50K+ tokens for a short voice message), triggering compaction.
+
+**Evidence:** The session JSONL shows actual `{"type":"compaction"}` events, but `compactionCount` in session metadata stays at 0. This is a secondary bug — compaction counting doesn't match actual compaction events.
+
+**Workarounds:**
+1. **Increase compaction threshold:** Bump `softThresholdTokens` to 100K+ to delay compaction
+   ```bash
+   jq '.agents.defaults.compaction.memoryFlush.softThresholdTokens = 100000' \
+     ~/.openclaw/openclaw.json > /tmp/oc.json && mv /tmp/oc.json ~/.openclaw/openclaw.json
+   ```
+2. **Use text instead of voice** when context preservation is critical
+3. **Turn off experimental session memory**, as suggested by someone online. Not clear why this would matter, but a few people have reported it working for some reason. Just set memorySearch.experimental.sessionMemory to false in openclaw.json.
+
+**Proper fix needed:** OpenClaw should exclude binary content from context, keeping only the transcript.
+
+**Reference:** Full investigation in `docs/cc_logs/2026-02-03-voice-message-context-crash.md`
+
 ### Global tools.allow Ceiling Effect (Needs Confirmation)
 
 **Status:** Observed behavior — needs confirmation from OpenClaw docs/community
@@ -1866,6 +1901,7 @@ Auto-recovery sometimes fails on context overflow.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.8.4 | 2026-02-03 | **Voice compaction bug documented:** Added known issue for voice messages causing silent context compaction (binary audio data in context). Also documented compactionCount mismatch bug. |
 | 3.8.3 | 2026-02-03 | **OpenClaw config migration:** config.yaml is now source of truth for openclaw.json settings. New `openclaw:` section for global defaults, per-agent model/heartbeat config. New `sync-openclaw-config.sh` replaces `update-agent-tools.sh`. Extended `parse-yaml.py` with `--to-json` mode for snake_case→camelCase conversion. |
 | 3.8.2 | 2026-02-03 | **Compaction fixes:** bruba-main switched from Opus to Sonnet (mid-session fallback was triggering compaction). softThresholdTokens increased 8K→40K. bruba-guru retains Opus. |
 | 3.8.1 | 2026-02-03 | **Bot transport abstraction:** `./tools/bot` and `bot_exec()` now support multiple transports (sudo, tailscale-ssh, ssh). Enables same-machine operation without SSH overhead when bruba is a local account. |

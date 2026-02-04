@@ -443,6 +443,52 @@ To switch TTS provider, update `messages.tts.provider`.
 
 ---
 
+## Known Issues
+
+### Bug: Voice Messages Cause Silent Context Compaction
+
+**Status:** Open — needs OpenClaw fix
+
+**Symptoms:**
+- Agent loses context mid-conversation after receiving a voice message
+- Session status shows "0 compactions" but earlier messages are gone
+- Agent repeats itself or loses track of conversation
+
+**Root cause:** Voice messages include **raw audio binary data inline** in the context. Instead of just the transcript, OpenClaw injects something like:
+
+```
+[Audio] User text: [Signal Michael ...] <media:audio>
+Transcript: Hello, how are you?
+<file name="abc123.mp3" mime="text/plain">
+[NULL BYTES AND BINARY DATA - potentially 50K+ tokens]
+</file>
+```
+
+This massive binary blob pushes context over the compaction threshold, causing immediate summarization.
+
+**Secondary bug:** The `compactionCount` in session metadata doesn't increment when compaction happens. The session JSONL shows `{"type":"compaction"}` events, but status reports "0 compactions."
+
+**Workarounds:**
+1. **Increase compaction threshold:**
+   ```bash
+   # Via config.yaml
+   openclaw:
+     compaction:
+       memory_flush:
+         soft_threshold_tokens: 100000
+
+   # Then sync
+   ./tools/sync-openclaw-config.sh
+   ```
+
+2. **Prefer text messages** when context preservation is critical
+
+**Proper fix needed:** OpenClaw should exclude binary content from context, only keeping the transcript.
+
+**Reference:** Full investigation in `docs/cc_logs/2026-02-03-voice-message-context-crash.md`
+
+---
+
 ## Siri Integration
 
 Siri provides hands-free access to Bruba via iOS Shortcuts. All Siri requests are **async-only** — Siri acknowledges immediately, and responses arrive in Signal.

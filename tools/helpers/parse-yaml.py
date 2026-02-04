@@ -179,6 +179,9 @@ SNAKE_TO_CAMEL = {
     'model_id': 'modelId',
     'voice_settings': 'voiceSettings',
     'similarity_boost': 'similarityBoost',
+    # Memory search settings
+    'model_path': 'modelPath',
+    'session_memory': 'sessionMemory',
 }
 
 

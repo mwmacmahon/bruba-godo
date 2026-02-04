@@ -68,6 +68,18 @@ openclaw:
   # Maximum concurrent agent sessions (global limit)
   max_concurrent: 4
 
+  # Memory search defaults
+  memory_search:
+    enabled: true                              # Enable memory search for agents
+    sources:
+      - memory                                 # Search sources (memory, sessions, etc.)
+    provider: local                            # Embedding provider (local, openai, etc.)
+    fallback: none                             # Fallback if provider fails
+    local:
+      model_path: "hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf"
+    experimental:
+      session_memory: false                    # Cross-session memory (experimental)
+
   # Voice settings (synced to tools.media.audio + messages.tts)
   # API keys stay in openclaw.json env.vars (not synced from config.yaml)
   voice:
