@@ -905,7 +905,7 @@ When sandbox is re-enabled, all four agents would run in Docker containers via O
 | **List files** | `exec` | `exec /bin/ls /Users/bruba/agents/bruba-main/memory/` |
 | **Find files** | `exec` | `exec /usr/bin/find /Users/bruba/agents/bruba-main/memory/ -name "*.md"` |
 | **Search content** | `exec` | `exec /usr/bin/grep -r "pattern" /Users/bruba/agents/bruba-main/memory/` |
-| **Run script** | `exec` | `exec /Users/bruba/tools/tts.sh "hello" /tmp/out.wav` |
+| **Run script** | `exec` | `exec /Users/bruba/agents/bruba-main/tools/tts.sh "hello" /tmp/out.wav` |
 | **Memory search** | `memory_search` | `memory_search "topic"` (indexed content) |
 
 **When to use what:**
@@ -921,7 +921,7 @@ When sandbox is re-enabled, all four agents would run in Docker containers via O
 | File viewing | `/bin/cat`, `/usr/bin/head`, `/usr/bin/tail` |
 | Searching | `/usr/bin/grep`, `/usr/bin/find` |
 | Info | `/usr/bin/wc`, `/usr/bin/du`, `/usr/bin/uname`, `/usr/bin/whoami` |
-| Custom tools | `/Users/bruba/tools/*.sh` |
+| Custom tools | `/Users/bruba/agents/bruba-main/tools/*.sh` |
 | System utils | `/opt/homebrew/bin/remindctl`, `/opt/homebrew/bin/icalBuddy` |
 
 **File System Layout (host paths):**
@@ -930,13 +930,13 @@ When sandbox is re-enabled, all four agents would run in Docker containers via O
 |-----------|------|--------|---------|
 | **Agent workspace** | `/Users/bruba/agents/bruba-main/` | Read-write | Prompts, memory, working files |
 | **Memory** | `/Users/bruba/agents/bruba-main/memory/` | Read-write | Docs, transcripts, repos |
-| **Tools** | `/Users/bruba/tools/` | Read (exec only) | Scripts — outside workspace, protected |
+| **Tools** | `/Users/bruba/agents/bruba-main/tools/` | Read (exec only) | Per-agent scripts (read-only in sandbox) |
 | **Shared packets** | `/Users/bruba/agents/bruba-shared/packets/` | Read-write | Main↔Guru handoff |
 
 **Security:**
-- Tools directory (`/Users/bruba/tools/`) is outside agent workspaces
-- File tools (read/write/edit) can't modify it — path validation blocks it
-- Only exec can run scripts there — and only allowlisted commands execute
+- Tools directory (`/Users/bruba/agents/{agent}/tools/`) is read-only in sandbox mode
+- Each agent has its own tools directory
+- Only allowlisted commands can be executed
 
 **Examples:**
 
@@ -945,10 +945,10 @@ When sandbox is re-enabled, all four agents would run in Docker containers via O
 - `write /Users/bruba/agents/bruba-main/workspace/output/result.md`
 - `exec /bin/ls /Users/bruba/agents/bruba-main/memory/`
 - `exec /usr/bin/grep -r "pattern" /Users/bruba/agents/bruba-main/`
-- `exec /Users/bruba/tools/tts.sh "hello" /tmp/out.wav`
+- `exec /Users/bruba/agents/bruba-main/tools/tts.sh "hello" /tmp/out.wav`
 
 ❌ **Incorrect:**
-- `write /Users/bruba/tools/new.sh` → Outside workspace, blocked by file tools
+- `write /Users/bruba/agents/bruba-main/tools/new.sh` → tools/ is read-only in sandbox
 
 ### Sandbox Configuration
 
@@ -986,7 +986,7 @@ When sandbox is re-enabled, all four agents would run in Docker containers via O
 
 **Key settings:**
 - `sandbox.workspaceRoot` = agent's `workspace` path (tells OpenClaw file tools where `/workspace/` is)
-- Tools are at `/Users/bruba/tools/` (outside workspaces) — no Docker bind needed for protection
+- Tools are at `/Users/bruba/agents/{agent}/tools/` (per-agent, read-only in sandbox)
 
 **Per-agent overrides:**
 

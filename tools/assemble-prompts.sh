@@ -201,7 +201,8 @@ resolve_section() {
     local component_file="$ROOT_DIR/components/$entry/prompts/${prompt_upper}.snippet.md"
     if [[ -f "$component_file" ]]; then
         echo "<!-- COMPONENT: $entry -->"
-        cat "$component_file"
+        # Substitute ${WORKSPACE} with agent's workspace path
+        sed "s|\${WORKSPACE}|$AGENT_WORKSPACE|g" "$component_file"
         echo "<!-- /COMPONENT: $entry -->"
         return 0
     fi

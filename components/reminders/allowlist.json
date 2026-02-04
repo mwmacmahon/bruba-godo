@@ -1,5 +1,7 @@
 {
   "entries": [
-    {"pattern": "${WORKSPACE}/tools/cleanup-reminders.sh", "id": "cleanup-reminders"}
+    {"pattern": "${WORKSPACE}/tools/cleanup-reminders.sh", "id": "cleanup-reminders"},
+    {"pattern": "${WORKSPACE}/tools/bruba-reminders.sh", "id": "bruba-reminders"},
+    {"pattern": "${WORKSPACE}/tools/bruba-reminders.sh *", "id": "bruba-reminders-args"}
   ]
 }

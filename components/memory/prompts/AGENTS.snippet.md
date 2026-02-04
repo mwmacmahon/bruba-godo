@@ -23,3 +23,18 @@ Capture what matters. Decisions, context, things to remember. Skip the secrets u
 - When you make a mistake → document it so future-you doesn't repeat it
 - **When editing config files (AGENTS.md, TOOLS.md, etc.)** → always show <REDACTED-NAME> the exact before/after diff
 - **Text > Brain** 📝
+
+### Recall Context with memory_search
+
+**Use `memory_search` liberally** to recall past context:
+- User mentions a topic? → `memory_search` for past discussions
+- Resuming ongoing work? → `memory_search` for recent activity
+- Uncertain about context? → `memory_search` before asking
+
+```
+memory_search "project X"     → Past discussions, decisions
+memory_search "dentist"       → Reminders, appointments
+memory_search "2026-01"       → January activity
+```
+
+`memory_search` is fast and cheap — use it frequently in all conversations, not just technical ones.

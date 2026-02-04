@@ -288,6 +288,113 @@ if missing:
 }
 
 # ============================================================
+# Test: --update flag is recognized
+# ============================================================
+test_update_flag_exists() {
+    echo ""
+    echo "=== Test: --update flag parsing ==="
+
+    # Verify the script parses --update flag
+    if grep -q 'UPDATE=false' "$ROOT_DIR/tools/sync-cronjobs.sh" && \
+       grep -q '\-\-update.*UPDATE=true' "$ROOT_DIR/tools/sync-cronjobs.sh"; then
+        pass "sync-cronjobs.sh recognizes --update flag"
+    else
+        fail "sync-cronjobs.sh should parse --update flag"
+    fi
+}
+
+# ============================================================
+# Test: get_job_schedule function exists
+# ============================================================
+test_get_job_schedule_function() {
+    echo ""
+    echo "=== Test: get_job_schedule function exists ==="
+
+    if grep -q '^get_job_schedule()' "$ROOT_DIR/tools/sync-cronjobs.sh"; then
+        pass "get_job_schedule function exists"
+    else
+        fail "get_job_schedule function should exist for schedule comparison"
+    fi
+}
+
+# ============================================================
+# Test: update_job function exists
+# ============================================================
+test_update_job_function() {
+    echo ""
+    echo "=== Test: update_job function exists ==="
+
+    if grep -q '^update_job()' "$ROOT_DIR/tools/sync-cronjobs.sh" && \
+       grep -q 'openclaw cron edit' "$ROOT_DIR/tools/sync-cronjobs.sh"; then
+        pass "update_job function exists with cron edit command"
+    else
+        fail "update_job function should exist for updating job schedules"
+    fi
+}
+
+# ============================================================
+# Test: --check flag is recognized
+# ============================================================
+test_check_flag_exists() {
+    echo ""
+    echo "=== Test: --check flag parsing ==="
+
+    if grep -q 'CHECK=false' "$ROOT_DIR/tools/sync-cronjobs.sh" && \
+       grep -q '\-\-check.*CHECK=true' "$ROOT_DIR/tools/sync-cronjobs.sh"; then
+        pass "sync-cronjobs.sh recognizes --check flag"
+    else
+        fail "sync-cronjobs.sh should parse --check flag"
+    fi
+}
+
+# ============================================================
+# Test: --check mode comparison logic exists
+# ============================================================
+test_check_mode_logic() {
+    echo ""
+    echo "=== Test: --check mode comparison logic ==="
+
+    # Verify the script has check mode logic
+    if grep -q 'CHECK.*==.*true' "$ROOT_DIR/tools/sync-cronjobs.sh" && \
+       grep -q 'Schedule mismatch' "$ROOT_DIR/tools/sync-cronjobs.sh" && \
+       grep -q 'Missing from bot' "$ROOT_DIR/tools/sync-cronjobs.sh" && \
+       grep -q 'Bot-only job' "$ROOT_DIR/tools/sync-cronjobs.sh"; then
+        pass "sync-cronjobs.sh has --check mode comparison logic"
+    else
+        fail "sync-cronjobs.sh should detect schedule mismatches, missing jobs, and bot-only jobs"
+    fi
+}
+
+# ============================================================
+# Test: get_all_bot_jobs function exists
+# ============================================================
+test_get_all_bot_jobs_function() {
+    echo ""
+    echo "=== Test: get_all_bot_jobs function exists ==="
+
+    if grep -q '^get_all_bot_jobs()' "$ROOT_DIR/tools/sync-cronjobs.sh"; then
+        pass "get_all_bot_jobs function exists"
+    else
+        fail "get_all_bot_jobs function should exist for bidirectional comparison"
+    fi
+}
+
+# ============================================================
+# Test: Default mode warns about schedule differences
+# ============================================================
+test_default_mode_warns() {
+    echo ""
+    echo "=== Test: Default mode warns about schedule differences ==="
+
+    # Verify the script warns (not silently skips) when schedules differ
+    if grep -q 'WARNING: Schedule mismatch' "$ROOT_DIR/tools/sync-cronjobs.sh"; then
+        pass "sync-cronjobs.sh warns about schedule mismatches in default mode"
+    else
+        fail "sync-cronjobs.sh should warn about schedule mismatches in default mode"
+    fi
+}
+
+# ============================================================
 # Run all tests
 # ============================================================
 
@@ -300,6 +407,13 @@ test_validates_required_fields_logic
 test_main_session_uses_system_event
 test_cronjob_yaml_valid
 test_cronjob_yaml_fields
+test_update_flag_exists
+test_get_job_schedule_function
+test_update_job_function
+test_check_flag_exists
+test_check_mode_logic
+test_get_all_bot_jobs_function
+test_default_mode_warns
 
 # Summary
 echo ""

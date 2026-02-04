@@ -215,7 +215,26 @@ CHANGES_MADE=0
 if [[ "$MISSING_COUNT" -gt 0 && "$REMOVE_ONLY" != "true" ]]; then
     log "Adding missing entries to exec-approvals.json..."
     MISSING_JSON=$(echo "$MISSING" | jq -c '.')
-    bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json | jq --argjson new '$MISSING_JSON' '.agents[\"$REMOTE_AGENT_ID\"].allowlist += \$new' > /tmp/exec-approvals.json && mv /tmp/exec-approvals.json $REMOTE_OPENCLAW/exec-approvals.json"
+
+    # Do the jq update locally, then push the result
+    current_json=$(bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json")
+    updated_json=$(echo "$current_json" | jq --arg agent "$REMOTE_AGENT_ID" --argjson new "$MISSING_JSON" '.agents[$agent].allowlist += $new')
+
+    # Write to temp file and copy to bot
+    tmp_file="/tmp/exec-approvals-$$.json"
+    echo "$updated_json" > "$tmp_file"
+
+    case "$BOT_TRANSPORT" in
+        sudo)
+            # Copy via sudo as bot user
+            cat "$tmp_file" | sudo -u "$BOT_USER" tee "$REMOTE_OPENCLAW/exec-approvals.json" > /dev/null
+            ;;
+        *)
+            scp $SSH_OPTS -q "$tmp_file" "$BOT_USER@$BOT_HOST:$REMOTE_OPENCLAW/exec-approvals.json"
+            ;;
+    esac
+    rm -f "$tmp_file"
+
     log "Added $MISSING_COUNT entries"
     CHANGES_MADE=1
 fi
@@ -225,7 +244,26 @@ if [[ "$ORPHAN_COUNT" -gt 0 && "$ADD_ONLY" != "true" ]]; then
     log "Removing orphan entries from exec-approvals.json..."
     # Get patterns to remove
     ORPHAN_PATTERNS=$(echo "$ORPHANS" | jq -c '[.[].pattern]')
-    bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json | jq --argjson remove '$ORPHAN_PATTERNS' '.agents[\"$REMOTE_AGENT_ID\"].allowlist |= map(select(.pattern as \$p | (\$remove | index(\$p)) == null))' > /tmp/exec-approvals.json && mv /tmp/exec-approvals.json $REMOTE_OPENCLAW/exec-approvals.json"
+
+    # Do the jq update locally, then push the result
+    current_json=$(bot_cmd "cat $REMOTE_OPENCLAW/exec-approvals.json")
+    updated_json=$(echo "$current_json" | jq --arg agent "$REMOTE_AGENT_ID" --argjson remove "$ORPHAN_PATTERNS" '.agents[$agent].allowlist |= map(select(.pattern as $p | ($remove | index($p)) == null))')
+
+    # Write to temp file and copy to bot
+    tmp_file="/tmp/exec-approvals-$$.json"
+    echo "$updated_json" > "$tmp_file"
+
+    case "$BOT_TRANSPORT" in
+        sudo)
+            # Copy via sudo as bot user
+            cat "$tmp_file" | sudo -u "$BOT_USER" tee "$REMOTE_OPENCLAW/exec-approvals.json" > /dev/null
+            ;;
+        *)
+            scp $SSH_OPTS -q "$tmp_file" "$BOT_USER@$BOT_HOST:$REMOTE_OPENCLAW/exec-approvals.json"
+            ;;
+    esac
+    rm -f "$tmp_file"
+
     log "Removed $ORPHAN_COUNT entries"
     CHANGES_MADE=1
 fi

@@ -1,17 +1,31 @@
 ## Reminder Management
 
-**Creating reminders:** Use remindctl to add items to Apple Reminders.
-**Maintenance:** cleanup script removes old completed reminders.
+**Primary tool:** `${WORKSPACE}/tools/bruba-reminders.sh`
+
+This wrapper handles Apple Reminders without requiring pipes or approval prompts.
+
+**Creating reminders:**
+```bash
+bruba-reminders.sh add "Task title" --list "ListName" --due tomorrow --priority high
+```
+
+**Viewing reminders:**
+```bash
+bruba-reminders.sh list                # All uncompleted
+bruba-reminders.sh list --overdue      # Overdue items
+bruba-reminders.sh list Work           # Specific list
+```
 
 **Behavioral notes:**
-- When <REDACTED-NAME> says "remind me..." → create reminder
-- When asked about reminders → default to uncompleted, skip completed unless asked
-- Use JSON output + UUIDs (never display indices)
+- When <REDACTED-NAME> says "remind me..." → create reminder with `add`
+- When asked about reminders → use default compact output (excludes completed)
+- For counts → use `count` command (token-efficient)
+- Use JSON output (`--json`) only when you need to parse specific fields
 
-**Cleanup tool:**
-```bash
-/Users/bruba/tools/cleanup-reminders.sh
-```
-Removes completed reminders older than 30 days.
+**⚠️ UUID Rule:** Always use UUIDs for edit/complete/delete. Display indices are broken.
+- Output shows `[4DF7]` prefix — use that for edits
+- Use `lookup "title"` to find UUID from title
 
-See `TOOLS.md` → Reminders for remindctl usage and UUID rules.
+**Common lists:** Reminders, Scheduled, Backlog, Work, Work Scheduled, Planning, Personal, Groceries
+
+See `TOOLS.md` → Reminders for full command reference.

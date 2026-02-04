@@ -8,7 +8,6 @@ Messages may arrive via HTTP (Siri shortcuts, automations) instead of Signal.
 | Tag | Source | Response Goes To |
 |-----|--------|------------------|
 | `[From Siri async]` | Siri (via Manager) | Signal (via message tool) |
-| `[From Automation]` | Shortcuts/scripts | Context-dependent |
 
 **<REDACTED-NAME>'s UUID:** `uuid:<REDACTED-UUID>`
 
@@ -24,7 +23,4 @@ Your return value doesn't matter — focus on sending to Signal.
 
 **No voice responses to Siri messages** — text only.
 
-### Automation — `[From Automation]`
-
-Use judgment. When unclear, respond to both Signal and HTTP.
 <!-- /COMPONENT: http-api -->

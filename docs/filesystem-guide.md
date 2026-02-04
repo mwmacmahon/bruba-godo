@@ -890,7 +890,7 @@ Agent (container) → exec tool → Gateway → Node Host (on HOST) → checks a
 | **List files** | `exec` | `exec /bin/ls /Users/bruba/agents/bruba-main/memory/` |
 | **Find files** | `exec` | `exec /usr/bin/find /Users/bruba/agents/bruba-main/ -name "*.md"` |
 | **Search content** | `exec` | `exec /usr/bin/grep -r "pattern" /Users/bruba/agents/bruba-main/` |
-| **Run script** | `exec` | `exec /Users/bruba/tools/tts.sh "text" /tmp/out.wav` |
+| **Run script** | `exec` | `exec /Users/bruba/agents/bruba-main/tools/tts.sh "text" /tmp/out.wav` |
 | **Discover in memory** | `memory_search` | `memory_search "topic"` |
 
 **Key distinction:**
@@ -936,7 +936,7 @@ Agent (container) → exec tool → Gateway → Node Host (on HOST) → checks a
 
 **Key settings:**
 - `sandbox.workspaceRoot` = agent's `workspace` path (tells OpenClaw file tools where `/workspace/` is)
-- Tools are at `/Users/bruba/tools/` (outside workspaces) — no Docker bind needed for protection
+- Tools are at `/Users/bruba/agents/{agent}/tools/` (per-agent, read-only in sandbox)
 
 **Per-agent overrides:**
 - `bruba-main`, `bruba-guru`, `bruba-manager`: `workspaceRoot` only
@@ -968,7 +968,7 @@ Agent (container) → exec tool → Gateway → Node Host (on HOST) → checks a
 | `~/agents/bruba-shared/packets/` | `/workspaces/shared/packets/` | rw | All agents |
 | `~/agents/bruba-shared/context/` | `/workspaces/shared/context/` | rw | All agents |
 | `~/agents/bruba-shared/repo/` | `/workspaces/shared/repo/` | **ro** | All agents |
-| `/Users/bruba/tools/` | N/A (exec only) | **blocked** | Tools directory (outside workspace, protected by file tools) |
+| `{agent}/tools/` | `/workspace/tools/` | **ro** | Per-agent tools (read-only in sandbox) |
 
 ### Per-Agent Access Matrix
 

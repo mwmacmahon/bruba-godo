@@ -35,7 +35,7 @@ memory_search "project status"    → Recent project updates
 |-----------|------|---------|
 | **Agent workspace** | `/Users/bruba/agents/bruba-manager/` | Prompts, memory, inbox, state |
 | **Memory** | `/Users/bruba/agents/bruba-manager/memory/` | Docs, repos |
-| **Tools** | `/Users/bruba/tools/` | Scripts (protected) |
+| **Tools** | `/Users/bruba/agents/bruba-manager/tools/` | Agent tools |
 
 **File Discovery:**
 

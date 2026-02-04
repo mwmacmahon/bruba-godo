@@ -1,35 +1,69 @@
 ### Reminders
 
-**Binary:** /opt/homebrew/bin/remindctl
+**Primary Tool:** `${WORKSPACE}/tools/bruba-reminders.sh`
+
+A wrapper around remindctl that handles filtering, JSON parsing, and provides token-efficient output without requiring pipes.
+
+**Quick Reference:**
+```bash
+bruba-reminders.sh list                          # All uncompleted
+bruba-reminders.sh list Planning                 # Specific list
+bruba-reminders.sh list --overdue                # Overdue only
+bruba-reminders.sh list --today                  # Today's items
+bruba-reminders.sh add "Task" --list "Work"      # Add reminder
+bruba-reminders.sh edit UUID --title "New"       # Edit by UUID
+bruba-reminders.sh complete UUID                 # Mark complete
+bruba-reminders.sh search "keyword"              # Search
+bruba-reminders.sh count --overdue               # Quick count
+bruba-reminders.sh lookup "title"                # Find UUID by title
+bruba-reminders.sh lists                         # Show all lists
+```
 
 **⚠️ CRITICAL: Never use display indices `[1]`, `[2]`, etc. — they are BROKEN.**
-Display indices don't match internal IDs. Using `remindctl edit 8` will edit the WRONG reminder (possibly from a different list, possibly years old).
+Display indices don't match internal IDs. Using `remindctl edit 8` will edit the WRONG reminder.
 
 **Always use UUIDs:**
-1. Get the UUID: `remindctl list Planning --json | grep -B5 "title text"`
-2. Use UUID or prefix: `remindctl edit 4DF7 --title "New title"`
+1. Default output shows `[UUID_PREFIX]` for each item
+2. Use UUID prefix (4+ chars): `bruba-reminders.sh edit 4DF7 --title "New"`
+3. Use `lookup` to find UUID from title: `bruba-reminders.sh lookup "task name"`
 
-**Behavior when asked about reminders:**
-- **Default to uncompleted** — "how many reminders" means uncompleted
-- **Skip completed unless asked** — saves tokens, completed are rarely relevant
-- **Exceptions:**
-  - "Did I already do X?" → check recent completed
-  - "What did I finish this week?" → check completed
-  - Last ~7 days → can include both completed and uncompleted
-- Use `--quiet` for counts, avoid loading full lists unless needed
+**Output Modes:**
+| Mode | When to Use | Tokens |
+|------|-------------|--------|
+| Default (compact) | Display to user | ~20-40/item |
+| `--json` | Programmatic parsing | ~150-300/item |
+| `count` | Quick checks | ~5 total |
 
-### Example: Calendar
-```
-**Binary:** /opt/homebrew/bin/icalBuddy (if installed)
-```
+**Common Operations:**
 
-### Voice Tools
-
-**Location:** `/Users/bruba/tools/`
-
-**Transcription:** Always use the script, not raw whisper-cpp:
 ```bash
-/Users/bruba/tools/whisper-clean.sh "/path/to/audio"
+# Add with all options
+bruba-reminders.sh add "Review PR" --list "Work" --due tomorrow --priority high --notes "Details"
+
+# Edit existing
+bruba-reminders.sh edit 4DF7 --title "Updated" --due "2026-02-15" --priority medium
+
+# Complete multiple
+bruba-reminders.sh complete 4DF7 A8B2 C3E9
+
+# Search with notes
+bruba-reminders.sh search "deploy" --notes
+
+# Get JSON for specific list
+bruba-reminders.sh list Work --json
 ```
 
-**⚠️ Check tools/ first** before running raw exec commands — there's usually a wrapper script that handles the details.
+**Date Formats:** `today`, `tomorrow`, `YYYY-MM-DD`, `YYYY-MM-DD HH:mm`
+
+**Priority Levels:** `low`, `medium`, `high`
+
+**Known Limitations (Apple API):**
+- Cannot move reminder between lists (error -3002)
+- Cannot clear due date (delete and recreate)
+- Cannot remove recurrence (delete and recreate)
+
+**Maintenance Tool:**
+```bash
+${WORKSPACE}/tools/cleanup-reminders.sh
+```
+Removes completed reminders older than retention period (7 days for Groceries, 365 for others).
