@@ -39,9 +39,9 @@ You have PKM content indexed in your memory from <REDACTED-NAME>'s knowledge man
 Before loading large files, check size (divide bytes by 4 for rough token count):
 
 ```bash
-/usr/bin/wc -c /Users/bruba/agents/bruba-main/memory/some-file.md
-/bin/ls -la /Users/bruba/agents/bruba-main/memory/
-/usr/bin/head -20 /Users/bruba/agents/bruba-main/memory/some-file.md
+/usr/bin/wc -c ${WORKSPACE}/memory/some-file.md
+/bin/ls -la ${WORKSPACE}/memory/
+/usr/bin/head -20 ${WORKSPACE}/memory/some-file.md
 ```
 
 **Report files >2000 tokens** to user before loading (what and why).

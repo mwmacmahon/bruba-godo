@@ -1,6 +1,0 @@
-{
-  "entries": [
-    {"pattern": "${WORKSPACE}/tools/web-search.sh", "id": "web-search-wrapper"},
-    {"pattern": "${WORKSPACE}/tools/ensure-web-reader.sh", "id": "ensure-web-reader"}
-  ]
-}

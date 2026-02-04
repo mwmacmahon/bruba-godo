@@ -2,8 +2,8 @@
 
 ### Continuation Packet Location
 
-**Path:** `/Users/bruba/agents/bruba-main/continuation/CONTINUATION.md`
-**Archive:** `/Users/bruba/agents/bruba-main/continuation/archive/`
+**Path:** `${WORKSPACE}/continuation/CONTINUATION.md`
+**Archive:** `${WORKSPACE}/continuation/archive/`
 
 This file persists context across session resets.
 
@@ -20,7 +20,7 @@ This happens BEFORE any other work. Don't bury it or skip it.
 When asked to write a continuation packet (or before session reset):
 
 ```
-write /Users/bruba/agents/bruba-main/continuation/CONTINUATION.md
+write ${WORKSPACE}/continuation/CONTINUATION.md
 ```
 
 **Format:**

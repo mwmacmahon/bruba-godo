@@ -1,6 +1,6 @@
 ## Generated Content
 
-**Working Area:** `/Users/bruba/agents/bruba-main/workspace/`
+**Working Area:** `${WORKSPACE}/workspace/`
 
 Everything you generate goes here. This is your read-write space for outputs, drafts, and working files.
 
@@ -10,7 +10,7 @@ Everything you generate goes here. This is your read-write space for outputs, dr
 - `workspace/temp/` — temporary files
 - `continuation/` — CONTINUATION.md and archive/
 
-**Memory:** `/Users/bruba/agents/bruba-main/memory/`
+**Memory:** `${WORKSPACE}/memory/`
 - Docs, transcripts, repos (searchable via `memory_search`)
 - Synced content from operator
 

@@ -36,13 +36,6 @@ NO_REPLY
 
 ### Common Patterns
 
-**Voice reply:**
-```
-exec /Users/bruba/tools/tts.sh "response" /tmp/response.wav
-message action=send target=uuid:18ce66e6-... filePath=/tmp/response.wav message="response"
-NO_REPLY
-```
-
 **Siri async (HTTP→Signal):**
 ```
 message action=send target=uuid:18ce66e6-... message="response"

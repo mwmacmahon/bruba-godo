@@ -1,6 +1,6 @@
 ## 📂 bruba-godo Repository Access
 
-**Path:** `/Users/bruba/agents/bruba-main/memory/repos/bruba-godo/`
+**Path:** `${WORKSPACE}/memory/repos/bruba-godo/`
 
 This is a read-only snapshot of bruba-godo, synced to your memory so you can reference the codebase without asking where it is.
 
@@ -29,20 +29,20 @@ memory_search "guru-routing component"
 
 Then read:
 ```
-read /Users/bruba/agents/bruba-main/memory/repos/bruba-godo/components/guru-routing/...
+read ${WORKSPACE}/memory/repos/bruba-godo/components/guru-routing/...
 ```
 
 ### Example Usage
 ```
 # Read a file:
-read /Users/bruba/agents/bruba-main/memory/repos/bruba-godo/CLAUDE.md
+read ${WORKSPACE}/memory/repos/bruba-godo/CLAUDE.md
 
 # Search for content:
 memory_search "exec-approvals"
   → Returns relevant files
 
 # Read config:
-read /Users/bruba/agents/bruba-main/memory/repos/bruba-godo/config.yaml
+read ${WORKSPACE}/memory/repos/bruba-godo/config.yaml
 ```
 
 **Note:** The repo snapshot is synced from the operator machine. You can read it, but don't modify — write a packet instead.
