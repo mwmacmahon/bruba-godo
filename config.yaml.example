@@ -25,6 +25,27 @@ local:
   exports: exports
   assembled: assembled
 
+# Vault mode: symlink gitignored content into a separate vault repo
+# When enabled, content dirs (sessions, intake, reference, etc.) become
+# symlinks into the vault. All processing happens directly in the vault.
+# See docs/vault-strategy.md for full documentation.
+vault:
+  enabled: false
+  path: ~/source/<vault-name>         # Path to vault repo
+  dirs:                                # Dirs to symlink into vault
+    - sessions
+    - intake
+    - reference
+    - exports
+    - assembled
+    - mirror
+    - logs
+    - docs/cc_logs
+    - docs/meta
+    - docs/packets
+  files:                               # Individual files to symlink
+    - config.yaml
+
 # Copy repo code (scripts, docs, prompts) to bot workspace during push
 # Read-only reference - bot can read to understand codebase, not execute
 clone_repo_code: false

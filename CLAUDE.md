@@ -127,7 +127,7 @@ For pipes/jq, run jq locally on the output:
 | `/mirror` | Pull bot files locally |
 | `/pull` | Pull closed sessions + convert to intake/ |
 | `/push` | Push content to bot memory |
-| `/sync` | Full pipeline sync (prompts + config + content) |
+| `/sync` | Full pipeline sync (prompts + config + content + vault commit) |
 | `/prompt-sync` | Assemble prompts + push (with conflict detection) |
 | `/config-sync` | Sync config.yaml settings to openclaw.json |
 | `/config` | Configure heartbeat, exec allowlist (interactive) |
@@ -139,6 +139,7 @@ For pipes/jq, run jq locally on the output:
 | `/convert` | Add CONFIG block to intake file (AI-assisted) |
 | `/intake` | Batch canonicalize files with CONFIG |
 | `/export` | Generate filtered exports from canonical files |
+| `/vault-sync` | Commit vault repo changes (when vault mode enabled) |
 | `/test` | Run test suite |
 
 ## Prompt Assembly Pipeline

@@ -28,6 +28,7 @@ Quick reference for all docs in bruba-godo.
 | [filesystem-guide.md](filesystem-guide.md) | Directory structure, file locations, path conventions |
 | [session-lifecycles.md](session-lifecycles.md) | Agent session management, reset patterns |
 | [voice-integration.md](voice-integration.md) | Voice handling (STT/TTS) and Siri integration |
+| [vault-strategy.md](vault-strategy.md) | Vault mode: symlink-based private content management |
 
 ## Vision & Planning
 

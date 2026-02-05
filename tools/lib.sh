@@ -66,6 +66,57 @@ load_config() {
     BOT_HOST="${BOT_HOST:-$SSH_HOST}"
 }
 
+# Load vault configuration from config.yaml
+# Sets: VAULT_ENABLED, VAULT_PATH, VAULT_DIRS[], VAULT_FILES[]
+load_vault_config() {
+    local config_file="$ROOT_DIR/config.yaml"
+
+    VAULT_ENABLED=$(python3 -c "
+import yaml
+with open('$config_file') as f:
+    c = yaml.safe_load(f)
+v = c.get('vault', {})
+print('true' if v.get('enabled') else 'false')
+" 2>/dev/null || echo "false")
+
+    if [[ "$VAULT_ENABLED" != "true" ]]; then
+        VAULT_PATH=""
+        VAULT_DIRS=()
+        VAULT_FILES=()
+        return 0
+    fi
+
+    VAULT_PATH=$(python3 -c "
+import yaml, os
+with open('$config_file') as f:
+    c = yaml.safe_load(f)
+print(os.path.expanduser(c['vault']['path']))
+" 2>/dev/null)
+
+    # Arrays for dirs and files
+    VAULT_DIRS=()
+    while IFS= read -r line; do
+        VAULT_DIRS+=("$line")
+    done < <(python3 -c "
+import yaml
+with open('$config_file') as f:
+    c = yaml.safe_load(f)
+for d in c.get('vault',{}).get('dirs',[]):
+    print(d)
+" 2>/dev/null)
+
+    VAULT_FILES=()
+    while IFS= read -r line; do
+        VAULT_FILES+=("$line")
+    done < <(python3 -c "
+import yaml
+with open('$config_file') as f:
+    c = yaml.safe_load(f)
+for f2 in c.get('vault',{}).get('files',[]):
+    print(f2)
+" 2>/dev/null)
+}
+
 # Get list of configured agents (excludes agents with null workspace or empty prompts)
 # Usage: mapfile -t AGENTS < <(get_agents)
 get_agents() {

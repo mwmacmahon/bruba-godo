@@ -188,13 +188,34 @@ Push now syncs content for all agents with `content_pipeline: true` (not just br
 
 ---
 
-### 3. Summary
+### 3. Vault Sync (if vault mode enabled)
+
+Check if vault mode is active and commit changes:
+
+```bash
+./tools/vault-setup.sh status
+```
+
+If vault mode is enabled (directories show as symlinks):
+
+```bash
+./tools/vault-sync.sh
+```
+
+This commits any pending changes in the vault repo. Since content dirs are symlinked into the vault, all the work done in steps 1-2 (pull, export, push) has already written into the vault — this just commits it.
+
+If vault mode is not enabled, skip this step silently.
+
+---
+
+### 4. Summary
 
 Show brief summary of what was synced.
 
 ## Related Skills
 
 - `/prompt-sync` - Prompt assembly only (detailed conflict resolution)
+- `/vault-sync` - Vault commit only
 - `/pull` - Pull sessions only
 - `/convert` - Convert single file
 - `/intake` - Batch canonicalize

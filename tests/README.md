@@ -24,6 +24,7 @@ python3 tests/run_tests.py test_variants
 ./tests/test-pull-sessions.sh --quick
 ./tests/test-push.sh --quick
 ./tests/test-sync-cronjobs.sh --quick
+./tests/test-identity-system.sh --quick
 ./tests/test-efficiency.sh --quick
 
 # Full test suite
@@ -37,6 +38,7 @@ python3 tests/run_tests.py -v && \
   ./tests/test-pull-sessions.sh --quick && \
   ./tests/test-push.sh --quick && \
   ./tests/test-sync-cronjobs.sh --quick && \
+  ./tests/test-identity-system.sh --quick && \
   ./tests/test-efficiency.sh --quick
 ```
 
@@ -58,6 +60,7 @@ tests/
 ├── test-pull-sessions.sh           # Pull sessions tests (9 tests)
 ├── test-push.sh                    # Push script tests (16 tests)
 ├── test-sync-cronjobs.sh           # Cron sync tests (6 tests)
+├── test-identity-system.sh         # Config-driven identity tests (23 tests)
 ├── test-efficiency.sh              # Efficiency audit tests (17 tests)
 └── fixtures/                       # Test fixtures
     ├── FIXTURES.md                 # Fixture documentation
@@ -148,9 +151,10 @@ Tests for `tools/helpers/convert-doc.py`, an isolated LLM document conversion sc
 | `test-pull-sessions.sh` | 9 | Pull sessions: state file, deduplication, JSON parsing |
 | `test-push.sh` | 16 | Push script: config parsing, file counting, routing |
 | `test-sync-cronjobs.sh` | 6 | Cron sync: YAML parsing, validation, status filtering |
+| `test-identity-system.sh` | 23 | Config-driven identity: validation, substitution, assembly, cronjobs |
 | `test-efficiency.sh` | 17 | Efficiency audit: SSH patterns, change detection, documentation |
 
-**Total tests: 236** (57 Python + 179 Shell)
+**Total tests: 259** (57 Python + 202 Shell)
 
 #### What's Tested in `test-export-prompts.sh`
 
@@ -247,6 +251,47 @@ Tests for `tools/sync-cronjobs.sh` cron synchronization:
 - **Session handling** - Main sessions use --system-event flag
 - **YAML validity** - All cronjobs/*.yaml files are valid YAML
 - **Required fields** - All YAML files have name, status, schedule, message
+
+#### What's Tested in `test-identity-system.sh`
+
+Tests the config-driven identity system (Phases 1-4) end-to-end:
+
+**Category 1: Config Validation (4 tests)**
+- **peer_agent refs** - peer_agent values point to real agents in config
+- **signal_uuid format** - UUIDs match standard format regex
+- **reset/wake consistency** - reset_cycle agents also have wake_cycle
+- **cross-comms requirements** - cross-comms agents have peer_agent + CROSS_COMMS_GOAL
+
+**Category 2: Identity Config Completeness (2 tests)**
+- **Component variable refs** - All `${VAR}` in component snippets have backing config
+- **Template base files** - Same check for guru-base, manager-base, web-base, base templates
+
+**Category 3: apply_substitutions() Sync (2 tests)**
+- **Function exists in both** - assemble-prompts.sh and detect-conflicts.sh
+- **Function bodies match** - Normalized diff (known workspace param difference excluded)
+
+**Category 4: Variable Substitution Completeness (4 tests)**
+- **Assembly succeeds** - `assemble-prompts.sh --force` exits 0
+- **No unresolved `${...}`** - No leftover variable placeholders in output
+- **No unresolved `{{...}}`** - No leftover template placeholders in output
+- **Output dirs exist** - All configured agents have core-prompts/ directory
+
+**Category 5: Variable Round-Trip (5 tests)**
+- **Main's human_name** - bruba-main output contains its configured name
+- **Rex's human_name** - bruba-rex output contains its name, not main's
+- **Guru's signal_uuid** - bruba-guru output contains correct UUID
+- **Cross-comms peer refs** - Peer agent names appear in cross-comms output
+- **Per-agent WORKSPACE** - Different agents have different workspace paths in output
+
+**Category 6: Cronjob Generation (6 tests)**
+- **Generation succeeds** - `generate-cronjobs.sh` exits 0
+- **Valid YAML** - All 4 cronjob files parse as valid YAML
+- **No placeholders** - No `{{...}}` remain after generation
+- **Manager's name** - morning-briefing.yaml contains manager's human_name
+- **Prep agent count** - sessions_send count matches reset agent count
+- **Wake agent count** - sessions_send count matches wake agent count
+
+All tests gracefully skip (not fail) if specific agents don't exist in config.
 
 #### What's Tested in `test-efficiency.sh`
 
@@ -405,6 +450,28 @@ Corrections file path:
 TOOL_ROOT / "components" / "distill" / "config" / "corrections.yaml"
 ```
 
+## Known Issues / Notes to Fix
+
+Issues discovered during test-identity-system.sh development (2026-02-05):
+
+### 1. lib.sh `log()` function name collision
+`tools/lib.sh` exports a `log()` function that writes to `$LOG_FILE`. Any test script that sources lib.sh and also defines its own `log()` helper will have the lib version overwrite it. **Workaround:** test-identity-system.sh uses `tlog()` for its test logging and sets `LOG_FILE=/dev/null` before calling `load_config`.
+
+**Fix:** Rename lib.sh's `log()` to `lib_log()` or similar, or guard the `LOG_FILE` write with a check.
+
+### 2. generate-cronjobs.sh `set -e` + `[[ ]] && echo` pattern
+Line 190 in `generate-cronjobs.sh` had `[[ "$VERBOSE" == "true" ]] && echo "Generated: $output_file"` — when VERBOSE is false under `set -e`, the `&&` short-circuit returns exit code 1 and kills the script. This caused silent exit-1 when running without `--verbose`.
+
+**Fixed (2026-02-05):** Added `|| true` to the line. But the same pattern may exist in other scripts — audit for `[[ ... ]] && echo` under `set -e`.
+
+### 3. grep count mismatch in cronjob tests
+`grep -c 'sessions_send'` in cronjob files counts ALL occurrences including header text like "Use sessions_send to tell agents...". The tests needed `grep -c 'sessions_send to agent:'` to match only the per-agent directive lines.
+
+**Lesson:** When counting structured YAML message content, use specific-enough patterns to avoid matching prose.
+
+### 4. SHARED_TOOLS config parsing in lib.sh
+`load_config` uses `grep '^  shared_tools:'` to find the shared_tools value. The indentation-sensitive grep may fail if config.yaml has shared_tools nested differently (e.g., under `remote:` at 4-space indent). Currently works because the default fallback kicks in. Worth switching to Python-based YAML parsing for robustness.
+
 ## CI/Local Verification
 
 Before committing changes to the distill pipeline:
@@ -421,6 +488,7 @@ python3 tests/run_tests.py -v && \
   ./tests/test-pull-sessions.sh --quick && \
   ./tests/test-push.sh --quick && \
   ./tests/test-sync-cronjobs.sh --quick && \
+  ./tests/test-identity-system.sh --quick && \
   ./tests/test-efficiency.sh --quick
 
 # Verify profile targeting

@@ -1,5 +1,5 @@
 ---
-version: 3.12.0
+version: 3.13.0
 updated: 2026-02-05
 type: refdoc
 project: planning
@@ -2025,6 +2025,86 @@ Before pushing, the system detects if the bot has made changes that would be ove
 
 ---
 
+## Part 14: Vault Mode (Private Content Management)
+
+### Two-Layer Model
+
+The system uses two git repositories:
+
+| Repo | Purpose | Visibility |
+|------|---------|------------|
+| **bruba-godo** | Tools, templates, components, docs | Public (GitHub) |
+| **bruba-vault** | Sessions, intake, reference, exports, config | Private (local-only) |
+
+With **vault mode** enabled, gitignored directories in godo become symlinks into the vault. All tools follow symlinks transparently — no code changes required.
+
+### How It Works
+
+```
+bruba-godo/sessions/   →  bruba-vault/sessions/
+bruba-godo/intake/     →  bruba-vault/intake/
+bruba-godo/reference/  →  bruba-vault/reference/
+bruba-godo/exports/    →  bruba-vault/exports/
+bruba-godo/config.yaml →  bruba-vault/config.yaml
+...
+```
+
+Content IS in the vault. No periodic sync needed. The old rsync + private branch model is eliminated.
+
+### Configuration
+
+```yaml
+# In config.yaml
+vault:
+  enabled: true
+  path: ~/source/bruba-vault
+  dirs:
+    - sessions
+    - intake
+    - reference
+    - exports
+    - assembled
+    - mirror
+    - logs
+    - docs/cc_logs
+    - docs/meta
+    - docs/packets
+  files:
+    - config.yaml
+```
+
+### Setup & Management
+
+```bash
+./tools/vault-setup.sh status   # Show symlink vs real state
+./tools/vault-setup.sh enable   # Migrate to symlinks (one-time)
+./tools/vault-setup.sh disable  # Reverse back to real dirs
+
+./tools/vault-sync.sh           # Commit vault changes (or use /vault-sync skill)
+./tools/vault-propose.sh        # Promote vault content to PR
+```
+
+### Integration with /sync
+
+`/sync` automatically runs vault commit as its final step (if vault mode is enabled). The flow is:
+1. Prompt sync (mirror → conflict check → assemble → push)
+2. Content pipeline (pull → convert → canonicalize → export → push)
+3. **Vault commit** (commits all changes written to vault via symlinks)
+
+Use `/vault-sync` standalone when you just want to commit vault changes without a full pipeline run.
+
+### vault.deny
+
+Lives in the vault repo. Controls which files are eligible for promotion via `vault-propose.sh`. Files matching deny patterns never appear in promotion PRs.
+
+### .gitignore Changes
+
+Vault mode simplifies .gitignore — complex `dir/*` + `!dir/.gitkeep` patterns become simple `dir` entries. Transformation is automatic during setup (with backup to `.gitignore.pre-vault`).
+
+See `docs/vault-strategy.md` for full documentation.
+
+---
+
 ## Quick Reference
 
 **Main can't search?** By design. Use `sessions_send` with `sessionKey: "agent:bruba-web:main"`.
@@ -2051,6 +2131,10 @@ Before pushing, the system detects if the bot has made changes that would be ove
 
 **Manager getting slow?** Context bloat. Reset session: `openclaw sessions reset --agent bruba-manager`.
 
+**Vault changes not committed?** Run `/vault-sync` or `./tools/vault-sync.sh`. `/sync` does this automatically.
+
+**Want to promote vault content?** `./tools/vault-propose.sh` — scans vault, filters through vault.deny, creates PR.
+
 **Voice response not sending?** Check `messages.tts.auto` config. For manual, use message tool with `NO_REPLY`.
 
 **Guru response too long for Main?** Guru should message directly via message tool, return summary only.
@@ -2076,6 +2160,7 @@ Before pushing, the system detects if the bot has made changes that would be ove
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.13.0 | 2026-02-05 | **Vault mode (symlinks):** Replaced rsync + private branch vault model with symlink-based integration. Gitignored dirs become symlinks into a separate vault repo. New `vault-setup.sh` (enable/disable/status), rewritten `vault-sync.sh` (simple commit) and `vault-propose.sh` (direct vault→PR, no private branch). Added `load_vault_config()` to lib.sh, `vault:` config section, `docs/vault-strategy.md`. |
 | 3.12.0 | 2026-02-05 | **Per-agent content pipeline:** Content pipeline (`/pull` → `/convert` → `/intake` → `/export` → `/push`) now handles per-agent intake and export. Agents opt in with `content_pipeline: true` in config.yaml. Files carry `agents:` frontmatter field for routing to specific agent memories. Per-agent dirs: `sessions/{agent}/`, `intake/{agent}/`, `exports/bot/{agent}/`. Backward compatible — files without `agents:` default to bruba-main. |
 | 3.11.0 | 2026-02-04 | **bruba-rex agent:** Added new alternate identity agent bound to different phone number. Same capabilities as Main, independent identity. Added bindings section to config.yaml for declarative routing management. Updated agent count to five-agent architecture. |
 | 3.10.0 | 2026-02-04 | **Component variant support:** Added `component:variant` syntax for components that need different prompts per agent. Merged `http-api` and `siri-async` components into `siri-async` with `:router` (Manager) and `:handler` (Main) variants. Added Part 13 documenting prompt assembly and component organization. |

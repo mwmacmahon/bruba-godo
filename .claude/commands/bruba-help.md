@@ -19,9 +19,10 @@ Output this reference card:
 ### Sync Commands
 | Command | Purpose |
 |---------|---------|
-| /sync | Full pipeline (prompts + config + content) |
+| /sync | Full pipeline (prompts + config + content + vault) |
 | /prompt-sync | Prompts only with conflict detection |
 | /config-sync | Sync config.yaml → openclaw.json |
+| /vault-sync | Commit vault repo changes |
 | /mirror | Pull bot files locally |
 | /pull | Pull closed sessions |
 | /push | Push content to bot |
@@ -63,6 +64,9 @@ Output this reference card:
 
 **Add content to bot memory:**
 1. `/pull` → `/convert <file>` → `/intake` → `/export` → `/push`
+
+**Commit vault changes:**
+1. `/vault-sync` (or `/sync` does it automatically as final step)
 
 **Debug sync issues:**
 1. `/mirror` to get current bot state

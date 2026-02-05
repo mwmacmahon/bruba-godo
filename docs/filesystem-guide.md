@@ -1,5 +1,5 @@
 ---
-version: 1.9.0
+version: 1.10.0
 updated: 2026-02-05
 type: refdoc
 project: planning
@@ -168,7 +168,10 @@ Complete reference for file locations, ownership, and data flow between operator
 │   ├── update-allowlist.sh     # Sync exec-approvals.json
 │   ├── update-agent-tools.sh   # Sync tool permissions
 │   ├── detect-conflicts.sh     # Compare exports vs mirror
-│   └── generate-cronjobs.sh   # Config-driven cronjob generation
+│   ├── generate-cronjobs.sh   # Config-driven cronjob generation
+│   ├── vault-setup.sh         # Enable/disable/status vault symlinks
+│   ├── vault-sync.sh          # Commit vault repo changes
+│   └── vault-propose.sh       # Promote vault content to PR
 │
 ├── tests/
 │   └── test-prompt-assembly.sh
@@ -176,6 +179,7 @@ Complete reference for file locations, ownership, and data flow between operator
 ├── docs/
 │   ├── architecture-masterdoc.md
 │   ├── filesystem-guide.md     # This document
+│   ├── vault-strategy.md       # Vault mode documentation
 │   └── cc_logs/
 │
 ├── logs/                        # Script execution logs
@@ -544,6 +548,46 @@ HTTP API → bruba-main
 
 **Note:** NO_REPLY not needed here — HTTP responses don't go to Signal.
 
+### Vault Mode (Symlink-Based Content Storage)
+
+When vault mode is enabled (`vault.enabled: true` in config.yaml), gitignored directories become symlinks into a separate vault repo. All pipelines above work unchanged — they follow symlinks transparently.
+
+```
+~/bruba-godo/                        ~/bruba-vault/
+├── sessions/ ──────symlink──────►  ├── sessions/
+├── intake/   ──────symlink──────►  ├── intake/
+├── reference/ ─────symlink──────►  ├── reference/
+├── exports/  ──────symlink──────►  ├── exports/
+├── assembled/ ─────symlink──────►  ├── assembled/
+├── mirror/   ──────symlink──────►  ├── mirror/
+├── logs/     ──────symlink──────►  ├── logs/
+├── docs/cc_logs/ ──symlink──────►  ├── docs/cc_logs/
+├── docs/meta/ ─────symlink──────►  ├── docs/meta/
+├── docs/packets/ ──symlink──────►  ├── docs/packets/
+├── config.yaml ────symlink──────►  ├── config.yaml
+│                                    ├── vault.deny     # Promotion filter
+│   (tools, templates, components,   ├── sync-from-godo.sh  # Legacy
+│    docs remain as real files)      └── .git/
+└── .git/
+```
+
+**Key points:**
+- Content IS in the vault — no rsync sync step needed
+- `vault-sync.sh` just commits vault repo changes
+- `vault-propose.sh` scans vault for promotable files (filtered by vault.deny), creates PR
+- `vault-setup.sh enable/disable/status` manages the symlink migration
+- `.gitignore` is simplified during setup (no .gitkeep patterns needed)
+- All existing tools (pull, push, export, intake, mirror, etc.) work unchanged
+
+**Setup:**
+```bash
+./tools/vault-setup.sh status   # Check current state
+./tools/vault-setup.sh enable   # Migrate to symlinks
+./tools/vault-setup.sh disable  # Reverse back to real dirs
+```
+
+See `docs/vault-strategy.md` for full documentation.
+
 ---
 
 ## Part 5: File Ownership Matrix
@@ -827,7 +871,7 @@ Bot memory uses **flat structure with prefix naming**:
 ./tools/push.sh
 
 # Or all at once:
-/sync   # Runs: mirror → assemble → push
+/sync   # Runs: mirror → assemble → push → vault commit
 ```
 
 ### Content Pipeline (Per-Agent)
@@ -838,6 +882,14 @@ Bot memory uses **flat structure with prefix naming**:
 /intake     # Canonicalize with --agent → reference/ (agents: in frontmatter)
 /export     # Route via agents: field → exports/bot/{agent}/
 /push       # Sync content_pipeline agents to bot memory
+```
+
+### Vault Operations
+
+```bash
+/vault-sync                     # Commit vault changes (standalone)
+./tools/vault-setup.sh status   # Check symlink state
+./tools/vault-propose.sh        # Promote vault content to PR
 ```
 
 ### Individual Operations
@@ -1162,6 +1214,7 @@ docker exec -it openclaw-sandbox-bruba-main /bin/sh
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.10.0 | 2026-02-05 | **Vault mode:** Added vault symlink documentation to directory tree (vault tools, vault-strategy.md), new "Vault Mode" section in Part 4 (Data Flow Pipelines) showing symlink layout and management commands. |
 | 1.9.0 | 2026-02-05 | **Phase 3-4 updates:** Removed signal-media-filter component, added cross-comms and local-voice components, updated cronjobs to generated model (templates/cronjobs/ + generate-cronjobs.sh), replaced REDACTED artifacts with config variable references. |
 | 1.8.0 | 2026-02-05 | **Per-agent content pipeline:** Sessions, intake, and exports now use per-agent subdirs (`sessions/{agent}/`, `intake/{agent}/`, `exports/bot/{agent}/`). Pipeline 2 diagram updated to show per-agent routing via `agents:` frontmatter field. Updated quick reference. |
 | 1.7.0 | 2026-02-04 | **bruba-rex agent:** Added filesystem entries for bruba-rex agent (workspace, sessions, mirror, auth). Updated tool permissions matrix. |

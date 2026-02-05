@@ -187,7 +187,7 @@ print(content.replace('{{AGENT_MESSAGES}}', messages), end='')
         [[ "$VERBOSE" == "true" ]] && echo "$content"
     else
         printf '%s\n' "$content" > "$output_file"
-        [[ "$VERBOSE" == "true" ]] && echo "Generated: $output_file"
+        [[ "$VERBOSE" == "true" ]] && echo "Generated: $output_file" || true
     fi
 }
 
