@@ -18,4 +18,6 @@ message: |
 
   2. sessions_send to agent:bruba-guru:main: "Session reset in 7 minutes. Write a continuation packet to memory/CONTINUATION.md. Include: Technical Session Summary (topics worked on), In Progress (debugging/analysis status), Open Questions (unresolved technical issues), Handoff Notes (context for next session). Write actual content, not placeholders. Create the file now."
 
+  3. sessions_send to agent:bruba-rex:main: "Session reset in 7 minutes. Write a continuation packet to memory/CONTINUATION.md. Include: Session Summary (what you remember from today, or 'Nothing recorded' if empty), In Progress (current tasks and status), Open Questions (unresolved items), Next Steps (action items for tomorrow). Write actual content, not placeholders. Create the file now."
+
   Reply NO_REPLY when done.

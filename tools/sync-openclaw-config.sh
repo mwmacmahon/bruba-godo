@@ -66,6 +66,7 @@ if ! parse_common_args "${args[@]}"; then
     echo "  agents     Per-agent settings (model, heartbeat, tools)"
     echo "  subagents  Subagent settings"
     echo "  voice      Voice settings (STT + TTS)"
+    echo "  bindings   Message routing bindings"
     exit 0
 fi
 
@@ -496,6 +497,25 @@ if [[ -z "$SECTION_FILTER" || "$SECTION_FILTER" == "voice" ]]; then
             CHANGES_FOUND=1
             if [[ "$CHECK_ONLY" != "true" && "$DRY_RUN" != "true" ]]; then
                 NEW_CONFIG=$(echo "$NEW_CONFIG" | jq ".messages.tts = $DESIRED_TTS")
+                CHANGES_APPLIED=1
+            fi
+        fi
+    fi
+fi
+
+# === SYNC BINDINGS ===
+if [[ -z "$SECTION_FILTER" || "$SECTION_FILTER" == "bindings" ]]; then
+    log "Checking bindings..."
+    echo "Checking bindings..."
+
+    DESIRED_BINDINGS=$(get_bindings_config)
+    if [[ -n "$DESIRED_BINDINGS" && "$DESIRED_BINDINGS" != "null" && "$DESIRED_BINDINGS" != "[]" ]]; then
+        CURRENT_BINDINGS=$(echo "$CURRENT_CONFIG" | jq -c '.bindings // []')
+        if ! json_equal "$CURRENT_BINDINGS" "$DESIRED_BINDINGS"; then
+            show_diff "bindings" "$CURRENT_BINDINGS" "$DESIRED_BINDINGS"
+            CHANGES_FOUND=1
+            if [[ "$CHECK_ONLY" != "true" && "$DRY_RUN" != "true" ]]; then
+                NEW_CONFIG=$(echo "$NEW_CONFIG" | jq ".bindings = $DESIRED_BINDINGS")
                 CHANGES_APPLIED=1
             fi
         fi

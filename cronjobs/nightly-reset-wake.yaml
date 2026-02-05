@@ -17,5 +17,6 @@ message: |
   1. sessions_send to agent:bruba-main:main: "Good morning. Session initialized. Check memory/CONTINUATION.md for context from previous session."
   2. sessions_send to agent:bruba-guru:main: "Good morning. Session initialized. Check memory/CONTINUATION.md for context from previous session."
   3. sessions_send to agent:bruba-web:main: "Good morning. Session initialized."
+  4. sessions_send to agent:bruba-rex:main: "Good morning. Session initialized. Check memory/CONTINUATION.md for context from previous session."
 
   Reply NO_REPLY when done.

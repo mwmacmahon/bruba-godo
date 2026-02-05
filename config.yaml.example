@@ -299,6 +299,54 @@ agents:
     tools_sections:
       - guru-base         # Uses templates/prompts/guru/TOOLS.md
 
+  # Alternate identity agent (optional)
+  # Same permissions as -main but bound to different contact
+  # <agent-id>-rex:
+  #   workspace: /Users/<bot-username>/agents/<agent-id>-rex
+  #   prompts: [agents, tools]
+  #   model: sonnet
+  #   heartbeat: false
+  #   tools_allow:
+  #     - read
+  #     - write
+  #     - edit
+  #     - exec
+  #     - group:memory
+  #     - group:sessions
+  #     - image
+  #     - message
+  #     - cron
+  #   tools_deny:
+  #     - browser
+  #     - canvas
+  #     - gateway
+  #     - web_search
+  #     - web_fetch
+  #     - sessions_spawn
+  #   agents_sections:
+  #     - header
+  #     - first-run
+  #     - session
+  #     - continuity
+  #     - memory
+  #     - distill
+  #     - safety
+  #     - bot:exec-approvals
+  #     - external-internal
+  #     - workspace
+  #     - repo-reference
+  #     - tools
+  #     - signal
+  #   tools_sections:
+  #     - base
+  #   remote_path: memory
+  #   include:
+  #     scope: [meta, reference, transcripts]
+  #     type: [prompt, doc, refdoc, claude_code_log]
+  #   exclude:
+  #     sensitivity: [sensitive, restricted]
+  #   redaction: [names, health]
+
 # Subagent (helper) configuration - DEPRECATED
 # v3.2: All agents use sessions_send to -web agent for web research
 # No agents spawn helpers for web tasks (tool inheritance ceiling prevents it)
@@ -340,6 +388,22 @@ exports:
     include:
       type: [prompt]
       scope: [meta, reference, transcripts]
+
+# Message routing bindings (synced to openclaw.json via sync-openclaw-config.sh)
+# Maps channels/peers to specific agents
+# bindings:
+#   - agent: <agent-id>-main
+#     channel: bluebubbles
+#     peer:
+#       kind: dm
+#       id: "+1234567890"            # Phone number for this contact
+#   - agent: <agent-id>-rex
+#     channel: bluebubbles
+#     peer:
+#       kind: dm
+#       id: "+0987654321"            # Different phone number
+#   - agent: <agent-id>-main
+#     channel: signal                 # Fallback: all Signal messages to main
 
 defaults:
   redaction: []

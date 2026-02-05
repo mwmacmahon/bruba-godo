@@ -445,6 +445,80 @@ test_sync_config_help_voice() {
 }
 
 # ============================================================
+# Test: lib.sh get_bindings_config function
+# ============================================================
+test_lib_get_bindings_config() {
+    echo ""
+    echo "=== Test: lib.sh get_bindings_config function ==="
+
+    local temp_dir
+    temp_dir=$(mktemp -d)
+
+    # Create config with bindings
+    cat > "$temp_dir/config.yaml" << 'EOF'
+version: 3
+
+ssh:
+  host: bruba
+
+remote:
+  home: /Users/bruba
+  workspace: /Users/bruba/agents/bruba-main
+  openclaw: /Users/bruba/.openclaw
+  agent_id: bruba-main
+
+bindings:
+  - agent: bruba-main
+    channel: bluebubbles
+    peer:
+      kind: dm
+      id: "+1234567890"
+  - agent: bruba-rex
+    channel: bluebubbles
+    peer:
+      kind: dm
+      id: "+0987654321"
+  - agent: bruba-main
+    channel: signal
+
+local:
+  mirror: mirror
+  sessions: sessions
+  logs: logs
+EOF
+
+    # Copy required files
+    mkdir -p "$temp_dir/tools/helpers"
+    cp "$ROOT_DIR/tools/lib.sh" "$temp_dir/tools/"
+    cp "$ROOT_DIR/tools/helpers/parse-yaml.py" "$temp_dir/tools/helpers/"
+
+    local result exit_code=0
+    result=$(
+        cd "$temp_dir"
+        ROOT_DIR="$temp_dir" bash -c '
+            source tools/lib.sh
+            get_bindings_config
+        '
+    ) || exit_code=$?
+
+    rm -rf "$temp_dir"
+
+    # Check for proper structure: agentId (not agent), match.channel, match.peer
+    # Use jq for reliable JSON parsing
+    if [[ $exit_code -eq 0 ]] && \
+       echo "$result" | jq -e '.[0].agentId == "bruba-main"' >/dev/null && \
+       echo "$result" | jq -e '.[1].agentId == "bruba-rex"' >/dev/null && \
+       echo "$result" | jq -e '.[0].match.channel == "bluebubbles"' >/dev/null && \
+       echo "$result" | jq -e '.[2].match.channel == "signal"' >/dev/null && \
+       echo "$result" | jq -e '.[0].match.peer.kind == "dm"' >/dev/null; then
+        pass "get_bindings_config returns proper openclaw.json format"
+    else
+        fail "get_bindings_config should return proper openclaw.json format"
+        log "Result: $result"
+    fi
+}
+
+# ============================================================
 # Run all tests
 # ============================================================
 
@@ -459,6 +533,7 @@ test_lib_get_openclaw_config
 test_lib_get_agent_heartbeat
 test_parse_yaml_voice_keys
 test_sync_config_help_voice
+test_lib_get_bindings_config
 
 # SSH-dependent tests
 if [[ "$QUICK" == "true" ]]; then

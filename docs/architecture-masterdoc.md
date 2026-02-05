@@ -1,9 +1,9 @@
 ---
-version: 3.10.0
+version: 3.11.0
 updated: 2026-02-04
 type: refdoc
 project: planning
-tags: [bruba, openclaw, multi-agent, architecture, cron, operations, guru, direct-message, docker, sandbox, security]
+tags: [bruba, openclaw, multi-agent, architecture, cron, operations, guru, direct-message, docker, sandbox, security, rex]
 ---
 
 # Bruba Multi-Agent Architecture Reference
@@ -14,11 +14,12 @@ Comprehensive reference for the Bruba multi-agent system. Covers the peer agent 
 
 ## Executive Summary
 
-Bruba uses a **four-agent architecture** with three peer agents and one service agent:
+Bruba uses a **five-agent architecture** with four peer agents and one service agent:
 
 | Agent | Model | Role | Web Access |
 |-------|-------|------|------------|
 | **bruba-main** | Sonnet | Reactive — user conversations, file ops, routing | ❌ via bruba-web |
+| **bruba-rex** | Sonnet | Reactive — alternate identity, separate phone binding | ❌ via bruba-web |
 | **bruba-guru** | Opus | Specialist — technical deep-dives, debugging, architecture | ❌ via bruba-web |
 | **bruba-manager** | Sonnet/Haiku | Proactive — heartbeat, cron coordination, monitoring | ❌ via bruba-web |
 | **bruba-web** | Sonnet | Service — stateless web search, prompt injection barrier | ✅ Direct |
@@ -202,6 +203,41 @@ Communication happens via `sessions_send` (agent-to-agent messaging), not `sessi
 **Bindings:** Signal DM (user-facing channel)
 
 **Workspace:** `/Users/bruba/agents/bruba-main/`
+
+---
+
+### bruba-rex
+
+**Purpose:** Alternate identity agent. Parallel to bruba-main with equivalent capabilities, bound to a different phone number for separate conversations.
+
+**Model:** Sonnet
+
+**Capabilities:**
+| Tool | Status | Notes |
+|------|--------|-------|
+| read, write, edit, apply_patch | ✅ | Full file access within workspace |
+| exec | ✅ | Via allowlist only |
+| memory_search, memory_get | ✅ | PKM integration |
+| sessions_send | ✅ | Communicate with other agents |
+| message | ✅ | Media attachments (voice responses, images) |
+| cron | ✅ | Schedule reminders, manage cron jobs |
+| image | ✅ | Image generation |
+| sessions_spawn | ❌ | Not needed — uses bruba-web instead |
+| web_search, web_fetch | ❌ | Security isolation — use bruba-web |
+| browser, canvas | ❌ | Not needed |
+| gateway | ❌ | Admin tools |
+
+**Heartbeat:** Disabled (`every: "0m"`)
+
+**Bindings:** BlueBubbles DM (phone: <REDACTED-PHONE>)
+
+**Workspace:** `/Users/bruba/agents/bruba-rex/`
+
+**Distinction from bruba-main:**
+- Bound to different phone number (separate contact routing)
+- Can evolve distinct identity/personality via IDENTITY.md, SOUL.md
+- Independent session/memory (no shared state with Main)
+- Same technical capabilities as Main
 
 ---
 
@@ -2039,6 +2075,7 @@ Before pushing, the system detects if the bot has made changes that would be ove
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.11.0 | 2026-02-04 | **bruba-rex agent:** Added new alternate identity agent bound to different phone number. Same capabilities as Main, independent identity. Added bindings section to config.yaml for declarative routing management. Updated agent count to five-agent architecture. |
 | 3.10.0 | 2026-02-04 | **Component variant support:** Added `component:variant` syntax for components that need different prompts per agent. Merged `http-api` and `siri-async` components into `siri-async` with `:router` (Manager) and `:handler` (Main) variants. Added Part 13 documenting prompt assembly and component organization. |
 | 3.9.0 | 2026-02-04 | **Docker sandbox enabled for bruba-web:** Cross-agent session visibility bug fixed in OpenClaw 2026.2.1. bruba-web now runs in Docker container (`sandbox.mode: "all"`, `network: "bridge"`). Added `web-search` component to bruba-main prompts (instructions for using bruba-web via `sessions_send`). Added `~/bin/bruba-start` script and LaunchAgent for container auto-warm. |
 | 3.8.4 | 2026-02-03 | **Voice compaction bug documented:** Added known issue for voice messages causing silent context compaction (binary audio data in context). Also documented compactionCount mismatch bug. |

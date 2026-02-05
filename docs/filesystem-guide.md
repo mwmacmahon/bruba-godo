@@ -1,9 +1,9 @@
 ---
-version: 1.6.0
-updated: 2026-02-03
+version: 1.7.0
+updated: 2026-02-04
 type: refdoc
 project: planning
-tags: [bruba, filesystem, data-flow, bruba-godo, operations, guru, message-tool]
+tags: [bruba, filesystem, data-flow, bruba-godo, operations, guru, message-tool, rex]
 ---
 
 # Bruba Filesystem & Data Flow Guide
@@ -124,6 +124,9 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   ├── config/             # openclaw.json, exec-approvals.json
 │   │   ├── tools/              # Bot scripts
 │   │   └── state/              # (if applicable)
+│   ├── bruba-rex/
+│   │   ├── prompts/
+│   │   └── memory/
 │   ├── bruba-guru/
 │   │   ├── prompts/
 │   │   └── memory/
@@ -209,6 +212,19 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   ├── media/              # Local media files
 │   │   └── intake/             # Bot-side intake (if used)
 │   │
+│   ├── bruba-rex/              # Alternate identity agent
+│   │   ├── AGENTS.md           # Assembled (same structure as Main)
+│   │   ├── TOOLS.md            # Assembled
+│   │   ├── IDENTITY.md         # Distinct identity (can differ from Main)
+│   │   ├── SOUL.md             # Bot-managed
+│   │   ├── USER.md             # Bot-managed
+│   │   ├── MEMORY.md           # Bot-managed
+│   │   │
+│   │   ├── memory/             # Content files (FLAT, like Main)
+│   │   │   └── archive/        # Continuation packets
+│   │   ├── tools/              # Scripts (read-only post-migration)
+│   │   └── output/             # Script outputs
+│   │
 │   ├── bruba-guru/             # Technical specialist agent
 │   │   ├── AGENTS.md           # Assembled (includes direct-message pattern)
 │   │   ├── TOOLS.md            # Assembled (includes message, TTS, sessions_send)
@@ -256,6 +272,8 @@ Complete reference for file locations, ownership, and data flow between operator
 │   ├── agents/
 │   │   ├── bruba-main/
 │   │   │   └── sessions/       # Session transcripts (~90 JSONL files)
+│   │   ├── bruba-rex/
+│   │   │   └── sessions/
 │   │   ├── bruba-guru/
 │   │   │   └── sessions/
 │   │   ├── bruba-manager/
@@ -278,6 +296,8 @@ Complete reference for file locations, ownership, and data flow between operator
     └── agents/
         ├── bruba-main/
         │   └── auth-profiles.json
+        ├── bruba-rex/
+        │   └── auth-profiles.json   # Copied from bruba-main
         ├── bruba-guru/
         │   └── auth-profiles.json   # Copied from bruba-main
         ├── bruba-manager/
@@ -534,6 +554,7 @@ HTTP API → bruba-main
 | Agent | message tool | Use Case |
 |-------|--------------|----------|
 | bruba-main | ✅ | Voice replies, Siri async routing |
+| bruba-rex | ✅ | Voice replies, media attachments |
 | bruba-guru | ✅ | Direct technical responses to Signal |
 | bruba-manager | ❌ | Routes via sessions_send to Main |
 | bruba-web | ❌ | Passive service, no outbound messaging |
@@ -1113,7 +1134,8 @@ docker exec -it openclaw-sandbox-bruba-main /bin/sh
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.7.0 | 2026-02-03 | **Sandbox disabled:** Agent-to-agent session visibility broken in sandbox mode. Set `sandbox.mode: "off"` until OpenClaw fixes. |
+| 1.7.0 | 2026-02-04 | **bruba-rex agent:** Added filesystem entries for bruba-rex agent (workspace, sessions, mirror, auth). Updated tool permissions matrix. |
+| 1.6.1 | 2026-02-03 | **Sandbox disabled:** Agent-to-agent session visibility broken in sandbox mode. Set `sandbox.mode: "off"` until OpenClaw fixes. |
 | 1.6.0 | 2026-02-03 | **File access architecture:** `/memory/` read-only (docs, transcripts, repos), `/workspace/` read-write (outputs, continuation). Discovery via `memory_search`. Updated Part 12 with new structure. |
 | 1.5.2 | 2026-02-03 | Added sandbox tool policy ceiling documentation (tools.sandbox.tools.allow) |
 | 1.5.1 | 2026-02-03 | Defense-in-depth: ALL agents now have tools/:ro (not just bruba-main) |

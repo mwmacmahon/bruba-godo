@@ -220,6 +220,42 @@ get_voice_config() {
     fi
 }
 
+# Get bindings config from config.yaml
+# Usage: get_bindings_config
+# Returns: JSON array of bindings for openclaw.json
+get_bindings_config() {
+    local config_file="$ROOT_DIR/config.yaml"
+    local helper="$ROOT_DIR/tools/helpers/parse-yaml.py"
+
+    # Get bindings as JSON, transforming agent->agentId and restructuring match
+    python3 -c "
+import yaml
+import json
+import sys
+
+with open('$config_file') as f:
+    config = yaml.safe_load(f)
+
+bindings = config.get('bindings', [])
+if not bindings:
+    print('[]')
+    sys.exit(0)
+
+result = []
+for b in bindings:
+    entry = {
+        'agentId': b.get('agent'),
+        'match': {'channel': b.get('channel')}
+    }
+    # Add peer if present
+    if 'peer' in b:
+        entry['match']['peer'] = b['peer']
+    result.append(entry)
+
+print(json.dumps(result))
+" 2>/dev/null || echo "[]"
+}
+
 # Cross-platform sed in-place
 # Usage: sed_inplace 's/foo/bar/' file.txt
 sed_inplace() {
