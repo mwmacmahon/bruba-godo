@@ -58,6 +58,9 @@ user/
 # Planning docs (internal only)
 docs/meta/
 
+# Phase packets (internal planning, not committed)
+docs/packets/
+
 # Claude Code work logs (local only, exported to bot)
 docs/cc_logs/
 
