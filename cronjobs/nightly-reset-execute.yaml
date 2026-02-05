@@ -16,5 +16,6 @@ message: |
 
   1. sessions_send to agent:bruba-main:main: "/reset"
   2. sessions_send to agent:bruba-guru:main: "/reset"
+  3. sessions_send to agent:bruba-rex:main: "/reset"
 
   Reply NO_REPLY when done.

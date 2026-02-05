@@ -1,0 +1,17 @@
+name: nightly-reset-manager
+description: bruba-main resets bruba-manager after wake
+status: active
+
+schedule:
+  cron: "10 4 * * *"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-main
+
+message: |
+  Use sessions_send to agent:bruba-manager:main: "/reset"
+
+  Reply NO_REPLY when done.
