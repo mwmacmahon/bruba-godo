@@ -449,5 +449,7 @@ echo ""
 echo "Run with --show-section NAME [FILE] to see full content"
 echo "Run with --diff NAME [FILE] to compare component to mirror"
 echo "Use --agent=NAME to filter by agent"
+echo ""
+echo "REMEMBER: Always ask user before accepting or discarding bot changes."
 
 exit 1

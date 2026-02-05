@@ -1,6 +1,6 @@
 ### Reminders
 
-**Primary Tool:** `${WORKSPACE}/tools/bruba-reminders.sh`
+**Primary Tool:** `${SHARED_TOOLS}/bruba-reminders.sh`
 
 A wrapper around remindctl that handles filtering, JSON parsing, and provides token-efficient output without requiring pipes.
 
@@ -64,6 +64,6 @@ bruba-reminders.sh list Work --json
 
 **Maintenance Tool:**
 ```bash
-${WORKSPACE}/tools/cleanup-reminders.sh
+${SHARED_TOOLS}/cleanup-reminders.sh
 ```
 Removes completed reminders older than retention period (7 days for Groceries, 365 for others).

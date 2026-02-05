@@ -6,80 +6,13 @@ Instructions for Claude Code when working in bruba-godo.
 
 Operator workspace for managing a personal AI assistant bot running OpenClaw. This repo contains the tools and skills to control the bot from the operator's machine.
 
-## Local Context
+## General Info
 
-If any files matching `LOCAL*.md` exist in the repo root, read them at session start and briefly acknowledge to the user. These contain machine-specific context that isn't committed to the repo.
-
-Common patterns:
-- `LOCAL.md` — primary local context (includes migration docs)
-
-**For development tasks:** If the user is working on bruba-godo tooling/features (not just operating the bot), check `LOCAL.md` for links to migration planning docs in PKM. These explain what's being extracted from PKM, current status, and design decisions.
-
-**On session start, show ONLY this skills list:**
-
-```
-Bot Skills:
-  Daemon:    /status, /launch, /stop, /restart
-  Files:     /mirror, /pull, /push
-  Sync:      /sync (full pipeline), /prompt-sync (prompts only)
-  Config:    /config, /update, /component, /prompts
-  Pipeline:  /convert, /intake, /export
-  Code:      /code
-  Convo:     /convo
-  Setup:     (run tools/setup-agent.sh)
-```
+For now, docs/architecture-masterdoc.md  is the best reference for how the system works and is put together. Also searching recent logs in docs/cc_logs, where for any long plan you should log your results.
 
 ## Directory Structure
 
-```
-bruba-godo/
-├── config.yaml.example      # Bot settings + export definitions template
-├── tools/
-│   ├── bot                  # SSH wrapper
-│   ├── lib.sh               # Shared functions
-│   ├── mirror.sh            # Mirror bot files
-│   ├── pull-sessions.sh     # Pull closed sessions
-│   ├── push.sh              # Push content to bot
-│   ├── assemble-prompts.sh  # Assemble prompts from templates + components
-│   ├── setup-agent.sh       # Agent provisioning
-│   └── helpers/
-│       ├── parse-yaml.py    # YAML parsing for shell
-│       └── parse-jsonl.py   # JSONL → markdown
-├── .claude/
-│   ├── settings.json        # Permission allowlists
-│   └── commands/            # Skill definitions
-├── templates/               # BASE PROMPTS (committed)
-│   ├── prompts/             # IDENTITY, AGENTS, TOOLS, etc.
-│   ├── config/              # openclaw.json, exec-approvals templates
-│   └── tools/               # Sample scripts
-├── components/              # OPTIONAL CAPABILITIES (committed)
-│   ├── signal/              # Signal messaging channel
-│   ├── voice/               # Voice input/output (planned)
-│   ├── distill/             # Conversation → knowledge pipeline
-│   └── ...                  # Other components
-├── user/                    # USER CUSTOMIZATIONS (gitignored)
-│   └── prompts/             # Personal prompt additions
-├── mirror/                  # BOT STATE (gitignored)
-│   └── prompts/             # Current bot prompts
-├── sessions/                # RAW SESSIONS (gitignored)
-│   └── *.jsonl              # JSONL files from bot (archived)
-├── intake/                  # DELIMITED MARKDOWN (gitignored)
-│   ├── *.md                 # Awaiting CONFIG (from /pull)
-│   └── processed/           # Originals after canonicalization
-├── reference/               # PROCESSED CONTENT (gitignored)
-│   ├── transcripts/         # Canonicalized conversations
-│   └── refdocs/             # Reference documents (PKM docs, guides)
-├── exports/                 # SYNC OUTPUTS (gitignored)
-│   ├── bot/                 # Content for bot
-│   │   ├── core-prompts/    # AGENTS.md → syncs to ~/agents/bruba-main/
-│   │   ├── prompts/         # Prompt - *.md → ~/agents/bruba-main/memory/prompts/
-│   │   ├── transcripts/     # Transcript - *.md → ~/agents/bruba-main/memory/transcripts/
-│   │   ├── refdocs/         # Refdoc - *.md → ~/agents/bruba-main/memory/refdocs/
-│   │   ├── docs/            # Doc - *.md → ~/agents/bruba-main/memory/docs/
-│   │   └── cc_logs/         # Claude Code Log - *.md → ~/agents/bruba-main/memory/cc_logs/
-│   └── claude/              # Content for Claude Projects/Code
-└── logs/                    # Script logs (gitignored)
-```
+see docs/filesystem-guide.md
 
 ## Configuration
 

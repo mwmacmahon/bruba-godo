@@ -1,6 +1,6 @@
 ## Reminder Management
 
-**Primary tool:** `${WORKSPACE}/tools/bruba-reminders.sh`
+**Primary tool:** `${SHARED_TOOLS}/bruba-reminders.sh`
 
 This wrapper handles Apple Reminders without requiring pipes or approval prompts.
 
