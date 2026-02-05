@@ -122,12 +122,15 @@ For pipes/jq, run jq locally on the output:
 | `/launch` | Start the daemon |
 | `/stop` | Stop the daemon |
 | `/restart` | Restart the daemon |
+| `/wake` | Wake all agents |
+| `/morning-check` | Verify post-reset wake |
 | `/mirror` | Pull bot files locally |
 | `/pull` | Pull closed sessions + convert to intake/ |
 | `/push` | Push content to bot memory |
-| `/sync` | Full pipeline sync (prompts + content) |
+| `/sync` | Full pipeline sync (prompts + config + content) |
 | `/prompt-sync` | Assemble prompts + push (with conflict detection) |
-| `/config` | Configure heartbeat, exec allowlist |
+| `/config-sync` | Sync config.yaml settings to openclaw.json |
+| `/config` | Configure heartbeat, exec allowlist (interactive) |
 | `/component` | Manage optional components (signal, voice, distill, etc.) |
 | `/prompts` | Manage prompt assembly, resolve conflicts, explain config |
 | `/update` | Update openclaw version |
@@ -136,6 +139,7 @@ For pipes/jq, run jq locally on the output:
 | `/convert` | Add CONFIG block to intake file (AI-assisted) |
 | `/intake` | Batch canonicalize files with CONFIG |
 | `/export` | Generate filtered exports from canonical files |
+| `/test` | Run test suite |
 
 ## Prompt Assembly Pipeline
 
