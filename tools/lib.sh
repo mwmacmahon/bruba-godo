@@ -125,11 +125,19 @@ try:
     with open('$config_file') as f:
         config = yaml.safe_load(f)
     agent = config.get('agents', {}).get('$agent', {})
+    all_agents = config.get('agents', {})
+    identity = agent.get('identity', {})
+    peer_id = identity.get('peer_agent', '')
+    peer_agent = all_agents.get(peer_id, {})
+    peer_identity = peer_agent.get('identity', {})
     print(json.dumps({
         'workspace': agent.get('workspace'),
         'prompts': agent.get('prompts', []),
         'remote_path': agent.get('remote_path', 'memory'),
-        'content_pipeline': agent.get('content_pipeline', False)
+        'content_pipeline': agent.get('content_pipeline', False),
+        'identity': identity,
+        'peer_human_name': peer_identity.get('human_name', ''),
+        'variables': agent.get('variables', {})
     }))
 except Exception as e:
     print(json.dumps({'workspace': None, 'prompts': [], 'remote_path': 'memory', 'content_pipeline': False}))
@@ -139,6 +147,15 @@ except Exception as e:
     AGENT_PROMPTS=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d.get('prompts', [])))" 2>/dev/null)
     AGENT_REMOTE_PATH=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('remote_path') or 'memory')" 2>/dev/null)
     AGENT_CONTENT_PIPELINE=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print('true' if d.get('content_pipeline') else 'false')" 2>/dev/null)
+
+    # Identity fields
+    AGENT_HUMAN_NAME=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('identity',{}).get('human_name',''))" 2>/dev/null)
+    AGENT_SIGNAL_UUID=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('identity',{}).get('signal_uuid',''))" 2>/dev/null)
+    AGENT_PEER_AGENT=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('identity',{}).get('peer_agent',''))" 2>/dev/null)
+    AGENT_PEER_HUMAN_NAME=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('peer_human_name',''))" 2>/dev/null)
+
+    # Custom variables as JSON (applied via Python in apply_substitutions)
+    AGENT_CUSTOM_VARIABLES=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d.get('variables', {})))" 2>/dev/null)
 
     # Derived paths
     AGENT_MIRROR_DIR="$MIRROR_DIR/$agent"

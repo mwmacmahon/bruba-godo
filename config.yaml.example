@@ -113,6 +113,14 @@ openclaw:
 agents:
   <agent-id>-main:
     workspace: /Users/<bot-username>/agents/<agent-id>-main
+    # Per-agent identity (used for variable substitution in prompts)
+    # identity:
+    #   human_name: "<human-name>"           # Name of the human this agent serves
+    #   signal_uuid: "<signal-uuid>"         # Human's Signal UUID (without uuid: prefix)
+    #   peer_agent: "<agent-id>-user2"       # Cross-comms peer agent ID
+    # Per-agent template variables (arbitrary, substituted as ${KEY} in prompts)
+    # variables:
+    #   CROSS_COMMS_GOAL: "Custom guidance for cross-agent communication"
     prompts: [agents, tools]  # Which prompt files to assemble
     # Model: string alias or object with primary/fallbacks
     model: sonnet                              # Override global default

@@ -74,10 +74,27 @@ TOTAL_MISSING=0
 # Usage: apply_substitutions "$content"
 apply_substitutions() {
     local content="$1"
-    echo "$content" | sed \
+    local result
+    result=$(echo "$content" | sed \
         -e "s|\${WORKSPACE}|$AGENT_WORKSPACE|g" \
         -e "s|\${AGENT_NAME}|$AGENT_NAME|g" \
-        -e "s|\${SHARED_TOOLS}|$SHARED_TOOLS|g"
+        -e "s|\${SHARED_TOOLS}|$SHARED_TOOLS|g" \
+        -e "s|\${HUMAN_NAME}|$AGENT_HUMAN_NAME|g" \
+        -e "s|\${SIGNAL_UUID}|$AGENT_SIGNAL_UUID|g" \
+        -e "s|\${PEER_AGENT}|$AGENT_PEER_AGENT|g" \
+        -e "s|\${PEER_HUMAN_NAME}|$AGENT_PEER_HUMAN_NAME|g")
+    # Apply custom per-agent variables
+    if [[ -n "$AGENT_CUSTOM_VARIABLES" && "$AGENT_CUSTOM_VARIABLES" != "{}" ]]; then
+        result=$(echo "$result" | VARS="$AGENT_CUSTOM_VARIABLES" python3 -c "
+import json, os, sys
+variables = json.loads(os.environ['VARS'])
+content = sys.stdin.read()
+for k, v in variables.items():
+    content = content.replace('\${' + k + '}', str(v))
+sys.stdout.write(content)
+")
+    fi
+    echo "$result"
 }
 
 # Parse sections list from config.yaml for a given prompt file and agent
