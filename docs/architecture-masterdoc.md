@@ -229,7 +229,7 @@ Communication happens via `sessions_send` (agent-to-agent messaging), not `sessi
 
 **Heartbeat:** Disabled (`every: "0m"`)
 
-**Bindings:** BlueBubbles DM (phone: <REDACTED-PHONE>)
+**Bindings:** BlueBubbles DM (phone configured in openclaw.json)
 
 **Workspace:** `/Users/bruba/agents/bruba-rex/`
 

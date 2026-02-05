@@ -1,5 +1,5 @@
 ---
-version: 1.8.0
+version: 1.9.0
 updated: 2026-02-05
 type: refdoc
 project: planning
@@ -62,6 +62,11 @@ Complete reference for file locations, ownership, and data flow between operator
 │   │   │   └── IDENTITY.md     # Guru identity
 │   │   └── helper/
 │   │       └── README.md       # Documentation only (helpers are ephemeral)
+│   ├── cronjobs/              # Cronjob templates (source for generate-cronjobs.sh)
+│   │   ├── nightly-reset-prep.yaml
+│   │   ├── nightly-reset-execute.yaml
+│   │   ├── nightly-reset-wake.yaml
+│   │   └── morning-briefing.yaml
 │   ├── config/
 │   │   ├── clawdbot.json.template
 │   │   └── exec-approvals.json.template
@@ -76,10 +81,10 @@ Complete reference for file locations, ownership, and data flow between operator
 │   ├── distill/                # Full pipeline with setup, config, lib
 │   ├── http-api/               # Siri async/sync routing
 │   ├── web-search/             # ⚠️ NEEDS UPDATE per v3.2
-│   ├── voice/                  # Voice message handling (message tool pattern)
+│   ├── local-voice/            # Voice message handling
 │   ├── reminders/
+│   ├── cross-comms/            # Cross-agent communication
 │   ├── signal/                 # Signal UUID extraction
-│   ├── signal-media-filter/
 │   ├── workspace/
 │   ├── repo-reference/
 │   ├── group-chats/
@@ -147,12 +152,10 @@ Complete reference for file locations, ownership, and data flow between operator
 │       ├── prompts/
 │       └── state/
 │
-├── cronjobs/                    # Cron job definitions
-│   ├── pre-reset-continuity.yaml    # Main's daily continuation packet
-│   ├── guru-pre-reset-continuity.yaml  # Guru's daily continuation packet
-│   ├── reminder-check.yaml
-│   ├── staleness-check.yaml
-│   ├── calendar-prep.yaml
+├── cronjobs/                    # Generated cron job definitions (gitignored)
+│   ├── nightly-reset-prep.yaml
+│   ├── nightly-reset-execute.yaml
+│   ├── nightly-reset-wake.yaml
 │   └── morning-briefing.yaml
 │
 ├── tools/                       # Shell scripts
@@ -164,7 +167,8 @@ Complete reference for file locations, ownership, and data flow between operator
 │   ├── lib.sh                  # Shared functions
 │   ├── update-allowlist.sh     # Sync exec-approvals.json
 │   ├── update-agent-tools.sh   # Sync tool permissions
-│   └── detect-conflicts.sh     # Compare exports vs mirror
+│   ├── detect-conflicts.sh     # Compare exports vs mirror
+│   └── generate-cronjobs.sh   # Config-driven cronjob generation
 │
 ├── tests/
 │   └── test-prompt-assembly.sh
@@ -633,9 +637,9 @@ agents_sections:
   - tools               # → templates/prompts/sections/tools.md
   - web-search          # → components/web-search/prompts/AGENTS.snippet.md
   - reminders           # → components/reminders/prompts/AGENTS.snippet.md
-  - voice               # → components/voice/prompts/AGENTS.snippet.md
-  - signal-media-filter # → components/signal-media-filter/prompts/AGENTS.snippet.md
+  - local-voice         # → components/local-voice/prompts/AGENTS.snippet.md
   - signal              # → components/signal/prompts/AGENTS.snippet.md
+  - cross-comms         # → components/cross-comms/prompts/AGENTS.snippet.md
   - guru-routing        # → components/guru-routing/prompts/AGENTS.snippet.md
 ```
 
@@ -744,7 +748,7 @@ message action=send target=uuid:<recipient-uuid> message="text"
 message action=send target=uuid:<recipient-uuid> filePath=/path/to/file message="caption"
 ```
 
-**<REDACTED-NAME>'s Signal UUID:** `uuid:<REDACTED-UUID>`
+**Signal UUID:** Configured per-agent via `${SIGNAL_UUID}` (from `config.yaml` identity block)
 
 **Patterns:**
 
@@ -1158,6 +1162,7 @@ docker exec -it openclaw-sandbox-bruba-main /bin/sh
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.9.0 | 2026-02-05 | **Phase 3-4 updates:** Removed signal-media-filter component, added cross-comms and local-voice components, updated cronjobs to generated model (templates/cronjobs/ + generate-cronjobs.sh), replaced REDACTED artifacts with config variable references. |
 | 1.8.0 | 2026-02-05 | **Per-agent content pipeline:** Sessions, intake, and exports now use per-agent subdirs (`sessions/{agent}/`, `intake/{agent}/`, `exports/bot/{agent}/`). Pipeline 2 diagram updated to show per-agent routing via `agents:` frontmatter field. Updated quick reference. |
 | 1.7.0 | 2026-02-04 | **bruba-rex agent:** Added filesystem entries for bruba-rex agent (workspace, sessions, mirror, auth). Updated tool permissions matrix. |
 | 1.6.1 | 2026-02-03 | **Sandbox disabled:** Agent-to-agent session visibility broken in sandbox mode. Set `sandbox.mode: "off"` until OpenClaw fixes. |
