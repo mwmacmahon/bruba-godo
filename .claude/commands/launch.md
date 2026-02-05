@@ -13,7 +13,7 @@ If already running, report status and exit.
 
 ### 2. Start the Daemon
 ```bash
-ssh bruba "openclaw daemon start"
+./tools/bot "openclaw daemon start"
 ```
 
 ### 3. Verify Startup

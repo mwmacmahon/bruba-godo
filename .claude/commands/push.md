@@ -88,7 +88,7 @@ Each component defines required entries in `allowlist.json`:
 - `components/web-search/allowlist.json`
 - `components/reminders/allowlist.json`
 
-After allowlist changes, restart the daemon: `ssh bruba 'clawdbot daemon restart'`
+After allowlist changes, restart the daemon: `./tools/bot 'clawdbot daemon restart'`
 
 ## Arguments
 

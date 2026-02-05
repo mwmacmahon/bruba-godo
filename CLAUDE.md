@@ -169,6 +169,8 @@ Override per-command if needed: `BOT_TRANSPORT=ssh ./tools/bot ...`
 
 **Always use `./tools/bot`** — never use `ssh bruba` directly. The wrapper handles transport (sudo vs SSH) automatically based on config.yaml.
 
+> **Note (2026-02-05):** Many skill files in `.claude/commands/` were migrated from `ssh bruba` to `./tools/bot`. Some tool scripts (`test-permissions.sh`, `test-sandbox.sh`, `fix-message-tool.sh`) still use `ssh bruba` due to multiline heredoc compatibility issues. If a skill fails unexpectedly, check if reverting to `ssh bruba` fixes it.
+
 For multi-line scripts:
 ```bash
 ./tools/bot 'cd ~/agents && ls -la && cat AGENTS.md'

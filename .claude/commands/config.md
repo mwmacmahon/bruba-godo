@@ -38,27 +38,27 @@ Current config location: `.agents.list[] | select(.id == "bruba-main") | .heartb
 
 **To enable heartbeat:**
 ```bash
-ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")) += {"heartbeat": {"every": "2m", "target": "signal", "model": "haiku"}}'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
+./tools/bot 'jq '\''(.agents.list[] | select(.id == "bruba-main")) += {"heartbeat": {"every": "2m", "target": "signal", "model": "haiku"}}'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
 ```
 
 **To disable heartbeat:**
 ```bash
-ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")) |= del(.heartbeat)'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
+./tools/bot 'jq '\''(.agents.list[] | select(.id == "bruba-main")) |= del(.heartbeat)'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
 ```
 
 **To change interval (example: 5m):**
 ```bash
-ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.every = "5m"'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
+./tools/bot 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.every = "5m"'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
 ```
 
 **To change target:**
 ```bash
-ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.target = "signal"'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
+./tools/bot 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.target = "signal"'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
 ```
 
 **To change model (example: haiku):**
 ```bash
-ssh bruba 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.model = "haiku"'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
+./tools/bot 'jq '\''(.agents.list[] | select(.id == "bruba-main")).heartbeat.model = "haiku"'\'' ~/.openclaw/openclaw.json > /tmp/cb.json && mv /tmp/cb.json ~/.openclaw/openclaw.json'
 ```
 
 ### 3b. Setting: Exec Allowlist
@@ -87,12 +87,12 @@ Location: `.agents["bruba-main"].allowlist`
 
 **Add a binary to allowlist:**
 ```bash
-ssh bruba 'jq '\''(.agents["bruba-main"].allowlist) += [{"pattern": "/path/to/binary", "id": "binary-name-bruba-main"}]'\'' ~/.openclaw/exec-approvals.json > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
+./tools/bot 'jq '\''(.agents["bruba-main"].allowlist) += [{"pattern": "/path/to/binary", "id": "binary-name-bruba-main"}]'\'' ~/.openclaw/exec-approvals.json > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
 ```
 
 **Remove a binary from allowlist:**
 ```bash
-ssh bruba 'jq '\''(.agents["bruba-main"].allowlist) |= map(select(.pattern != "/path/to/binary"))'\'' ~/.openclaw/exec-approvals.json > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
+./tools/bot 'jq '\''(.agents["bruba-main"].allowlist) |= map(select(.pattern != "/path/to/binary"))'\'' ~/.openclaw/exec-approvals.json > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
 ```
 
 **Common paths:**
@@ -105,7 +105,7 @@ ssh bruba 'jq '\''(.agents["bruba-main"].allowlist) |= map(select(.pattern != "/
 After any config change, ask if user wants to restart the daemon:
 
 ```bash
-ssh bruba 'openclaw gateway restart'
+./tools/bot 'openclaw gateway restart'
 ```
 
 ## Arguments

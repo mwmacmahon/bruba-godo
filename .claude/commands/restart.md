@@ -6,7 +6,7 @@ Restart the OpenClaw daemon. Use after config changes or if the bot is misbehavi
 
 ### 1. Restart the Daemon
 ```bash
-ssh bruba "openclaw daemon restart"
+./tools/bot "openclaw daemon restart"
 ```
 
 ### 2. Verify Running

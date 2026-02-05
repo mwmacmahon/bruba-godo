@@ -158,7 +158,7 @@ scp -r $SNAPSHOT_NAME/config/* bruba:~/.clawdbot/
 scp -r $SNAPSHOT_NAME/workspace/* bruba:~/clawd/
 
 # Restart daemon
-ssh bruba 'clawdbot daemon restart'
+./tools/bot 'clawdbot daemon restart'
 \`\`\`
 EOF
 

@@ -13,7 +13,7 @@ If already stopped, report and exit.
 
 ### 2. Stop the Daemon
 ```bash
-ssh bruba "openclaw daemon stop"
+./tools/bot "openclaw daemon stop"
 ```
 
 ### 3. Verify Stopped

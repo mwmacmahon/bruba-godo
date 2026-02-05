@@ -30,9 +30,9 @@ For each staged file, check if it already exists in production:
 - Label as "**UPDATE**" (not "NEW")
 - Show diff between staged and production versions:
   ```bash
-  ssh bruba 'diff ~/clawd/tools/{script}.sh ~/.openclaw/agents/bruba-main/workspace/code/{script}.sh'
+  ./tools/bot 'diff ~/clawd/tools/{script}.sh ~/.openclaw/agents/bruba-main/workspace/code/{script}.sh'
   # Or for Python:
-  ssh bruba 'diff ~/clawd/tools/helpers/{script}.py ~/.openclaw/agents/bruba-main/workspace/code/{script}.py'
+  ./tools/bot 'diff ~/clawd/tools/helpers/{script}.py ~/.openclaw/agents/bruba-main/workspace/code/{script}.py'
   ```
 - Frame review as "approving changes to existing tool" not "approving new code"
 
@@ -48,13 +48,13 @@ For each staged file, search all sessions:
 
 ```bash
 # Find all sessions mentioning the exact filename
-ssh bruba 'grep -l "cleanup-reminders.py" ~/.openclaw/agents/bruba-main/sessions/*.jsonl'
+./tools/bot 'grep -l "cleanup-reminders.py" ~/.openclaw/agents/bruba-main/sessions/*.jsonl'
 ```
 
 Then get line numbers within each matching session:
 
 ```bash
-ssh bruba 'grep -n "cleanup-reminders.py" ~/.openclaw/agents/bruba-main/sessions/{session}.jsonl'
+./tools/bot 'grep -n "cleanup-reminders.py" ~/.openclaw/agents/bruba-main/sessions/{session}.jsonl'
 ```
 
 **Display logic:**
@@ -67,7 +67,7 @@ For each hit, grab the matching line plus 2-3 lines before/after:
 
 ```bash
 # If match is at line 162, grab 159-165
-ssh bruba 'sed -n "159,165p" ~/.openclaw/agents/bruba-main/sessions/{session}.jsonl'
+./tools/bot 'sed -n "159,165p" ~/.openclaw/agents/bruba-main/sessions/{session}.jsonl'
 ```
 
 #### 3c. Parse JSONL and Extract Key Fields
@@ -155,8 +155,8 @@ Migrate files to production:
 
 ```bash
 # Use ssh directly for cp (quoting issues with bot wrapper)
-ssh bruba 'cp ~/.openclaw/agents/bruba-main/workspace/code/script.sh ~/clawd/tools/'
-ssh bruba 'chmod +x ~/clawd/tools/script.sh'
+./tools/bot 'cp ~/.openclaw/agents/bruba-main/workspace/code/script.sh ~/clawd/tools/'
+./tools/bot 'chmod +x ~/clawd/tools/script.sh'
 ```
 
 ### Step 7: Update Allowlist
@@ -168,14 +168,14 @@ Add new tools to exec-approvals.json:
 ./tools/bot cat /Users/bruba/.openclaw/exec-approvals.json
 
 # Add new entry (use ssh for JSON manipulation)
-ssh bruba 'cat ~/.openclaw/exec-approvals.json | jq ".agents[\"bruba-main\"].allowlist += [{\"pattern\": \"/Users/bruba/agents/bruba-main/tools/script.sh\", \"id\": \"script-name\"}]" > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
+./tools/bot 'cat ~/.openclaw/exec-approvals.json | jq ".agents[\"bruba-main\"].allowlist += [{\"pattern\": \"/Users/bruba/agents/bruba-main/tools/script.sh\", \"id\": \"script-name\"}]" > /tmp/ea.json && mv /tmp/ea.json ~/.openclaw/exec-approvals.json'
 ```
 
 ### Step 8: Restart Daemon & Verify
 
 ```bash
-ssh bruba 'openclaw daemon restart'
-ssh bruba 'openclaw gateway health'
+./tools/bot 'openclaw daemon restart'
+./tools/bot 'openclaw gateway health'
 ```
 
 ### Step 9: Optional Cleanup
@@ -186,7 +186,7 @@ Ask user if they want to remove migrated files from workspace/code/:
 
 ```bash
 # Run via ssh (not via bot wrapper)
-ssh bruba 'rm ~/.openclaw/agents/bruba-main/workspace/code/script.sh'
+./tools/bot 'rm ~/.openclaw/agents/bruba-main/workspace/code/script.sh'
 ```
 
 ## Arguments

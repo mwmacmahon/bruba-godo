@@ -9,19 +9,19 @@ Send a ping to all agents to ensure their containers are running.
 Run these commands sequentially (each spawns a container if needed):
 
 ```bash
-ssh bruba 'openclaw agent --agent bruba-main -m "ping"'
+./tools/bot 'openclaw agent --agent bruba-main -m "ping"'
 ```
 
 ```bash
-ssh bruba 'openclaw agent --agent bruba-guru -m "ping"'
+./tools/bot 'openclaw agent --agent bruba-guru -m "ping"'
 ```
 
 ```bash
-ssh bruba 'openclaw agent --agent bruba-web -m "ping"'
+./tools/bot 'openclaw agent --agent bruba-web -m "ping"'
 ```
 
 ```bash
-ssh bruba 'openclaw agent --agent bruba-manager -m "ping"'
+./tools/bot 'openclaw agent --agent bruba-manager -m "ping"'
 ```
 
 ### 2. Report Results

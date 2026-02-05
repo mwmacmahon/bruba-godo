@@ -18,10 +18,10 @@ Shows sessions active in the last hour. After 4am reset, all agents should show 
 
 ### 3. Verify Each Agent Responds
 ```bash
-ssh bruba 'openclaw agent --agent bruba-main -m "ping"'
-ssh bruba 'openclaw agent --agent bruba-guru -m "ping"'
-ssh bruba 'openclaw agent --agent bruba-web -m "ping"'
-ssh bruba 'openclaw agent --agent bruba-manager -m "ping"'
+./tools/bot 'openclaw agent --agent bruba-main -m "ping"'
+./tools/bot 'openclaw agent --agent bruba-guru -m "ping"'
+./tools/bot 'openclaw agent --agent bruba-web -m "ping"'
+./tools/bot 'openclaw agent --agent bruba-manager -m "ping"'
 ```
 
 ## Expected Output

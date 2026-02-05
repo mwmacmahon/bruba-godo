@@ -3,7 +3,7 @@
 Update OpenClaw to a new version. OpenClaw is installed from source on the bot account, so updates use git checkout + pnpm build via SSH.
 
 > **Source location:** `~/src/openclaw/` (on bot account)
-> **Access via:** `ssh bruba "..."`
+> **Access via:** `./tools/bot "..."`
 > **Binary symlink:** `~/.npm-global/bin/openclaw` → source dist/entry.js
 
 **User intervention may be needed for:**
@@ -56,7 +56,7 @@ Check ownership model (bruba-owned vs root-owned) — the correct action depends
 
 ```bash
 # Fetch latest from remote
-ssh bruba "cd ~/src/openclaw && git fetch --all --tags"
+./tools/bot "cd ~/src/openclaw && git fetch --all --tags"
 
 # Get current checkout info
 ./tools/bot cd /Users/bruba/src/openclaw && echo 'HEAD:' && git rev-parse --short HEAD && echo 'Tag:' && git describe --tags --abbrev=0
@@ -129,7 +129,7 @@ BACKUP_DIR=~/clawd/backups/$(date +%Y-%m-%d)
 mkdir -p "$BACKUP_DIR"
 
 # Backup bot's config to main account
-ssh bruba "tar -czf - .openclaw/" > "$BACKUP_DIR/bruba-openclaw-config.tar.gz"
+./tools/bot "tar -czf - .openclaw/" > "$BACKUP_DIR/bruba-openclaw-config.tar.gz"
 
 # Verify backup
 ls -la "$BACKUP_DIR/"
@@ -142,36 +142,36 @@ Based on user's choice:
 **For tagged release:**
 ```bash
 # Checkout the tag
-ssh bruba "cd ~/src/openclaw && git checkout [TAG]"
+./tools/bot "cd ~/src/openclaw && git checkout [TAG]"
 ```
 
 **For main branch:**
 ```bash
 # Checkout main
-ssh bruba "cd ~/src/openclaw && git checkout main && git pull"
+./tools/bot "cd ~/src/openclaw && git checkout main && git pull"
 ```
 
 **For beta/other branch:**
 ```bash
 # Checkout specific branch/commit
-ssh bruba "cd ~/src/openclaw && git checkout [BRANCH]"
+./tools/bot "cd ~/src/openclaw && git checkout [BRANCH]"
 ```
 
 **Then build:**
 ```bash
 # Rebuild
-ssh bruba "cd ~/src/openclaw && pnpm install && pnpm build"
+./tools/bot "cd ~/src/openclaw && pnpm install && pnpm build"
 
 # Relink global
-ssh bruba "cd ~/src/openclaw && pnpm link --global"
+./tools/bot "cd ~/src/openclaw && pnpm link --global"
 
 # Verify
-ssh bruba "openclaw --version"
+./tools/bot "openclaw --version"
 ```
 
 **If `pnpm install` prompts for build approval:** Ask user to run interactively:
 ```bash
-ssh bruba
+./tools/bot
 cd ~/src/openclaw
 pnpm approve-builds  # Select packages as needed
 pnpm rebuild node-llama-cpp  # If llama-cpp changed
@@ -182,7 +182,7 @@ exit
 
 **Restart daemon and verify:**
 ```bash
-ssh bruba "openclaw daemon restart"
+./tools/bot "openclaw daemon restart"
 sleep 3
 
 # Quick health check (compact output)
@@ -235,13 +235,13 @@ If something goes wrong:
 ./tools/bot cd /Users/bruba/src/openclaw && git tag -l | grep 2026 | sort -V | tail -5
 
 # Checkout previous (replace [previous-version])
-ssh bruba "cd ~/src/openclaw && git checkout [previous-version]"
+./tools/bot "cd ~/src/openclaw && git checkout [previous-version]"
 
 # Rebuild
-ssh bruba "cd ~/src/openclaw && pnpm install && pnpm build && pnpm link --global"
+./tools/bot "cd ~/src/openclaw && pnpm install && pnpm build && pnpm link --global"
 
 # Restart daemon
-ssh bruba "openclaw daemon restart"
+./tools/bot "openclaw daemon restart"
 ```
 
 ## Arguments
