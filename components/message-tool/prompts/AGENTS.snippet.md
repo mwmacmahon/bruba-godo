@@ -15,10 +15,10 @@ message action=send target=uuid:<recipient-uuid> message="Your message"
 message action=send target=uuid:<recipient-uuid> filePath=/path/to/file message="Caption"
 ```
 
-### <REDACTED-NAME>'s Signal UUID
+### ${HUMAN_NAME}'s Signal UUID
 
 ```
-uuid:<REDACTED-UUID>
+uuid:${SIGNAL_UUID}
 ```
 
 ### NO_REPLY Pattern
@@ -26,7 +26,7 @@ uuid:<REDACTED-UUID>
 If you're bound to Signal (like bruba-main), follow message tool with `NO_REPLY`:
 
 ```
-message action=send target=uuid:18ce66e6-... message="response"
+message action=send target=uuid:${SIGNAL_UUID} message="response"
 NO_REPLY
 ```
 
@@ -38,14 +38,14 @@ NO_REPLY
 
 **Siri async (HTTP→Signal):**
 ```
-message action=send target=uuid:18ce66e6-... message="response"
+message action=send target=uuid:${SIGNAL_UUID} message="response"
 ✓
 ```
 (No NO_REPLY needed — HTTP responses don't go to Signal)
 
 **Guru direct response:**
 ```
-message action=send target=uuid:18ce66e6-... message="[full technical response]"
+message action=send target=uuid:${SIGNAL_UUID} message="[full technical response]"
 Summary: [one-liner for Main's tracking]
 ```
 (No NO_REPLY — Guru returns to Main via sessions_send, not Signal)

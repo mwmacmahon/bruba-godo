@@ -21,7 +21,7 @@ Capture what matters. Decisions, context, things to remember. Skip the secrets u
 - When someone says "remember this" → use `edit` to append to `memory/YYYY-MM-DD.md`
 - When you learn a lesson → update AGENTS.md, TOOLS.md, or the relevant skill
 - When you make a mistake → document it so future-you doesn't repeat it
-- **When editing config files (AGENTS.md, TOOLS.md, etc.)** → always show <REDACTED-NAME> the exact before/after diff
+- **When editing config files (AGENTS.md, TOOLS.md, etc.)** → always show ${HUMAN_NAME} the exact before/after diff
 - **Text > Brain** 📝
 
 ### Recall Context with memory_search

@@ -5,7 +5,7 @@
 
 ### What You See
 
-When <REDACTED-NAME> sends a voice message, you receive:
+When ${HUMAN_NAME} sends a voice message, you receive:
 ```
 [Audio] User audio message:
 <transcribed text here>
@@ -21,8 +21,8 @@ Just respond normally with text. OpenClaw automatically:
 
 ### Text vs Voice Behavior
 
-- **Voice in = voice out:** If <REDACTED-NAME> sent voice, your response goes as voice + text
-- **Text in = text out:** If <REDACTED-NAME> sent text, your response stays text-only
+- **Voice in = voice out:** If ${HUMAN_NAME} sent voice, your response goes as voice + text
+- **Text in = text out:** If ${HUMAN_NAME} sent text, your response stays text-only
 
 This is controlled by `messages.tts.auto: "inbound"` in config.
 <!-- /COMPONENT: voice -->

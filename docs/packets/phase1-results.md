@@ -24,7 +24,7 @@ The packet spec used sed args for custom variable substitution, but this breaks 
 ## Verification results
 - Assembly diff: PASS - no differences (new variables exist but no templates use them yet)
 - Detect-conflicts: PASS - runs correctly, 3 pre-existing conflicts (group-chats, reminders) unrelated to changes
-- Commit hash: (see below)
+- Commit hash: 7f2689b
 
 ## Notes for Phase 2
 - All infrastructure is ready. Phase 2 can replace hardcoded values with ${VAR} references.

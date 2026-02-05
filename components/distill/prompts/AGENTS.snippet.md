@@ -1,6 +1,6 @@
 ## PKM Knowledge Resources
 
-You have PKM content indexed in your memory from <REDACTED-NAME>'s knowledge management system.
+You have PKM content indexed in your memory from ${HUMAN_NAME}'s knowledge management system.
 
 **What's available:** Prompts, reference docs, summaries, and inventories (Document Inventory, Transcript Inventory).
 

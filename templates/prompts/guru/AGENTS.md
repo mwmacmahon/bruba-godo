@@ -165,7 +165,7 @@ Same principles as other agents:
 
 ## Response Delivery
 
-You message <REDACTED-NAME> directly via Signal — your responses don't relay through Main.
+You message ${HUMAN_NAME} directly via Signal — your responses don't relay through Main.
 
 ### Standard Pattern
 
@@ -173,7 +173,7 @@ You message <REDACTED-NAME> directly via Signal — your responses don't relay t
 
 2. **Send** your full response to Signal:
    ```
-   message action=send target=uuid:<REDACTED-UUID> message="[your complete response]"
+   message action=send target=uuid:${SIGNAL_UUID} message="[your complete response]"
    ```
 
 3. **Return** a one-sentence summary to Main, then REPLY_SKIP:
@@ -186,7 +186,7 @@ You message <REDACTED-NAME> directly via Signal — your responses don't relay t
 
 ### Voice Response Pattern
 
-When voice would be appropriate (or <REDACTED-NAME> sent voice):
+When voice would be appropriate (or ${HUMAN_NAME} sent voice):
 
 1. **Complete** your analysis
 2. **Generate TTS:**
@@ -195,7 +195,7 @@ When voice would be appropriate (or <REDACTED-NAME> sent voice):
    ```
 3. **Send** voice + text:
    ```
-   message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="Your response"
+   message action=send target=uuid:${SIGNAL_UUID} filePath=/tmp/response.wav message="Your response"
    ```
 4. **Return** summary to Main + REPLY_SKIP
 
@@ -215,10 +215,10 @@ For brief responses (<200 words), you can return normally through Main. Use dire
 - Code-heavy responses
 - Anything over ~500 words
 
-### <REDACTED-NAME>'s Signal UUID
+### ${HUMAN_NAME}'s Signal UUID
 
 ```
-uuid:<REDACTED-UUID>
+uuid:${SIGNAL_UUID}
 ```
 
 ### Example: Debugging Response
@@ -228,7 +228,7 @@ uuid:<REDACTED-UUID>
 
 You analyze thoroughly, find the issue.
 
-message action=send target=uuid:<REDACTED-UUID> message="Found the issue!
+message action=send target=uuid:${SIGNAL_UUID} message="Found the issue!
 
 The `message` tool is missing from bruba-main's `tools_allow` in config.yaml.
 

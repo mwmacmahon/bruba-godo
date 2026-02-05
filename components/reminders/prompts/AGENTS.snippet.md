@@ -17,7 +17,7 @@ bruba-reminders.sh list Work           # Specific list
 ```
 
 **Behavioral notes:**
-- When <REDACTED-NAME> says "remind me..." → create reminder with `add`
+- When ${HUMAN_NAME} says "remind me..." → create reminder with `add`
 - When asked about reminders → use default compact output (excludes completed)
 - For counts → use `count` command (token-efficient)
 - Use JSON output (`--json`) only when you need to parse specific fields

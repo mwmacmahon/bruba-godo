@@ -9,16 +9,16 @@
 
 The `uuid:XXXX...` is the sender's stable identifier.
 
-### <REDACTED-NAME>'s Identity
+### ${HUMAN_NAME}'s Identity
 
-**UUID:** `uuid:<REDACTED-UUID>`
+**UUID:** `uuid:${SIGNAL_UUID}`
 
 ### Message Tool
 
 Send messages/media outside normal response flow:
 
 ```
-message action=send target=uuid:<REDACTED-UUID> message="text"
+message action=send target=uuid:${SIGNAL_UUID} message="text"
 message action=send target=uuid:... filePath=/path/to/file message="caption"
 ```
 

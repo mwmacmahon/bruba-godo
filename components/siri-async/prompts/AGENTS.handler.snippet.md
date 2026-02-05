@@ -9,14 +9,14 @@ Messages may arrive via HTTP (Siri shortcuts, automations) instead of Signal.
 | `[From Siri async]` | Siri (via Manager) | Signal (via message tool) |
 | `[From Automation]` | Shortcuts/scripts | Context-dependent |
 
-**<REDACTED-NAME>'s UUID:** `uuid:<REDACTED-UUID>`
+**${HUMAN_NAME}'s UUID:** `uuid:${SIGNAL_UUID}`
 
 ### Siri Async — `[From Siri async]`
 
 These messages arrive via Manager (forwarded with `sessions_send`). Manager already responded "✓" to HTTP. Your job: process and send to Signal.
 
 ```
-message action=send target=uuid:<REDACTED-UUID> message="[full response]"
+message action=send target=uuid:${SIGNAL_UUID} message="[full response]"
 ```
 
 Your return value doesn't matter — focus on sending to Signal.

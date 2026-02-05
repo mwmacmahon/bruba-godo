@@ -216,15 +216,15 @@ Send messages directly to Signal, bypassing Main.
 
 **Text only:**
 ```
-message action=send target=uuid:<REDACTED-UUID> message="Your message"
+message action=send target=uuid:${SIGNAL_UUID} message="Your message"
 ```
 
 **With audio/media:**
 ```
-message action=send target=uuid:<REDACTED-UUID> filePath=/tmp/response.wav message="Caption"
+message action=send target=uuid:${SIGNAL_UUID} filePath=/tmp/response.wav message="Caption"
 ```
 
-**<REDACTED-NAME>'s UUID:** `uuid:<REDACTED-UUID>`
+**${HUMAN_NAME}'s UUID:** `uuid:${SIGNAL_UUID}`
 
 **When to use:**
 - Substantial technical responses (>500 words)
@@ -253,7 +253,7 @@ exec /Users/bruba/tools/tts.sh "Text to speak" /tmp/response.wav
 **Use with message tool:**
 ```
 exec /Users/bruba/tools/tts.sh "Here's what I found..." /tmp/response.wav
-message action=send target=uuid:18ce66e6-... filePath=/tmp/response.wav message="Here's what I found..."
+message action=send target=uuid:${SIGNAL_UUID} filePath=/tmp/response.wav message="Here's what I found..."
 ```
 
 ---
