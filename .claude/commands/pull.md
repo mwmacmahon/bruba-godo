@@ -28,41 +28,48 @@ Options:
 ## Example Output
 
 ```
-=== Pull Sessions ===
+=== Pulling Bot Sessions ===
+Content pipeline agents: bruba-main bruba-rex
 
-Active session: abc12345 (skipping)
+--- Agent: bruba-main ---
+  Pulled: 3 new
+  def67890.jsonl -> intake/bruba-main/def67890.md
+  ghi12345.jsonl -> intake/bruba-main/ghi12345.md
 
-Pulled: 3 new sessions
-  def67890.jsonl -> intake/def67890.md
-  ghi12345.jsonl -> intake/ghi12345.md
-  jkl67890.jsonl -> intake/jkl67890.md
+--- Agent: bruba-rex ---
+  Pulled: 1 new
+  abc11111.jsonl -> intake/bruba-rex/abc11111.md
 
-Skipped: 24 already pulled
-
-Sessions: 3 new, 24 skipped, 3 converted to intake/
+bruba-main: 3 new, 24 skipped, 3 converted
+bruba-rex: 1 new, 5 skipped, 1 converted
+Sessions: 4 new, 29 skipped, 4 converted
 ```
 
 ## Pipeline
 
+Per-agent pull (for agents with `content_pipeline: true` in config.yaml):
+
 ```
 /pull
   ↓
-sessions/*.jsonl (raw JSONL, archived)
+sessions/{agent}/*.jsonl (raw JSONL, archived per agent)
   ↓ (automatic conversion)
-intake/*.md (delimited markdown, ready for /convert)
+intake/{agent}/*.md (delimited markdown, ready for /convert)
 ```
 
 ## Notes
 
 - Closed sessions are immutable - once pulled, they never change
 - Active session is always skipped (still being written)
-- Raw JSONL kept in sessions/ for archival
-- Delimited markdown written to intake/ for processing
-- State tracked in `sessions/.pulled`
+- Iterates over all agents with `content_pipeline: true`
+- Raw JSONL kept in `sessions/{agent}/` for archival
+- Delimited markdown written to `intake/{agent}/` for processing
+- State tracked per-agent in `sessions/{agent}/.pulled`
+- Backward compat: existing `sessions/.pulled` auto-migrates to `sessions/bruba-main/.pulled`
 
 ## Next Steps
 
-After pulling, files in intake/ need CONFIG blocks added before canonicalization:
+After pulling, files in `intake/{agent}/` need CONFIG blocks added before canonicalization:
 1. `/convert <file>` - AI-assisted CONFIG generation
 2. `/intake` - Batch canonicalize files with CONFIG
 

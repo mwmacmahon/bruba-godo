@@ -1,6 +1,6 @@
 ---
-version: 1.7.0
-updated: 2026-02-04
+version: 1.8.0
+updated: 2026-02-05
 type: refdoc
 project: planning
 tags: [bruba, filesystem, data-flow, bruba-godo, operations, guru, message-tool, rex]
@@ -99,17 +99,30 @@ Complete reference for file locations, ownership, and data flow between operator
 │       └── descriptive-name.md
 │
 ├── intake/                      # Pre-canonicalized files awaiting CONFIG
-│   ├── {uuid}.md               # Raw converted sessions
-│   └── processed/              # Moved here after canonicalization
+│   ├── bruba-main/             # Per-agent intake (from /pull)
+│   │   ├── {uuid}.md
+│   │   └── processed/          # Moved here after canonicalization
+│   ├── bruba-rex/              # Per-agent intake
+│   │   ├── {uuid}.md
+│   │   └── processed/
+│   └── {uuid}.md               # Legacy flat intake (treated as bruba-main)
 │
-├── sessions/                    # Raw JSONL from bot (~81 files)
-│   ├── {uuid}.jsonl
-│   └── .pulled                 # Tracks which sessions have been pulled
+├── sessions/                    # Raw JSONL from bot
+│   ├── bruba-main/             # Per-agent sessions
+│   │   ├── {uuid}.jsonl
+│   │   └── .pulled             # Tracks pulled sessions for this agent
+│   ├── bruba-rex/
+│   │   ├── {uuid}.jsonl
+│   │   └── .pulled
+│   └── .pulled                 # Legacy (auto-migrated to bruba-main/.pulled)
 │
 ├── exports/                     # Filtered content for sync
-│   ├── bot/                    # For bot memory (may be empty)
-│   │   └── bruba-main/
-│   │       └── core-prompts/
+│   ├── bot/                    # Per-agent exports (routed via agents: frontmatter)
+│   │   ├── bruba-main/
+│   │   │   ├── core-prompts/
+│   │   │   └── transcripts/
+│   │   └── bruba-rex/
+│   │       └── transcripts/
 │   └── claude/                 # For Claude Projects
 │       ├── transcripts/
 │       ├── refdocs/
@@ -341,67 +354,78 @@ exports/bot/{agent}/core-prompts/{NAME}.md
 /Users/bruba/agents/{agent}/{NAME}.md  (DEPLOYED)
 ```
 
-### Pipeline 2: Content (Transcripts)
+### Pipeline 2: Content (Transcripts) — Per-Agent
+
+Content pipeline now handles intake and export per-agent. Agents with `content_pipeline: true` in config.yaml participate. Files carry an `agents:` frontmatter field for routing.
 
 ```
-Bot Sessions (remote)
-/Users/bruba/.openclaw/agents/bruba-main/sessions/*.jsonl
+Bot Sessions (remote, per agent)
+/Users/bruba/.openclaw/agents/{agent}/sessions/*.jsonl
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  /pull (pull-sessions.sh)                    │
-│  1. SCP closed sessions to sessions/*.jsonl                  │
-│  2. Convert via distill CLI → intake/*.md                    │
-│  3. Track in sessions/.pulled                                │
+│  For each agent with content_pipeline: true:                 │
+│  1. SCP closed sessions to sessions/{agent}/*.jsonl          │
+│  2. Convert via distill CLI → intake/{agent}/*.md            │
+│  3. Track in sessions/{agent}/.pulled                        │
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
-intake/{uuid}.md (delimited markdown, no CONFIG)
+intake/{agent}/{uuid}.md (delimited markdown, no CONFIG)
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │            /convert (AI-assisted) or /intake --auto-config   │
 │  Adds CONFIG block:                                          │
 │    title, slug, date, source, tags, sections_remove          │
+│    agents: [{agent}]  ← routing field                        │
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
-intake/{uuid}.md (with CONFIG block)
+intake/{agent}/{uuid}.md (with CONFIG block)
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    /intake (canonicalize)                    │
 │  - Split large files (>60K chars)                            │
-│  - Parse CONFIG → YAML frontmatter                           │
+│  - Parse CONFIG → YAML frontmatter (includes agents:)        │
 │  - Apply transcription corrections                           │
+│  - Pass --agent {agent} for routing                          │
 │  - Rename to {slug}.md                                       │
-│  - Move original to intake/processed/                        │
+│  - Move original to intake/{agent}/processed/                │
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
-reference/transcripts/{slug}.md (canonical)
+reference/transcripts/{slug}.md (canonical, agents: in frontmatter)
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                        /export                               │
+│  Standalone profiles (claude, tests): all files              │
+│  Agent profiles (bruba-main, bruba-rex):                     │
+│  - Route via agents: frontmatter field                       │
+│  - Default to [bruba-main] if no agents: field               │
 │  - Filter by include/exclude rules                           │
-│  - Apply sections_remove                                     │
-│  - Apply redaction                                           │
+│  - Apply sections_remove + redaction                         │
 │  - Add type prefix (Transcript -, Doc -, etc.)               │
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
-exports/bot/bruba-main/transcripts/Transcript - {slug}.md
+exports/bot/{agent}/transcripts/Transcript - {slug}.md
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                        /push                                 │
+│  For each agent with content_pipeline: true:                 │
 │  rsync FLAT to {WORKSPACE}/memory/                           │
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
-/Users/bruba/agents/bruba-main/memory/Transcript - {slug}.md
+/Users/bruba/agents/{agent}/memory/Transcript - {slug}.md
 ```
+
+**Routing model:** Canonical files in `reference/` use `agents: [bruba-main, bruba-rex]` in YAML frontmatter to control which agents receive them during export. Files without this field default to `[bruba-main]`.
 
 ### Pipeline 3: Mirror (Conflict Detection)
 
@@ -802,14 +826,14 @@ Bot memory uses **flat structure with prefix naming**:
 /sync   # Runs: mirror → assemble → push
 ```
 
-### Content Pipeline
+### Content Pipeline (Per-Agent)
 
 ```bash
-/pull       # Bot JSONL → sessions/ → intake/
-/convert    # Add CONFIG blocks (AI-assisted)
-/intake     # Canonicalize → reference/
-/export     # Filter → exports/
-/push       # Sync to bot
+/pull       # Bot JSONL → sessions/{agent}/ → intake/{agent}/
+/convert    # Add CONFIG blocks + agents: routing (AI-assisted)
+/intake     # Canonicalize with --agent → reference/ (agents: in frontmatter)
+/export     # Route via agents: field → exports/bot/{agent}/
+/push       # Sync content_pipeline agents to bot memory
 ```
 
 ### Individual Operations
@@ -1134,6 +1158,7 @@ docker exec -it openclaw-sandbox-bruba-main /bin/sh
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.8.0 | 2026-02-05 | **Per-agent content pipeline:** Sessions, intake, and exports now use per-agent subdirs (`sessions/{agent}/`, `intake/{agent}/`, `exports/bot/{agent}/`). Pipeline 2 diagram updated to show per-agent routing via `agents:` frontmatter field. Updated quick reference. |
 | 1.7.0 | 2026-02-04 | **bruba-rex agent:** Added filesystem entries for bruba-rex agent (workspace, sessions, mirror, auth). Updated tool permissions matrix. |
 | 1.6.1 | 2026-02-03 | **Sandbox disabled:** Agent-to-agent session visibility broken in sandbox mode. Set `sandbox.mode: "off"` until OpenClaw fixes. |
 | 1.6.0 | 2026-02-03 | **File access architecture:** `/memory/` read-only (docs, transcripts, repos), `/workspace/` read-write (outputs, continuation). Discovery via `memory_search`. Updated Part 12 with new structure. |

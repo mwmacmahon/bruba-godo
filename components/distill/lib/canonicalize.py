@@ -142,6 +142,8 @@ def generate_canonical_frontmatter(config: CanonicalConfig) -> str:
         lines.append(f'tags: [{", ".join(config.tags)}]')
     else:
         lines.append('tags: []')
+    if config.agents:
+        lines.append(f'agents: [{", ".join(config.agents)}]')
 
     # Section handling
     if config.sections_remove:
@@ -349,7 +351,8 @@ def extract_main_content(content: str) -> str:
 def canonicalize(
     input_path: Path,
     corrections: Optional[List[TranscriptionFix]] = None,
-    logger: Optional[logging.Logger] = None
+    logger: Optional[logging.Logger] = None,
+    agent: Optional[str] = None
 ) -> Tuple[str, CanonicalConfig, Backmatter]:
     """
     Transform raw input into canonical format.
@@ -360,6 +363,7 @@ def canonicalize(
         input_path: Path to input file
         corrections: Optional list of transcription corrections
         logger: Optional logger
+        agent: Optional agent name for frontmatter routing
 
     Returns:
         Tuple of (canonical_content, config, backmatter)
@@ -380,6 +384,10 @@ def canonicalize(
     # Parse config (auto-detects v1 vs v2)
     config = parse_config_block_auto(config_block)
     logger.info(f"Parsed config: {config.title or config.slug}")
+
+    # Set agent routing if not already in config
+    if not config.agents and agent:
+        config.agents = [agent]
 
     # Fill in missing date from filename if needed
     if not config.date:

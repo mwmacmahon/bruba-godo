@@ -117,7 +117,7 @@ Restart daemon to apply synced changes (prompts, allowlist, memory index):
 ./tools/pull-sessions.sh --verbose
 ```
 
-Report: new sessions pulled, converted to intake/
+Report: per-agent session counts, converted to `intake/{agent}/`
 
 #### Step 2: Triage & Convert
 
@@ -125,10 +125,11 @@ Report: new sessions pulled, converted to intake/
 
 **2a. Identify trivial files for deletion**
 
-Scan for tiny conversations (≤4 messages OR <800 chars):
+Scan for tiny conversations across per-agent subdirs (≤4 messages OR <800 chars):
 
 ```bash
-for f in intake/*.md; do
+for f in intake/*/*.md intake/*.md; do
+    [ -f "$f" ] || continue
     msgs=$(grep -c "^=== MESSAGE" "$f" 2>/dev/null || echo 0)
     chars=$(wc -c < "$f" | tr -d ' ')
     if [ "$msgs" -le 4 ] || [ "$chars" -lt 800 ]; then
@@ -145,7 +146,7 @@ If trivial files found, ask user:
 **2b. Handle files needing CONFIG**
 
 ```bash
-grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
+find intake -name "*.md" -not -path "*/processed/*" -not -path "*/split/*" -not -path "*/skipped/*" -exec grep -L "=== EXPORT CONFIG ===" {} \;
 ```
 
 If files need CONFIG, ask user:
@@ -156,15 +157,17 @@ If files need CONFIG, ask user:
 #### Step 3: Canonicalize ready files
 
 ```bash
-grep -l "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
+find intake -name "*.md" -not -path "*/processed/*" -not -path "*/split/*" -not -path "*/skipped/*" -exec grep -l "=== EXPORT CONFIG ===" {} \;
 ```
 
-If files ready:
+If files ready, detect agent from path and pass `--agent`:
 ```bash
-python -m components.distill.lib.cli canonicalize intake/<file>.md \
+# For intake/{agent}/<file>.md, extract agent from path
+python -m components.distill.lib.cli canonicalize intake/<agent>/<file>.md \
+    --agent <agent> \
     -o reference/transcripts/ \
     -c components/distill/config/corrections.yaml \
-    --move intake/processed
+    --move intake/<agent>/processed
 ```
 
 #### Step 4: Generate exports
@@ -173,11 +176,15 @@ python -m components.distill.lib.cli canonicalize intake/<file>.md \
 python -m components.distill.lib.cli export --verbose
 ```
 
+This runs both standalone profiles (claude, tests) and per-agent profiles (bruba-main, bruba-rex). Files are routed to agents via the `agents:` frontmatter field.
+
 #### Step 5: Push to bot memory
 
 ```bash
 ./tools/push.sh --verbose
 ```
+
+Push now syncs content for all agents with `content_pipeline: true` (not just bruba-main).
 
 ---
 

@@ -712,6 +712,7 @@ def parse_v2_config_block(block: str) -> CanonicalConfig:
     file_type = parsed.get('type', '')
     scope = parsed.get('scope', '')
     description = parsed.get('description', '')
+    agents = parse_inline_list(parsed.get('agents', []))
 
     # Parse sections_remove
     sections_remove = []
@@ -805,6 +806,7 @@ def parse_v2_config_block(block: str) -> CanonicalConfig:
         type=file_type,
         scope=scope,
         description=description,
+        agents=agents,
         sections_remove=sections_remove,
         sections_lite_remove=sections_lite_remove,
         code_blocks=code_blocks,

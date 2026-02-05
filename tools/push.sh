@@ -206,8 +206,8 @@ for agent in "${AGENTS[@]}"; do
         fi
     fi
 
-    # 2. Only sync content directories for main agent (bruba-main has memory)
-    if [[ "$agent" == "bruba-main" ]]; then
+    # 2. Sync content directories for agents with content_pipeline: true
+    if [[ "$AGENT_CONTENT_PIPELINE" == "true" ]]; then
         # Generate inventory files
         if [[ -f "$ROOT_DIR/tools/generate-inventory.sh" ]]; then
             log "Generating inventories..."
@@ -341,7 +341,7 @@ if [[ "$UPDATE_ALLOWLIST" == "true" ]]; then
     "$ROOT_DIR/tools/update-allowlist.sh" $ALLOWLIST_ARGS
 fi
 
-# Trigger reindex for main agent if not dry run
+# Trigger reindex for content_pipeline agents if not dry run
 # Use conditional reindex to skip if no content changed
 if [[ "$DRY_RUN" != "true" && "$NO_INDEX" != "true" ]]; then
     HASH_FILE="$ROOT_DIR/.last-sync-hash"
@@ -359,12 +359,20 @@ if [[ "$DRY_RUN" != "true" && "$NO_INDEX" != "true" ]]; then
 
     if [[ -n "$CURRENT_HASH" && "$CURRENT_HASH" != "$PREV_HASH" ]]; then
         log "Triggering memory reindex (content changed)..."
-        if bot_cmd "openclaw memory index" 2>/dev/null; then
-            log "Memory indexed"
-            echo "$CURRENT_HASH" > "$HASH_FILE"
-        else
-            log "Warning: Memory index failed (may need manual reindex)"
-        fi
+        # Reindex all content_pipeline agents
+        CP_AGENTS=()
+        while IFS= read -r cp_agent; do
+            [[ -n "$cp_agent" ]] && CP_AGENTS+=("$cp_agent")
+        done < <(get_content_pipeline_agents)
+
+        for cp_agent in "${CP_AGENTS[@]}"; do
+            if bot_cmd "openclaw memory index --agent $cp_agent" 2>/dev/null; then
+                log "  $cp_agent: memory indexed"
+            else
+                log "  $cp_agent: Warning: Memory index failed (may need manual reindex)"
+            fi
+        done
+        echo "$CURRENT_HASH" > "$HASH_FILE"
     else
         log "Skipping reindex (no content changes)"
     fi

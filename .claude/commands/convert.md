@@ -6,7 +6,9 @@ AI-assisted generation of CONFIG blocks for intake files. **Interactive, one fil
 
 $ARGUMENTS
 
-The path to a file in `intake/` (without CONFIG). If omitted, show available files and ask which one.
+The path to a file in `intake/{agent}/` (without CONFIG). If omitted, show available files and ask which one.
+
+Files live in per-agent subdirs: `intake/bruba-main/`, `intake/bruba-rex/`, etc.
 
 ## How It Works
 
@@ -36,10 +38,13 @@ If no file specified:
 **"/convert" with no context** → List files and ask which one:
 
 ```bash
-grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
+# Scan per-agent subdirs and legacy flat intake
+find intake -name "*.md" -not -path "*/processed/*" -not -path "*/split/*" -not -path "*/skipped/*" | while read f; do
+    grep -L "=== EXPORT CONFIG ===" "$f" 2>/dev/null
+done
 ```
 
-Show a numbered list with message count and size.
+Show a numbered list with agent, message count and size. Detect agent from path (e.g., `intake/bruba-rex/abc.md` → bruba-rex).
 
 ### 2. Remove Noise (Automatic)
 
@@ -92,6 +97,13 @@ Identify and report:
 4. ARTIFACTS:
    - Large pasted content, code blocks, logs
    Format: type, size, recommendation (remove/keep)
+
+5. AGENT ROUTING:
+   - The agents field controls which bot agents receive this file in their memory.
+   - Default is the agent whose intake dir the file is in.
+   - If this conversation would be useful for other agents too, suggest adding them.
+   - Available agents with content_pipeline: bruba-main, bruba-rex
+   Format: agents: [agent-name, ...]
 
 Output as structured analysis table.
 
@@ -215,6 +227,7 @@ slug: YYYY-MM-DD-topic-slug
 date: YYYY-MM-DD
 source: bruba
 tags: [tag1, tag2]
+agents: [bruba-main]
 
 sections_remove:
   - start: "First 5-50 words of section start..."

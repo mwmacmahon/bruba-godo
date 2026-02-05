@@ -86,9 +86,29 @@ except Exception as e:
 " 2>/dev/null
 }
 
+# Get list of agents with content_pipeline: true
+# Usage: mapfile -t CP_AGENTS < <(get_content_pipeline_agents)
+get_content_pipeline_agents() {
+    local config_file="$ROOT_DIR/config.yaml"
+
+    python3 -c "
+import yaml, sys
+try:
+    with open('$config_file') as f:
+        config = yaml.safe_load(f)
+    for name, cfg in config.get('agents', {}).items():
+        if cfg.get('content_pipeline', False):
+            print(name)
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
+}
+
 # Load config for a specific agent
 # Usage: load_agent_config "bruba-main"
-# Sets: AGENT_NAME, AGENT_WORKSPACE, AGENT_PROMPTS, AGENT_REMOTE_PATH, AGENT_MIRROR_DIR, AGENT_EXPORT_DIR
+# Sets: AGENT_NAME, AGENT_WORKSPACE, AGENT_PROMPTS, AGENT_REMOTE_PATH, AGENT_CONTENT_PIPELINE,
+#       AGENT_REMOTE_SESSIONS, AGENT_MIRROR_DIR, AGENT_EXPORT_DIR
 load_agent_config() {
     local agent="${1:-bruba-main}"
     local config_file="$ROOT_DIR/config.yaml"
@@ -108,19 +128,22 @@ try:
     print(json.dumps({
         'workspace': agent.get('workspace'),
         'prompts': agent.get('prompts', []),
-        'remote_path': agent.get('remote_path', 'memory')
+        'remote_path': agent.get('remote_path', 'memory'),
+        'content_pipeline': agent.get('content_pipeline', False)
     }))
 except Exception as e:
-    print(json.dumps({'workspace': None, 'prompts': [], 'remote_path': 'memory'}))
+    print(json.dumps({'workspace': None, 'prompts': [], 'remote_path': 'memory', 'content_pipeline': False}))
 " 2>/dev/null)
 
     AGENT_WORKSPACE=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('workspace') or '')" 2>/dev/null)
     AGENT_PROMPTS=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d.get('prompts', [])))" 2>/dev/null)
     AGENT_REMOTE_PATH=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('remote_path') or 'memory')" 2>/dev/null)
+    AGENT_CONTENT_PIPELINE=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print('true' if d.get('content_pipeline') else 'false')" 2>/dev/null)
 
     # Derived paths
     AGENT_MIRROR_DIR="$MIRROR_DIR/$agent"
     AGENT_EXPORT_DIR="$EXPORTS_DIR/bot/$agent"
+    AGENT_REMOTE_SESSIONS="$REMOTE_OPENCLAW/agents/$agent/sessions"
 }
 
 # Get tools_allow list for an agent from config.yaml

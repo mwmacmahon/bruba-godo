@@ -8,55 +8,63 @@ $ARGUMENTS
 
 Options:
 - `--profile <name>` - Run specific profile only (default: all)
+- `--profile agent:<name>` - Run specific agent profile (e.g., `agent:bruba-rex`)
 - `--dry-run` - Show what would be exported without writing
 
 ## Instructions
 
 ### 1. Run Export Command
 
-For all profiles:
+For all profiles (standalone + agent profiles):
 ```bash
 python -m components.distill.lib.cli export --verbose
 ```
 
-For specific profile:
+For specific standalone profile:
 ```bash
-python -m components.distill.lib.cli export --profile bot --verbose
+python -m components.distill.lib.cli export --profile claude --verbose
+```
+
+For specific agent profile:
+```bash
+python -m components.distill.lib.cli export --profile agent:bruba-rex --verbose
 ```
 
 ### 2. Report Results
 
 Show for each profile:
 - How many files processed
-- How many files skipped (filtered out)
+- How many files skipped (filtered out or not routed to this agent)
 - Output location
 - Redaction categories applied
 
 ## Export Profiles
 
-Profiles are defined in `exports.yaml`:
+### Standalone Profiles (in `exports:` section of config.yaml)
+
+Process all canonical files regardless of `agents:` frontmatter:
 
 ```yaml
 exports:
-  bot:
-    description: "Content synced to bot memory"
-    output_dir: exports/bot
-    remote_path: memory
+  claude:
+    description: "Prompts for Claude Projects / Claude Code"
+    output_dir: exports/claude
     include:
       scope: [meta, reference, transcripts]
-    exclude:
-      sensitivity: [sensitive, restricted]
     redaction: [names, health]
-
-  rag:
-    description: "Content for external RAG systems"
-    output_dir: exports/rag
-    include:
-      scope: [reference, transcripts]
-    format: chunked
 ```
 
-### Filter Rules
+### Agent Profiles (auto-generated from `agents:` section)
+
+Agents with `content_pipeline: true` AND `include:` rules automatically get export profiles. Files are routed via the `agents:` field in frontmatter:
+
+- File with `agents: [bruba-main]` -> exported to `exports/bot/bruba-main/`
+- File with `agents: [bruba-main, bruba-rex]` -> exported to both
+- File with no `agents:` field -> defaults to `[bruba-main]`
+
+To supply a transcript to another agent's memory, add that agent to the `agents:` list in the file's frontmatter.
+
+## Filter Rules
 
 **include.scope** - File must match at least one scope:
 - `transcripts` - All canonical transcript files (always matches)
@@ -68,6 +76,8 @@ exports:
 **exclude.sensitivity** - Skip files with these sensitivity levels:
 - `sensitive` - Marked as sensitive
 - `restricted` - Highly restricted content
+
+**agents: frontmatter** (agent profiles only) - File must list this agent in its `agents:` field
 
 ### Sections Remove
 
@@ -91,29 +101,22 @@ Redaction uses the `sensitivity.terms` defined in each file's frontmatter.
 ```
 === /export ===
 
-Found 12 canonical files in reference/transcripts/
+Found 12 canonical files
 
-=== Profile: bot ===
-  Content synced to bot memory
+=== Profile: claude ===
+  Prompts for Claude Projects / Claude Code
+  Written: 10, Unchanged: 1, Skipped: 1
+  Output: exports/claude/
 
-  Processing...
-    2026-01-28-user-auth.md -> exports/bot/
-    2026-01-27-db-schema.md -> exports/bot/
-    Skip (filtered): 2026-01-26-health-notes.md  # excluded: sensitive
+=== Agent: bruba-main ===
+  Content for bruba-main memory
+  Written: 11, Unchanged: 0, Skipped: 1
+  Output: exports/bot/bruba-main/
 
-  Processed: 11, Skipped: 1
-  Redaction: names, health
-  Output: exports/bot/
-
-=== Profile: rag ===
-  Content for external RAG systems
-
-  Processing...
-    2026-01-28-user-auth.md -> exports/rag/
-    ...
-
-  Processed: 10, Skipped: 2
-  Output: exports/rag/
+=== Agent: bruba-rex ===
+  Content for bruba-rex memory
+  Written: 3, Unchanged: 0, Skipped: 9
+  Output: exports/bot/bruba-rex/
 
 Export complete.
 ```
@@ -123,21 +126,19 @@ Export complete.
 ```
 /pull
   ↓
-intake/*.md
+intake/{agent}/*.md
   ↓
-/convert
+/convert (sets agents: field)
   ↓
-intake/*.md (with CONFIG)
+/intake (canonicalizes with --agent)
   ↓
-/intake
-  ↓
-reference/transcripts/*.md
+reference/transcripts/*.md (agents: in frontmatter)
   ↓
 /export (this skill)  ← YOU ARE HERE
   ↓
-exports/bot/*.md (filtered + redacted)
+exports/bot/{agent}/*.md (per-agent filtered + redacted)
   ↓
-/push
+/push (syncs content_pipeline agents)
   ↓
 bot memory
 ```
@@ -147,12 +148,12 @@ bot memory
 After export, verify output:
 
 ```bash
-# Check export counts
-ls exports/bot/*.md | wc -l
-ls exports/rag/*.md | wc -l
+# Check per-agent export counts
+find exports/bot/bruba-main -name "*.md" | wc -l
+find exports/bot/bruba-rex -name "*.md" | wc -l
 
-# Spot-check redaction worked
-grep -l "\[REDACTED\]" exports/bot/*.md
+# Verify multi-agent routing (file in both dirs)
+ls exports/bot/bruba-main/transcripts/ exports/bot/bruba-rex/transcripts/
 ```
 
 ## Related Skills

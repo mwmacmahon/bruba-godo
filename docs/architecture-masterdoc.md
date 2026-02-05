@@ -1,6 +1,6 @@
 ---
-version: 3.11.0
-updated: 2026-02-04
+version: 3.12.0
+updated: 2026-02-05
 type: refdoc
 project: planning
 tags: [bruba, openclaw, multi-agent, architecture, cron, operations, guru, direct-message, docker, sandbox, security, rex]
@@ -1879,6 +1879,7 @@ This binary blob causes massive token inflation (~50K+ tokens for a short voice 
 | Tool restriction cleanup | ✅ | Main/Manager deny web tools, use bruba-web |
 | bruba-web Docker sandbox | ✅ | Enabled with bridge network (2026-02-04) |
 | web-search component | ✅ | Prompts for Main to use bruba-web |
+| Per-agent content pipeline | ✅ | Sessions/intake/export per agent via `content_pipeline` flag and `agents:` frontmatter routing |
 
 ### In Progress
 
@@ -2075,6 +2076,7 @@ Before pushing, the system detects if the bot has made changes that would be ove
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.12.0 | 2026-02-05 | **Per-agent content pipeline:** Content pipeline (`/pull` → `/convert` → `/intake` → `/export` → `/push`) now handles per-agent intake and export. Agents opt in with `content_pipeline: true` in config.yaml. Files carry `agents:` frontmatter field for routing to specific agent memories. Per-agent dirs: `sessions/{agent}/`, `intake/{agent}/`, `exports/bot/{agent}/`. Backward compatible — files without `agents:` default to bruba-main. |
 | 3.11.0 | 2026-02-04 | **bruba-rex agent:** Added new alternate identity agent bound to different phone number. Same capabilities as Main, independent identity. Added bindings section to config.yaml for declarative routing management. Updated agent count to five-agent architecture. |
 | 3.10.0 | 2026-02-04 | **Component variant support:** Added `component:variant` syntax for components that need different prompts per agent. Merged `http-api` and `siri-async` components into `siri-async` with `:router` (Manager) and `:handler` (Main) variants. Added Part 13 documenting prompt assembly and component organization. |
 | 3.9.0 | 2026-02-04 | **Docker sandbox enabled for bruba-web:** Cross-agent session visibility bug fixed in OpenClaw 2026.2.1. bruba-web now runs in Docker container (`sandbox.mode: "all"`, `network: "bridge"`). Added `web-search` component to bruba-main prompts (instructions for using bruba-web via `sessions_send`). Added `~/bin/bruba-start` script and LaunchAgent for container auto-warm. |

@@ -117,7 +117,8 @@ def cmd_canonicalize(args):
             canonical_content, config, backmatter = canonicalize(
                 path,
                 corrections=corrections,
-                logger=logger
+                logger=logger,
+                agent=getattr(args, 'agent', None)
             )
 
             if output_dir:
@@ -280,17 +281,44 @@ def cmd_export(args):
     exports = exports_config.get('exports', {})
     defaults = exports_config.get('defaults', {})
 
-    if not exports:
-        print("No export profiles defined in exports.yaml")
+    # Build agent export profiles from agents with content_pipeline: true
+    agents_config = exports_config.get('agents', {})
+    agent_profiles = {}
+    for agent_name, agent_cfg in agents_config.items():
+        if agent_cfg.get('content_pipeline', False) and 'include' in agent_cfg:
+            agent_profiles[agent_name] = {
+                'description': f"Content for {agent_name} memory",
+                'output_dir': f'exports/bot/{agent_name}',
+                'include': agent_cfg.get('include', {}),
+                'exclude': agent_cfg.get('exclude', {}),
+                'redaction': agent_cfg.get('redaction', []),
+            }
+
+    if not exports and not agent_profiles:
+        print("No export profiles defined in config.yaml")
         sys.exit(1)
 
     # Filter to specific profile if requested
+    run_agent_profiles = True
     if args.profile:
-        if args.profile not in exports:
+        if args.profile.startswith('agent:'):
+            # Agent-specific profile: agent:bruba-rex
+            agent_name = args.profile[6:]
+            if agent_name not in agent_profiles:
+                print(f"Error: Agent profile '{agent_name}' not found")
+                available = list(agent_profiles.keys())
+                print(f"Available agent profiles: {', '.join(available)}")
+                sys.exit(1)
+            agent_profiles = {agent_name: agent_profiles[agent_name]}
+            exports = {}  # Skip standalone profiles
+        elif args.profile in exports:
+            exports = {args.profile: exports[args.profile]}
+            run_agent_profiles = False  # Only run the requested standalone profile
+        else:
             print(f"Error: Profile '{args.profile}' not found")
-            print(f"Available profiles: {', '.join(exports.keys())}")
+            all_profiles = list(exports.keys()) + [f"agent:{n}" for n in agent_profiles]
+            print(f"Available profiles: {', '.join(all_profiles)}")
             sys.exit(1)
-        exports = {args.profile: exports[args.profile]}
     else:
         # When running all profiles, skip those with skip_auto_export: true
         exports = {
@@ -459,6 +487,120 @@ def cmd_export(args):
 
         print(f"  Written: {processed}, Unchanged: {unchanged}, Skipped: {skipped}")
         print(f"  Output: {output_dir}/")
+
+    # Process agent export profiles (content_pipeline agents)
+    if run_agent_profiles and agent_profiles:
+        from .parsing import parse_inline_list as _parse_inline_list
+
+        for agent_name, agent_config in agent_profiles.items():
+            print(f"\n=== Agent: {agent_name} ===")
+            print(f"  {agent_config.get('description', 'No description')}")
+
+            agent_output_dir = Path(agent_config.get('output_dir', f'exports/bot/{agent_name}'))
+            agent_output_dir.mkdir(parents=True, exist_ok=True)
+
+            agent_include = agent_config.get('include', {})
+            agent_exclude = agent_config.get('exclude', {})
+            agent_redaction = agent_config.get('redaction', defaults.get('redaction', []))
+            if isinstance(agent_redaction, str):
+                agent_redaction = [agent_redaction]
+
+            processed = 0
+            unchanged = 0
+            skipped = 0
+
+            for canonical_path in canonical_files:
+                try:
+                    content = canonical_path.read_text(encoding='utf-8')
+                    is_prompt = 'components' in str(canonical_path)
+
+                    if is_prompt:
+                        # Prompts: use same logic as standalone profiles
+                        pconfig = _parse_prompt_frontmatter(content)
+                        if pconfig is None:
+                            skipped += 1
+                            continue
+                        if not _matches_prompt_filters(pconfig, agent_include, agent_exclude, agent_name):
+                            skipped += 1
+                            continue
+
+                        output_name = pconfig.get('output_name', canonical_path.stem)
+                        prompts_dir = agent_output_dir / "prompts"
+                        prompts_dir.mkdir(parents=True, exist_ok=True)
+                        out_path = prompts_dir / f"Prompt - {output_name}.md"
+                        if _write_if_changed(out_path, content):
+                            processed += 1
+                            if args.verbose:
+                                print(f"  -> {out_path}")
+                        else:
+                            unchanged += 1
+                    else:
+                        # Canonical files: check agents routing
+                        config, main_content, backmatter = parse_canonical_file(content)
+
+                        # Get agents list from frontmatter (default to bruba-main)
+                        file_agents = getattr(config, 'agents', [])
+                        if not file_agents:
+                            file_agents = ['bruba-main']
+
+                        # Skip if this agent isn't in the file's agents list
+                        if agent_name not in file_agents:
+                            if args.verbose:
+                                print(f"  Skip (not routed to {agent_name}): {canonical_path.name}")
+                            skipped += 1
+                            continue
+
+                        # Apply include/exclude filters
+                        if not _matches_filters(config, agent_include, agent_exclude):
+                            if args.verbose:
+                                print(f"  Skip (filtered): {canonical_path.name}")
+                            skipped += 1
+                            continue
+
+                        # Determine output subdirectory and prefix
+                        subdir, prefix = _get_content_subdirectory_and_prefix(canonical_path, config)
+                        content_output_dir = agent_output_dir / subdir
+                        content_output_dir.mkdir(parents=True, exist_ok=True)
+
+                        # Generate variants with redaction
+                        options = VariantOptions(
+                            generate_transcript=True,
+                            generate_lite=False,
+                            generate_summary=True,
+                            redact_categories=agent_redaction,
+                            output_dir=content_output_dir
+                        )
+
+                        result = generate_variants(canonical_path, options, logger)
+
+                        if result.transcript:
+                            out_name = f"{prefix}{canonical_path.stem}.md" if prefix else f"{canonical_path.stem}.md"
+                            out_path = content_output_dir / out_name
+                            if _write_if_changed(out_path, result.transcript):
+                                processed += 1
+                                if args.verbose:
+                                    print(f"  -> {out_path}")
+                            else:
+                                unchanged += 1
+
+                        if result.summary:
+                            summary_dir = agent_output_dir / "summaries"
+                            summary_dir.mkdir(parents=True, exist_ok=True)
+                            summary_name = f"Summary - {canonical_path.stem}.md"
+                            summary_path = summary_dir / summary_name
+                            if _write_if_changed(summary_path, result.summary):
+                                if args.verbose:
+                                    print(f"  -> {summary_path}")
+
+                except Exception as e:
+                    print(f"  Error processing {canonical_path.name}: {e}")
+                    if args.verbose:
+                        import traceback
+                        traceback.print_exc()
+                    skipped += 1
+
+            print(f"  Written: {processed}, Unchanged: {unchanged}, Skipped: {skipped}")
+            print(f"  Output: {agent_output_dir}/")
 
     print("\nExport complete.")
 
@@ -790,6 +932,10 @@ def main():
     canonicalize_parser.add_argument(
         '--move', '-m',
         help='Move source files to this directory after successful canonicalization (e.g., intake/processed)'
+    )
+    canonicalize_parser.add_argument(
+        '--agent', '-a',
+        help='Agent name for frontmatter routing (sets agents: [name] if not in CONFIG)'
     )
     canonicalize_parser.set_defaults(func=cmd_canonicalize)
 

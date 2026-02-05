@@ -17,17 +17,17 @@ Options:
 
 **Before processing**, identify conversations that are likely not worth keeping.
 
-Scan all intake files and categorize as trivial if:
+Scan all intake files (across per-agent subdirs) and categorize as trivial if:
 - **≤4 messages** (incomplete exchanges, abandoned sessions)
 - **OR total filesize < 800 characters** (very short messages like "test", "hello", "oops")
 
 ```bash
-# Get message count and size for each file
-for f in intake/*.md; do
+# Get message count and size for each file (scan per-agent subdirs)
+for f in intake/*/*.md intake/*.md; do
+    [ -f "$f" ] || continue
     msgs=$(grep -c "^=== MESSAGE" "$f" 2>/dev/null || echo 0)
     chars=$(wc -c < "$f")
-    session_id=$(basename "$f" .md)
-    printf "%s|%d|%d\n" "$session_id" "$msgs" "$chars"
+    printf "%s|%d|%d\n" "$f" "$msgs" "$chars"
 done
 ```
 
@@ -62,11 +62,11 @@ Recommendation: Delete these trivial files to reduce clutter.
 Default recommendation is "delete both" for truly trivial files.
 
 ```bash
-# Delete both intake and archived JSONL
-rm intake/<session-id>.md
-rm sessions/<session-id>.jsonl
+# Delete both intake and archived JSONL (use per-agent paths)
+rm intake/<agent>/<session-id>.md
+rm sessions/<agent>/<session-id>.jsonl
 # Also remove from .pulled tracking
-sed -i '' '/^<session-id>$/d' sessions/.pulled
+sed -i '' '/^<session-id>$/d' sessions/<agent>/.pulled
 ```
 
 **After triage**, continue with remaining files.
@@ -75,21 +75,21 @@ sed -i '' '/^<session-id>$/d' sessions/.pulled
 
 ### 1. Discover Files
 
-Find files in intake/ and categorize them:
+Find files across per-agent intake subdirs and categorize them:
 
 ```bash
-# All intake files
-ls intake/*.md 2>/dev/null | wc -l
+# All intake files (per-agent subdirs + legacy flat)
+find intake -name "*.md" -not -path "*/processed/*" -not -path "*/split/*" -not -path "*/skipped/*" 2>/dev/null
 
 # Files WITH CONFIG blocks (ready for canonicalization)
-grep -l "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
+grep -rl "=== EXPORT CONFIG ===" intake/*/  intake/*.md 2>/dev/null
 
 # Files WITHOUT CONFIG blocks (need /convert first)
-grep -L "=== EXPORT CONFIG ===" intake/*.md 2>/dev/null
+grep -rL "=== EXPORT CONFIG ===" intake/*/ intake/*.md 2>/dev/null
 ```
 
-Report:
-- X files in intake/
+Report per agent:
+- X files in intake/{agent}/
 - Y ready for canonicalization (have CONFIG)
 - Z need CONFIG (no CONFIG block)
 
@@ -146,7 +146,11 @@ After applying auto-CONFIG, continue to step 2 (canonicalize).
 Ensure output directories exist:
 
 ```bash
-mkdir -p reference/transcripts intake/processed intake/split
+mkdir -p reference/transcripts
+# Per-agent processed dirs
+for agent_dir in intake/*/; do
+    [ -d "$agent_dir" ] && mkdir -p "${agent_dir}processed" "${agent_dir}split"
+done
 ```
 
 ### 3. Check for Large Files & Split if Needed
@@ -178,22 +182,27 @@ Each part:
 
 ### 4. Canonicalize Ready Files
 
-For each file WITH a CONFIG block (or each part file):
+For each file WITH a CONFIG block (or each part file), pass `--agent` to set the `agents:` frontmatter field:
 
 ```bash
-python -m components.distill.lib.cli canonicalize intake/<file>.md \
+# For files in intake/{agent}/ subdirs, detect agent from path
+python -m components.distill.lib.cli canonicalize intake/<agent>/<file>.md \
+    --agent <agent> \
     -o reference/transcripts/ \
     -c components/distill/config/corrections.yaml \
-    --move intake/processed
+    --move intake/<agent>/processed
 ```
+
+For files in the legacy flat `intake/` dir (no agent subdir), default to `--agent bruba-main`.
 
 The CLI will:
 - Parse the CONFIG block → YAML frontmatter
+- Set `agents: [<agent>]` if not already in CONFIG
 - Apply transcription corrections from corrections.yaml
 - Strip Signal/Telegram wrappers
 - Content stays intact (sections_remove applied later at /export)
 - Use the slug from CONFIG as the output filename
-- Move source file to `intake/processed/` after successful canonicalization
+- Move source file to `intake/{agent}/processed/` after successful canonicalization
 
 ### 6. Report Results
 
@@ -291,21 +300,21 @@ Run /convert to add CONFIG blocks to these files.
 ```
 /pull
   ↓
-intake/*.md (delimited markdown)
+intake/{agent}/*.md (delimited markdown, per agent)
   ↓
-/convert (adds CONFIG + backmatter)
+/convert (adds CONFIG + backmatter, including agents: field)
   ↓
-intake/*.md (with CONFIG)
+intake/{agent}/*.md (with CONFIG)
   ↓
-/intake (this skill - canonicalizes)  ← YOU ARE HERE
+/intake (this skill - canonicalizes with --agent)  ← YOU ARE HERE
   ↓
-reference/transcripts/*.md (canonical)
+reference/transcripts/*.md (canonical, agents: in frontmatter)
   ↓
-/export (filters + redacts)
+/export (routes to per-agent exports via agents: frontmatter)
   ↓
-exports/bot/*.md
+exports/bot/{agent}/*.md
   ↓
-/push
+/push (syncs content_pipeline agents)
 ```
 
 ## Related Skills

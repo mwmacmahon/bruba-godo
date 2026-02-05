@@ -250,6 +250,9 @@ class CanonicalConfig:
     scope: str = ""  # reference | meta | transcripts
     description: str = ""  # One-line summary for inventory display
 
+    # === AGENT ROUTING ===
+    agents: List[str] = field(default_factory=list)
+
     # === SECTION HANDLING ===
     sections_remove: List[SectionSpec] = field(default_factory=list)
     sections_lite_remove: List[SectionSpec] = field(default_factory=list)
