@@ -69,6 +69,17 @@ EXPORTS_FILE="$ROOT_DIR/config.yaml"
 # List of prompt files to check
 PROMPT_FILES=(agents tools heartbeat)
 
+# Apply variable substitutions to content (must match assemble-prompts.sh)
+# Usage: apply_substitutions "$content" "$workspace"
+apply_substitutions() {
+    local content="$1"
+    local workspace="$2"
+    echo "$content" | sed \
+        -e "s|\${WORKSPACE}|$workspace|g" \
+        -e "s|\${AGENT_NAME}|$AGENT_NAME|g" \
+        -e "s|\${SHARED_TOOLS}|$SHARED_TOOLS|g"
+}
+
 # Get config sections for a specific prompt file and agent
 get_config_sections() {
     local prompt_name="$1"
@@ -345,8 +356,8 @@ for agent in "${AGENTS[@]}"; do
                 # Get content from mirror (using full entry for marker matching)
                 mirror_content=$(get_component_content_from_mirror "$entry" "$mirror_file" 2>/dev/null) || continue
 
-                # Get source content
-                source_content=$(cat "$component_file")
+                # Get source content with substitutions applied (to match what was pushed)
+                source_content=$(apply_substitutions "$(cat "$component_file")" "$AGENT_WORKSPACE")
 
                 # Compare
                 if ! diff -q <(printf '%s\n' "$mirror_content") <(printf '%s\n' "$source_content") >/dev/null 2>&1; then

@@ -29,9 +29,9 @@ All file operations use **full host paths** (`/Users/bruba/...`).
 
 | Directory | Path | Purpose |
 |-----------|------|---------|
-| **Agent workspace** | `/Users/bruba/agents/bruba-main/` | Prompts, memory, working files |
-| **Memory** | `/Users/bruba/agents/bruba-main/memory/` | Docs, transcripts, repos |
-| **Tools** | `/Users/bruba/tools/` | Scripts (protected — outside workspace) |
+| **Agent workspace** | `${WORKSPACE}/` | Prompts, memory, working files |
+| **Memory** | `${WORKSPACE}/memory/` | Docs, transcripts, repos |
+| **Tools** | `${SHARED_TOOLS}/` | Scripts (protected — outside workspace) |
 | **Shared packets** | `/Users/bruba/agents/bruba-shared/packets/` | Main↔Guru handoff |
 
 ### File Discovery
@@ -39,14 +39,14 @@ All file operations use **full host paths** (`/Users/bruba/...`).
 **Option 1: `memory_search`** (preferred for indexed content)
 ```
 memory_search "topic"        → Returns paths
-read /Users/bruba/agents/bruba-main/memory/docs/Doc - setup.md  → Contents
+read ${WORKSPACE}/memory/docs/Doc - setup.md  → Contents
 ```
 
 **Option 2: `exec` shell utilities** (for exploring directories)
 ```
-exec /bin/ls /Users/bruba/agents/bruba-main/memory/
-exec /usr/bin/find /Users/bruba/agents/bruba-main/memory/ -name "*.md"
-exec /usr/bin/grep -r "pattern" /Users/bruba/agents/bruba-main/memory/
+exec /bin/ls ${WORKSPACE}/memory/
+exec /usr/bin/find ${WORKSPACE}/memory/ -name "*.md"
+exec /usr/bin/grep -r "pattern" ${WORKSPACE}/memory/
 ```
 
 Both work. Use `memory_search` for indexed content; use `exec` when you need ls/find/grep.
@@ -54,7 +54,7 @@ Both work. Use `memory_search` for indexed content; use `exec` when you need ls/
 ### Memory Structure
 
 ```
-/Users/bruba/agents/bruba-main/memory/
+${WORKSPACE}/memory/
 ├── transcripts/          # Transcript - *.md
 ├── docs/                 # Doc - *.md, Refdoc - *.md, CC Log - *.md
 ├── repos/bruba-godo/     # bruba-godo mirror (updated on sync)
@@ -64,7 +64,7 @@ Both work. Use `memory_search` for indexed content; use `exec` when you need ls/
 ### Workspace Structure
 
 ```
-/Users/bruba/agents/bruba-main/
+${WORKSPACE}/
 ├── memory/              # Synced content (searchable via memory_search)
 ├── workspace/           # Working files
 │   ├── output/          # Your outputs
@@ -77,15 +77,15 @@ Both work. Use `memory_search` for indexed content; use `exec` when you need ls/
 
 | Operation | Tool | Example |
 |-----------|------|---------|
-| **Read file** | `read` | `read /Users/bruba/agents/bruba-main/memory/docs/Doc - setup.md` |
-| **Write file** | `write` | `write /Users/bruba/agents/bruba-main/workspace/output/result.md` |
-| **Edit file** | `edit` | `edit /Users/bruba/agents/bruba-main/workspace/drafts/draft.md` |
-| **List files** | `exec` | `exec /bin/ls /Users/bruba/agents/bruba-main/memory/` |
-| **Find files** | `exec` | `exec /usr/bin/find /Users/bruba/agents/bruba-main/ -name "*.md"` |
-| **Search content** | `exec` | `exec /usr/bin/grep -r "pattern" /Users/bruba/agents/bruba-main/` |
-| **Run script** | `exec` | `exec /Users/bruba/tools/tts.sh "hello" /tmp/out.wav` |
+| **Read file** | `read` | `read ${WORKSPACE}/memory/docs/Doc - setup.md` |
+| **Write file** | `write` | `write ${WORKSPACE}/workspace/output/result.md` |
+| **Edit file** | `edit` | `edit ${WORKSPACE}/workspace/drafts/draft.md` |
+| **List files** | `exec` | `exec /bin/ls ${WORKSPACE}/memory/` |
+| **Find files** | `exec` | `exec /usr/bin/find ${WORKSPACE}/ -name "*.md"` |
+| **Search content** | `exec` | `exec /usr/bin/grep -r "pattern" ${WORKSPACE}/` |
+| **Run script** | `exec` | `exec ${SHARED_TOOLS}/tts.sh "hello" /tmp/out.wav` |
 
-**Security:** Tools at `/Users/bruba/tools/` are outside your workspace — file tools (read/write/edit) can't modify them. Only exec can run them.
+**Security:** Tools at `${SHARED_TOOLS}/` are outside your workspace — file tools (read/write/edit) can't modify them. Only exec can run them.
 
 ### File I/O Rules
 
@@ -101,7 +101,7 @@ Both work. Use `memory_search` for indexed content; use `exec` when you need ls/
 
 **Exec is for discovery and scripts only:**
 - Discovery: `/bin/ls`, `/usr/bin/find`, `/usr/bin/grep`, `/bin/cat` (read-only)
-- Scripts: `/Users/bruba/tools/*.sh`
+- Scripts: `${SHARED_TOOLS}/*.sh`
 - Apps: `/opt/homebrew/bin/remindctl`, `/opt/homebrew/bin/icalBuddy`
 
 Remember, always use full paths for files!

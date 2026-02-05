@@ -89,7 +89,7 @@ rotate_log "$LOG_FILE"
 
 log "=== Pushing Content to Bot ==="
 
-# Sync component tools function (to main agent only - they share tools)
+# Sync component tools function (to shared tools location)
 sync_component_tools() {
     local tools_synced=0
     local tool_rsync_opts="-avz --chmod=+x"
@@ -100,12 +100,17 @@ sync_component_tools() {
         tool_rsync_opts="$tool_rsync_opts --quiet"
     fi
 
+    # Ensure shared tools directory exists
+    if [[ "$DRY_RUN" != "true" ]]; then
+        ssh "$SSH_HOST" "mkdir -p $SHARED_TOOLS"
+    fi
+
     for component_dir in "$ROOT_DIR/components"/*/tools; do
         if [[ -d "$component_dir" ]]; then
             local component
             component=$(basename "$(dirname "$component_dir")")
-            log "  Syncing $component tools..."
-            rsync $tool_rsync_opts "$component_dir/" "$SSH_HOST:$REMOTE_WORKSPACE/tools/"
+            log "  Syncing $component tools to $SHARED_TOOLS..."
+            rsync $tool_rsync_opts "$component_dir/" "$SSH_HOST:$SHARED_TOOLS/"
             if [[ "$DRY_RUN" != "true" ]]; then
                 tools_synced=$((tools_synced + $(find "$component_dir" -type f | wc -l | tr -d ' ')))
             fi

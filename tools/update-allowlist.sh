@@ -175,10 +175,11 @@ collect_required_entries() {
             # Log to stderr to avoid capturing in subshell output
             echo "  Found: $entry → $(basename "$allowlist_file")" >&2
 
-            # Read entries and expand ${WORKSPACE} placeholder
+            # Read entries and expand ${WORKSPACE} and ${SHARED_TOOLS} placeholders
             local component_entries
             component_entries=$(jq -c '.entries' "$allowlist_file" | \
-                sed "s|\${WORKSPACE}|$workspace|g")
+                sed -e "s|\${WORKSPACE}|$workspace|g" \
+                    -e "s|\${SHARED_TOOLS}|$SHARED_TOOLS|g")
 
             # Merge into entries array using jq properly
             entries=$(jq -n --argjson a "$entries" --argjson b "$component_entries" '$a + $b')
@@ -221,7 +222,7 @@ find_missing_entries() {
 }
 
 # Find entries on bot that are not in required list (orphans to remove)
-# Only considers entries matching component tool paths (~/clawd/tools/*)
+# Matches any path containing /tools/ (clawd, per-agent, shared, legacy locations)
 # Usage: find_orphan_entries "$required" "$current" "$workspace"
 find_orphan_entries() {
     local required="$1"
@@ -233,11 +234,11 @@ find_orphan_entries() {
     required_patterns=$(echo "$required" | jq -r '.[].pattern')
 
     # Filter current entries to those:
-    # 1. Match component tool path pattern (*/clawd/tools/*)
+    # 1. Match any tools path pattern (covers clawd, per-agent, shared, and legacy locations)
     # 2. Not in required list
     echo "$current" | jq --arg patterns "$required_patterns" --arg workspace "$workspace" '
         map(select(
-            (.pattern | contains("/clawd/tools/") or contains($workspace + "/tools/")) and
+            (.pattern | contains("/tools/")) and
             (.pattern as $p | ($patterns | split("\n") | map(select(. != "")) | index($p)) == null)
         ))
     '

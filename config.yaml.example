@@ -14,6 +14,7 @@ remote:
   workspace: /Users/<bot-username>/agents/<agent-id>
   openclaw: /Users/<bot-username>/.openclaw
   agent_id: <your-agent-id>        # e.g., mybot-main
+  shared_tools: /Users/<bot-username>/agents/bruba-shared/tools  # Shared tools location
 
 local:
   mirror: mirror

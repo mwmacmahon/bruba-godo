@@ -70,6 +70,16 @@ TOTAL_FILES=0
 TOTAL_SECTIONS=0
 TOTAL_MISSING=0
 
+# Apply variable substitutions to content
+# Usage: apply_substitutions "$content"
+apply_substitutions() {
+    local content="$1"
+    echo "$content" | sed \
+        -e "s|\${WORKSPACE}|$AGENT_WORKSPACE|g" \
+        -e "s|\${AGENT_NAME}|$AGENT_NAME|g" \
+        -e "s|\${SHARED_TOOLS}|$SHARED_TOOLS|g"
+}
+
 # Parse sections list from config.yaml for a given prompt file and agent
 # Usage: get_sections "agents" -> outputs section names one per line
 get_sections() {
@@ -145,7 +155,7 @@ resolve_section() {
     if [[ "$entry" == "base" ]]; then
         local template_file="$ROOT_DIR/templates/prompts/${prompt_upper}.md"
         if [[ -f "$template_file" ]]; then
-            cat "$template_file"
+            apply_substitutions "$(cat "$template_file")"
             return 0
         else
             return 1
@@ -156,7 +166,7 @@ resolve_section() {
     if [[ "$entry" == "manager-base" ]]; then
         local template_file="$ROOT_DIR/templates/prompts/manager/${prompt_upper}.md"
         if [[ -f "$template_file" ]]; then
-            cat "$template_file"
+            apply_substitutions "$(cat "$template_file")"
             return 0
         else
             return 1
@@ -167,7 +177,7 @@ resolve_section() {
     if [[ "$entry" == "web-base" ]]; then
         local template_file="$ROOT_DIR/templates/prompts/web/${prompt_upper}.md"
         if [[ -f "$template_file" ]]; then
-            cat "$template_file"
+            apply_substitutions "$(cat "$template_file")"
             return 0
         else
             return 1
@@ -178,7 +188,7 @@ resolve_section() {
     if [[ "$entry" == "guru-base" ]]; then
         local template_file="$ROOT_DIR/templates/prompts/guru/${prompt_upper}.md"
         if [[ -f "$template_file" ]]; then
-            cat "$template_file"
+            apply_substitutions "$(cat "$template_file")"
             return 0
         else
             return 1
@@ -216,8 +226,7 @@ resolve_section() {
 
     if [[ -f "$component_file" ]]; then
         echo "<!-- COMPONENT: $entry -->"
-        # Substitute ${WORKSPACE} with agent's workspace path
-        sed "s|\${WORKSPACE}|$AGENT_WORKSPACE|g" "$component_file"
+        apply_substitutions "$(cat "$component_file")"
         echo "<!-- /COMPONENT: $entry -->"
         return 0
     fi
@@ -227,7 +236,7 @@ resolve_section() {
         local section_file="$ROOT_DIR/templates/prompts/sections/$entry.md"
         if [[ -f "$section_file" ]]; then
             echo "<!-- SECTION: $entry -->"
-            cat "$section_file"
+            apply_substitutions "$(cat "$section_file")"
             echo "<!-- /SECTION: $entry -->"
             return 0
         fi

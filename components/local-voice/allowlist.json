@@ -1,7 +1,7 @@
 {
   "entries": [
-    {"pattern": "${WORKSPACE}/tools/tts.sh", "id": "tts"},
-    {"pattern": "${WORKSPACE}/tools/whisper-clean.sh", "id": "whisper-clean"},
-    {"pattern": "${WORKSPACE}/tools/voice-status.sh", "id": "voice-status"}
+    {"pattern": "${SHARED_TOOLS}/tts.sh", "id": "tts"},
+    {"pattern": "${SHARED_TOOLS}/whisper-clean.sh", "id": "whisper-clean"},
+    {"pattern": "${SHARED_TOOLS}/voice-status.sh", "id": "voice-status"}
   ]
 }

@@ -1,7 +1,7 @@
 {
   "entries": [
-    {"pattern": "${WORKSPACE}/tools/cleanup-reminders.sh", "id": "cleanup-reminders"},
-    {"pattern": "${WORKSPACE}/tools/bruba-reminders.sh", "id": "bruba-reminders"},
-    {"pattern": "${WORKSPACE}/tools/bruba-reminders.sh *", "id": "bruba-reminders-args"}
+    {"pattern": "${SHARED_TOOLS}/cleanup-reminders.sh", "id": "cleanup-reminders"},
+    {"pattern": "${SHARED_TOOLS}/bruba-reminders.sh", "id": "bruba-reminders"},
+    {"pattern": "${SHARED_TOOLS}/bruba-reminders.sh *", "id": "bruba-reminders-args"}
   ]
 }

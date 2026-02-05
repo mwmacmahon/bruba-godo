@@ -47,6 +47,10 @@ load_config() {
     CLONE_REPO_CODE=$(grep "^clone_repo_code:" "$config_file" | awk '{print $2}' | tr -d '"')
     CLONE_REPO_CODE="${CLONE_REPO_CODE:-false}"
 
+    # Shared tools location (all agents use same tools directory)
+    SHARED_TOOLS=$(grep "^  shared_tools:" "$config_file" | awk '{print $2}' | tr -d '"')
+    SHARED_TOOLS="${SHARED_TOOLS:-${REMOTE_HOME}/agents/bruba-shared/tools}"
+
     # Derived remote paths
     REMOTE_SESSIONS="$REMOTE_OPENCLAW/agents/$REMOTE_AGENT_ID/sessions"
 
