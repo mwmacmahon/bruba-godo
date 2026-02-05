@@ -105,6 +105,44 @@ except Exception as e:
 " 2>/dev/null
 }
 
+# Get list of agents with reset_cycle: true
+# Usage: mapfile -t RESET_AGENTS < <(get_reset_agents)
+get_reset_agents() {
+    local config_file="$ROOT_DIR/config.yaml"
+
+    python3 -c "
+import yaml, sys
+try:
+    with open('$config_file') as f:
+        config = yaml.safe_load(f)
+    for name, cfg in config.get('agents', {}).items():
+        if cfg.get('reset_cycle', False):
+            print(name)
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
+}
+
+# Get list of agents with wake_cycle: true
+# Usage: mapfile -t WAKE_AGENTS < <(get_wake_agents)
+get_wake_agents() {
+    local config_file="$ROOT_DIR/config.yaml"
+
+    python3 -c "
+import yaml, sys
+try:
+    with open('$config_file') as f:
+        config = yaml.safe_load(f)
+    for name, cfg in config.get('agents', {}).items():
+        if cfg.get('wake_cycle', False):
+            print(name)
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
+}
+
 # Load config for a specific agent
 # Usage: load_agent_config "bruba-main"
 # Sets: AGENT_NAME, AGENT_WORKSPACE, AGENT_PROMPTS, AGENT_REMOTE_PATH, AGENT_CONTENT_PIPELINE,

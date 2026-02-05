@@ -1,0 +1,18 @@
+name: nightly-reset-execute
+description: Manager resets agent sessions
+status: active
+
+schedule:
+  cron: "2 4 * * *"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-manager
+
+message: |
+  Nightly reset. Use sessions_send:
+
+{{AGENT_MESSAGES}}
+  Reply NO_REPLY when done.

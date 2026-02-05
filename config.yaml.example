@@ -121,6 +121,10 @@ agents:
     # Per-agent template variables (arbitrary, substituted as ${KEY} in prompts)
     # variables:
     #   CROSS_COMMS_GOAL: "Custom guidance for cross-agent communication"
+    # Nightly reset cycle participation (used by generate-cronjobs.sh)
+    # reset_cycle: true    # Include in nightly reset prep + execute
+    # wake_cycle: true     # Include in post-reset wake
+    # continuation_type: technical  # Optional: "technical" for guru-style prep messages
     prompts: [agents, tools]  # Which prompt files to assemble
     # Model: string alias or object with primary/fallbacks
     model: sonnet                              # Override global default

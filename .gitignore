@@ -43,6 +43,12 @@ exports/claude/*
 !exports/bot/.gitkeep
 !exports/claude/.gitkeep
 
+# Generated cronjob files (source of truth: templates/cronjobs/ + config.yaml)
+cronjobs/nightly-reset-prep.yaml
+cronjobs/nightly-reset-execute.yaml
+cronjobs/nightly-reset-wake.yaml
+cronjobs/morning-briefing.yaml
+
 # Assembled outputs (generated from templates + components + user)
 assembled/
 

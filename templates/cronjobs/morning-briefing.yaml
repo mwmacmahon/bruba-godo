@@ -1,0 +1,36 @@
+name: morning-briefing
+description: Daily summary delivered directly to Signal (fire-and-forget)
+status: proposed
+
+schedule:
+  cron: "15 7 * * 1-5"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-sonnet-4-5
+  agent: bruba-manager
+
+delivery:
+  enabled: true
+  channel: signal
+
+message: |
+  Create a brief morning briefing for {{HUMAN_NAME}}.
+
+  Check:
+  1. Run: icalBuddy eventsToday - any important meetings?
+  2. Read inbox/calendar-prep.json if it exists - any prep needed?
+  3. Read inbox/reminder-check.json if it exists - any critical overdue items?
+
+  Format as 3-5 bullet points maximum. Be concise.
+
+  Example:
+  • 10am: Q1 Review - might want to check slides
+  • 2 overdue reminders (dentist 5 days, expenses 2 days)
+  • Clear weather, high 45°F
+
+  Do NOT read state/nag-history.json - that's for Manager's heartbeat processing.
+
+output:
+  direct: signal

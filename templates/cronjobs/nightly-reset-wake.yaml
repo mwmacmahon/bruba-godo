@@ -1,0 +1,18 @@
+name: nightly-reset-wake
+description: Initialize fresh agent sessions after reset
+status: active
+
+schedule:
+  cron: "7 4 * * *"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-manager
+
+message: |
+  Post-reset wake. Use sessions_send:
+
+{{AGENT_MESSAGES}}
+  Reply NO_REPLY when done.
