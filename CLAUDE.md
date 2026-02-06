@@ -48,7 +48,7 @@ agents:
 
 ## Bot Commands
 
-**Always use `./tools/bot`** — it handles transport abstraction automatically.
+**Try to use `./tools/bot` unless absolutely required** — it handles transport abstraction automatically. Can skip for heredocs or if you can't get somethign to work without massive amounts of workarounds.
 
 ### Transport Options
 
@@ -212,7 +212,7 @@ Optional capabilities in `components/`:
 | voice | Planned | Voice input/output (whisper, TTS) |
 | distill | Core | Conversation → knowledge pipeline |
 | reminders | Planned | Apple Reminders integration |
-| web-search | Planned | Web search capability |
+| web-search | Ready | Web research delegation via bruba-web |
 
 Each component can contribute:
 - `setup.sh` — Interactive setup

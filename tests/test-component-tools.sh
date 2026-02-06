@@ -69,7 +69,7 @@ test_component_tools_discovery() {
     log "=== Test 1: Component Tools Discovery ==="
 
     # Expected components with tools/
-    local expected_components=("voice" "web-search" "reminders")
+    local expected_components=("voice" "reminders")
     local found=0
 
     for component in "${expected_components[@]}"; do
@@ -307,7 +307,7 @@ test_snippet_wiring() {
     log "=== Test 7: AGENTS.snippet.md Wiring ==="
 
     # Components with tools should have AGENTS.snippet.md
-    local components_with_tools=("voice" "web-search" "reminders")
+    local components_with_tools=("voice" "reminders")
 
     for component in "${components_with_tools[@]}"; do
         local snippet="$ROOT_DIR/components/$component/prompts/AGENTS.snippet.md"

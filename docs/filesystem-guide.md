@@ -1,5 +1,5 @@
 ---
-version: 1.14.0
+version: 1.15.0
 updated: 2026-02-06
 type: refdoc
 project: planning
@@ -80,7 +80,7 @@ Complete reference for file locations, ownership, and data flow between operator
 │   ├── memory/
 │   ├── distill/                # Full pipeline with setup, config, lib
 │   ├── http-api/               # Siri async/sync routing
-│   ├── web-search/             # ⚠️ NEEDS UPDATE per v3.2
+│   ├── web-search/             # Web research delegation (trigger stub + on-demand prompt)
 │   ├── local-voice/            # Voice message handling
 │   ├── reminders/
 │   ├── cross-comms/            # Cross-agent communication
@@ -93,7 +93,9 @@ Complete reference for file locations, ownership, and data flow between operator
 │   ├── session/
 │   ├── guru-routing/           # Main→Guru routing logic
 │   │   ├── README.md
-│   │   └── prompts/AGENTS.snippet.md
+│   │   └── prompts/
+│   │       ├── AGENTS.snippet.md      # Trigger stub
+│   │       └── Guru Routing.md        # On-demand prompt (full reference)
 │   └── message-tool/           # Direct Signal messaging patterns
 │       └── prompts/AGENTS.snippet.md
 │
@@ -923,7 +925,6 @@ Bot memory uses **flat structure with prefix naming**:
 | Issue | Location | Action Needed |
 |-------|----------|---------------|
 | `active-helpers.json` in mirror | agents/bruba-manager/mirror/state/ | Should be `pending-tasks.json` |
-| `web-search` component | components/web-search/ | Update for v3.2 (bruba-web pattern) |
 | `agents/*/exports/` empty | agents/*/exports/ | Verify export pipeline |
 
 ### Directory Naming
@@ -1220,6 +1221,7 @@ docker exec -it openclaw-sandbox-bruba-main /bin/sh
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.15.0 | 2026-02-06 | **On-demand prompts:** Updated component tree for guru-routing (prompt file), web-search (prompt file). |
 | 1.14.0 | 2026-02-06 | **Routing model docs + research dir:** Added `reference/research/` to directory tree. Clarified routing model in Pipeline 2 — both `agents` and `users` fields needed for multi-agent routing, cross-referenced to `distill-pipeline.md` for full filtering docs. |
 | 1.13.0 | 2026-02-06 | **Per-user routing + export cleanup:** Updated exports directory tree (`exports/claude/` → `exports/claude-gus/` + `exports/claude-rex/`). Updated Pipeline 2 export box to show per-user filtering, stale file reconciliation. Added `users:` field to routing model description. |
 | 1.12.0 | 2026-02-05 | **Vault mode active:** Vault symlinks enabled — all content dirs now symlinked into `bruba-vault/`. Vault internal structure migrated from flat `sessions/{agent}/` to `agents/{agent}/sessions/`. Cleaned up stale leftovers (empty `intake/`, doubled-prefix duplicates). Updated vault.deny to single `agents/` pattern. |

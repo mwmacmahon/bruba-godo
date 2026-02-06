@@ -197,7 +197,7 @@ agents:
       - snippets:repo-reference
       - snippets:group-chats
       - tools
-      # - snippets:web-search     # Enable for web search capability
+      # - web-search              # Enable for web search delegation to -web agent
       # - reminders               # Enable for reminders integration
       - voice
       # - snippets:heartbeats     # Enable for heartbeat mode
@@ -301,6 +301,15 @@ agents:
       - gateway
     agents_sections:
       - web-base  # Uses templates/prompts/web/AGENTS.md
+    # Docker sandbox for security isolation (session-scoped: container torn down after each conversation)
+    # Reduces blast radius from prompt injection in web content
+    sandbox:
+      mode: "all"
+      scope: "session"
+      docker:
+        network: "bridge"        # Needs internet access for web_search/web_fetch
+        memory: "256m"
+        cpus: 0.5
 
   <agent-id>-guru:
     workspace: /Users/<bot-username>/agents/<agent-id>-guru

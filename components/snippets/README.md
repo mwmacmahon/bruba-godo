@@ -22,7 +22,6 @@ Each snippet adds a section to a prompt file (currently all AGENTS.md).
 | `snippets:session` | Session startup workflow and greeting behavior |
 | `snippets:siri-handler` | Siri async handler (Main processes forwarded requests) |
 | `snippets:siri-router` | Siri async router (Manager forwards to Main) |
-| `snippets:web-search` | Web search via bruba-web agent |
 | `snippets:workspace` | Generated content paths and write permissions |
 
 ## Usage

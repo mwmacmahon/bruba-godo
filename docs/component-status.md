@@ -7,7 +7,7 @@ description: "Accurate inventory of all bruba-godo components"
 
 # Component Status
 
-Last updated: 2026-01-31
+Last updated: 2026-02-06
 
 ## Status Labels
 
@@ -32,9 +32,10 @@ Last updated: 2026-01-31
 | http-api | Prompt-Only | ✓ | - | - | - | HTTP API access instructions |
 | continuity | Prompt-Only | ✓ | - | - | - | Session continuity instructions |
 | cc-packets | Prompt-Only | ✓ | - | - | - | Claude Code packet handling |
-| repo-reference | Prompt-Only | ✓ | - | - | - | Repository reference guidance |
+| repo-reference | Prompt-Only | ✓ | - | - | - | Trigger stub + on-demand prompt (`Repo Reference.md`) |
 | voice | Partial | ✓ | ✓ 3 | - | - | Has snippet + tools but no setup/validate |
-| web-search | Partial | ✓ | ✓ 2 | - | - | Has snippet + tools but no setup/validate |
+| web-search | Prompt Ready | ✓ | - | - | - | Trigger stub + on-demand prompt (`Web Search.md`); bruba-web prompt in templates/prompts/web/ |
+| guru-routing | Prompt-Only | ✓ | - | - | - | Trigger stub + on-demand prompt (`Guru Routing.md`) |
 | reminders | Partial | ✓ | ✓ 2 | - | - | Has AGENTS + TOOLS snippets + tools |
 
 ## Tools Inventory
@@ -43,10 +44,6 @@ Last updated: 2026-01-31
 - `tts.sh` - Text-to-speech via sherpa-onnx
 - `whisper-clean.sh` - Speech-to-text via Whisper
 - `voice-status.sh` - Voice system status check
-
-### web-search/tools/
-- `web-search.sh` - Wrapper invoking web-reader agent
-- `ensure-web-reader.sh` - Ensures Docker sandbox is running
 
 ### reminders/tools/
 - `cleanup-reminders.sh` - Cleanup old completed reminders

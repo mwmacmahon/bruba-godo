@@ -1,6 +1,6 @@
 ---
-version: 1.0.0
-updated: 2026-02-03
+version: 1.2.0
+updated: 2026-02-06
 type: refdoc
 project: planning
 tags: [bruba, prompts, assembly, components, budget, openclaw]
@@ -46,16 +46,17 @@ workspace bootstrap file AGENTS.md is 34679 chars (limit 20000); truncating
 
 ### Current Budget Status
 
-As of 2026-02-03:
+As of 2026-02-06:
 
 | Agent | AGENTS.md Size | Budget | Headroom |
 |-------|----------------|--------|----------|
-| bruba-main | 19,053 chars | 20,000 | ~950 chars |
-| bruba-guru | ~8,000 chars | 20,000 | ~12,000 chars |
-| bruba-manager | ~6,000 chars | 20,000 | ~14,000 chars |
-| bruba-web | ~2,000 chars | 20,000 | ~18,000 chars |
+| bruba-main | 17,355 chars | 20,000 | ~2,645 chars |
+| bruba-rex | 15,606 chars | 20,000 | ~4,394 chars |
+| bruba-guru | 12,995 chars | 20,000 | ~7,005 chars |
+| bruba-manager | 5,629 chars | 20,000 | ~14,371 chars |
+| bruba-web | 4,299 chars | 20,000 | ~15,701 chars |
 
-**bruba-main is near capacity.** New components need to be offset by trimming existing ones.
+**bruba-main has healthy headroom** after on-demand prompt refactoring (Feb 2026). New components can be added without immediate trimming, but keep an eye on budget.
 
 ### Checking Budget
 
@@ -142,7 +143,6 @@ Components can provide multiple prompt snippets for different agents or roles us
 | `siri-async` | `:router` | bruba-manager | Receives HTTP, forwards to Main |
 | `siri-async` | `:handler` | bruba-main | Processes forwarded requests |
 | `web-search` | `:consumer` | bruba-main | How to use bruba-web |
-| `web-search` | `:service` | bruba-web | How to be bruba-web (planned) |
 
 **File naming:**
 - Default: `components/{name}/prompts/{NAME}.snippet.md`
@@ -212,11 +212,42 @@ components/
 ├── guru-routing/
 │   ├── README.md
 │   └── prompts/
-│       └── AGENTS.snippet.md
+│       ├── AGENTS.snippet.md        # Trigger stub (concise)
+│       └── Guru Routing.md          # On-demand prompt (full reference)
 └── message-tool/
     └── prompts/
         └── AGENTS.snippet.md
 ```
+
+### On-Demand Prompt Files
+
+Components can include **on-demand prompt files** alongside their snippets. These are full reference docs the bot loads when triggered, keeping the AGENTS.md snippet small.
+
+**Pattern:**
+1. Snippet in AGENTS.md is a short trigger stub (~5-10 lines)
+2. Prompt file lives alongside: `components/{name}/prompts/{Title}.md`
+3. Prompt file has `type: prompt` frontmatter — export pipeline picks it up
+4. Bot loads the prompt on demand via `memory_search` or `read`
+
+**Current on-demand prompts:**
+
+| Component | Prompt File | Trigger |
+|-----------|-------------|---------|
+| guru-routing | `Guru Routing.md` | Technical content, "ask guru" |
+| web-search | `Web Search.md` | Web research requests |
+| snippets | `Repo Reference.md` | bruba-godo file lookups |
+
+**Frontmatter format:**
+```yaml
+---
+type: prompt
+scope: meta
+title: "Guru Routing"
+output_name: "Guru Routing"
+---
+```
+
+The export pipeline scans `components/*/prompts/*.md` (excluding `*.snippet.md`). Files with `type: prompt` are exported to `prompts/` in each agent's memory (e.g., `memory/prompts/Prompt - Guru Routing.md`).
 
 ### Snippet Format
 
@@ -239,7 +270,9 @@ The comment markers help identify component boundaries in the assembled output.
 | Medium capability | 800-1,500 chars | 2,000 chars |
 | Complex capability | 1,500-2,500 chars | 3,500 chars |
 
-**If a component exceeds 3,500 chars**, it's probably trying to do too much. Split it or move details to TOOLS.md.
+**If a component exceeds 3,500 chars**, it's probably trying to do too much. Options:
+- Split it or move details to TOOLS.md
+- Refactor to an **on-demand prompt** — keep a short trigger stub in the snippet, move full reference to a prompt file (see "On-Demand Prompt Files" above)
 
 ---
 
@@ -466,11 +499,14 @@ grep -n "COMPONENT:" agents/bruba-main/exports/core-prompts/AGENTS.md
 |----------|-------------|
 | High | Duplicate information (already covered elsewhere) |
 | High | Multiple examples of same pattern |
+| High | Verbose reference sections → refactor to on-demand prompts |
 | Medium | Verbose explanations |
 | Medium | Troubleshooting sections |
 | Low | Useful but rarely-needed details |
 | Never | Core behavioral triggers |
 | Never | Critical syntax (exact commands) |
+
+**On-demand prompt refactoring** is the highest-leverage trimming technique. A 2,500-char section becomes a ~300-char trigger stub, saving ~2,200 chars while preserving all the detail in a loadable prompt file.
 
 ### 3. Edit Components
 
@@ -510,36 +546,52 @@ Reduced from X to Y chars (Z% reduction)
 
 ## Part 8: Component Inventory
 
-Current components and their sizes (as of 2026-02-03):
+Current components and their sizes (as of 2026-02-06):
 
 ### bruba-main AGENTS.md Components
 
-| Component | Size | Purpose |
-|-----------|------|---------|
-| header | ~300 | Identity, basic behavior |
-| http-api | ~920 | Siri integration patterns |
-| session | ~650 | Session management |
-| continuity | ~1,200 | Continuation packets |
-| distill | ~1,500 | PKM/memory integration |
-| voice | ~970 | Voice message handling |
-| signal | ~790 | Signal-specific patterns |
-| guru-routing | ~1,630 | Technical routing to Guru |
-| group-chats | ~850 | Group chat behavior |
-| web-search | ~900 | Web search via bruba-web |
-| cc-packets | ~900 | Claude Code packet format |
-| repo-reference | ~800 | bruba-godo reference |
-| reminders | ~1,500 | Apple Reminders integration |
-| signal-media-filter | ~400 | Media handling |
-| **Total** | **~19,000** | |
+| Component | Size | Purpose | Notes |
+|-----------|------|---------|-------|
+| header | ~300 | Identity, basic behavior | |
+| http-api | ~920 | Siri integration patterns | |
+| session | ~650 | Session management | |
+| continuity | ~1,200 | Continuation packets | |
+| distill | ~1,500 | PKM/memory integration | Uses on-demand prompts (Export, Transcription, Daily Triage) |
+| local-voice | ~970 | Voice message handling | |
+| signal | ~790 | Signal-specific patterns | |
+| guru-routing | ~450 | Technical routing to Guru | **Refactored:** trigger stub → on-demand prompt |
+| group-chats | ~850 | Group chat behavior | |
+| web-search | ~250 | Web search via bruba-web | **Refactored:** trigger stub → on-demand prompt |
+| repo-reference | ~250 | bruba-godo reference | **Refactored:** trigger stub → on-demand prompt |
+| reminders | ~1,500 | Apple Reminders integration | |
+| cross-comms | ~400 | Cross-agent communication | |
+| emotional-intelligence | ~2,100 | Behavioral guidance | |
+| **Total** | **~17,355** | | |
+
+### On-Demand Prompt Files
+
+These full-reference docs are loaded by the bot when triggered (not baked into AGENTS.md):
+
+| Prompt | Source Component | Bot Location |
+|--------|-----------------|--------------|
+| Guru Routing | guru-routing | `memory/prompts/Prompt - Guru Routing.md` |
+| Web Search | web-search | `memory/prompts/Prompt - Web Search.md` |
+| Repo Reference | snippets | `memory/prompts/Prompt - Repo Reference.md` |
+| Export | distill | `memory/prompts/Prompt - Export.md` |
+| Transcription | distill | `memory/prompts/Prompt - Transcription.md` |
+| Daily Triage | distill | `memory/prompts/Prompt - Daily Triage.md` |
 
 ### Where Headroom Exists
 
-- bruba-guru: ~12,000 chars available
-- bruba-manager: ~14,000 chars available  
-- bruba-web: ~18,000 chars available
+- bruba-main: ~2,645 chars available (17,355 / 20,000)
+- bruba-guru: ~7,000 chars available
+- bruba-manager: ~14,000 chars available
+- bruba-web: ~16,000 chars available
 - TOOLS.md files: Generally underutilized
 
-**Strategy:** Move detailed reference content from AGENTS.md to TOOLS.md to free up behavioral budget.
+**Strategies for freeing space:**
+1. **On-demand prompts** — Refactor verbose sections to trigger stub + prompt file (highest leverage)
+2. **TOOLS.md split** — Move detailed reference content from AGENTS.md to TOOLS.md
 
 ---
 
@@ -607,7 +659,7 @@ wc -c agents/bruba-main/exports/core-prompts/AGENTS.md
 | AGENTS.md limit | 20,000 chars |
 | Safe target | 19,500 chars |
 | Comfort zone | 18,000 chars |
-| bruba-main current | ~19,000 chars |
+| bruba-main current | ~17,355 chars |
 
 ---
 
@@ -615,5 +667,6 @@ wc -c agents/bruba-main/exports/core-prompts/AGENTS.md
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2.0 | 2026-02-06 | **On-demand prompts:** Documented on-demand prompt pattern (trigger stub + prompt file). Updated budget status, component inventory, trimming workflow. Added on-demand prompt table. |
 | 1.1.0 | 2026-02-06 | Merged from masterdoc: component variants, allowlist variants, conflict detection. Removed stale WARNING header. |
 | 1.0.0 | 2026-02-03 | Initial version after AGENTS.md trimming effort |

@@ -11,12 +11,13 @@ Re-enable OpenClaw's native Docker sandbox for bruba-web with network access.
 ## Status
 
 **✅ COMPLETED (Partial):** 2026-02-04
+**🔄 Updated:** 2026-02-06 — switched to `scope: "session"` (was `scope: "agent"`)
 
 Implemented **bruba-web only** sandboxing instead of full agent sandboxing:
-- bruba-web: Docker sandbox with `network: bridge`
+- bruba-web: Docker sandbox with `network: bridge`, **session-scoped** (container torn down after each conversation)
 - Other agents: Running directly on host (`sandbox.mode: "off"` globally)
 
-This provides prompt injection isolation for web content while avoiding complexity of full sandboxing.
+Session scope reduces blast radius from prompt injection: even if malicious web content manipulates the agent during a session, the contaminated state is destroyed afterward. Redundant fields (`workspace`, `agentDir`, `workspaceRoot`, `tools.deny`) were also removed — OpenClaw derives paths from agent ID, and `tools.allow` is deny-by-default.
 
 ## Background
 
@@ -36,10 +37,11 @@ Instead of global sandbox defaults, we enabled sandbox only for bruba-web:
   "id": "bruba-web",
   "sandbox": {
     "mode": "all",
-    "scope": "agent",
-    "workspaceRoot": "/Users/bruba/agents/bruba-web",
+    "scope": "session",
     "docker": {
-      "network": "bridge"
+      "network": "bridge",
+      "memory": "256m",
+      "cpus": 0.5
     }
   }
 }
@@ -47,11 +49,11 @@ Instead of global sandbox defaults, we enabled sandbox only for bruba-web:
 
 Global `agents.defaults.sandbox.mode` remains `"off"`.
 
-### 2. Container Auto-Warm
+### 2. Container Auto-Warm (Disabled)
 
-Created `~/bin/bruba-start` script and LaunchAgent to warm the container on login:
-- Script: `/Users/bruba/bin/bruba-start`
-- LaunchAgent: `~/Library/LaunchAgents/ai.openclaw.sandbox-warm.plist`
+Previously created `~/bin/bruba-start` script and LaunchAgent to warm the container on login. With session scope, containers are ephemeral — warm-up is a no-op since the warmed container gets destroyed when the warmup session ends. The LaunchAgent has been unloaded (2026-02-06).
+- Script: `/Users/bruba/bin/bruba-start` (still exists, harmless)
+- LaunchAgent: `~/Library/LaunchAgents/ai.openclaw.sandbox-warm.plist` (unloaded)
 
 ### 3. Verification Performed
 
@@ -231,7 +233,7 @@ In `~/.openclaw/openclaw.json`, add sandbox defaults:
 
 ## Reference: Architecture Diagrams
 
-### Current State (bruba-web Only)
+### Current State (bruba-web Only, Session-Scoped)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -243,10 +245,10 @@ In `~/.openclaw/openclaw.json`, add sandbox defaults:
 │  └──────────────┘ └──────────────┘ └──────────────┘                     │
 │                                                                          │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │                   Docker Container                                 │  │
+│  │              Ephemeral Docker Container (per session)              │  │
 │  │  ┌──────────────┐                                                  │  │
-│  │  │  bruba-web   │  ← Only agent in container                       │  │
-│  │  │network:bridge│                                                  │  │
+│  │  │  bruba-web   │  ← Session-scoped: destroyed after conversation  │  │
+│  │  │network:bridge│    256m RAM, 0.5 CPU                             │  │
 │  │  └──────────────┘                                                  │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────────────────────┘
@@ -350,9 +352,8 @@ openclaw sandbox explain --agent bruba-web
 
 ### Container not running after reboot
 
-The container starts on-demand. Either:
-1. Run `~/bin/bruba-start` manually
-2. Send any message to bruba-web: `openclaw agent --agent bruba-web -m "ping"`
+With session scope, containers are ephemeral and start on-demand when a session begins. No warm-up needed.
+Send any message to bruba-web to cold-start: `openclaw agent --agent bruba-web -m "ping"`
 
 ### Cross-agent routing fails
 

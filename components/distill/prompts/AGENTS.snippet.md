@@ -20,6 +20,9 @@ You have PKM content indexed in your memory from ${HUMAN_NAME}'s knowledge manag
 | `Prompt - Export.md` | "export", "wrap up" |
 | `Prompt - Transcription.md` | "transcribe", "dictate" |
 | `Prompt - Daily Triage.md` | "triage" |
+| `Prompt - Guru Routing.md` | Technical question, code, debugging |
+| `Prompt - Web Search.md` | Need web research |
+| `Prompt - Repo Reference.md` | Need to find files in bruba-godo repo |
 
 ### What's Synced
 

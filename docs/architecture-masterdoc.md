@@ -1,5 +1,5 @@
 ---
-version: 4.1.0
+version: 4.2.0
 updated: 2026-02-06
 type: refdoc
 project: planning
@@ -296,10 +296,13 @@ bruba-shared/
 ```
 
 **Routing from Main:**
-Main routes technical questions to Guru via `sessions_send`:
-- Auto-routing: Main detects technical content (code dumps, config files, debugging)
-- Guru mode: User explicitly enters extended technical session
+Main suggests routing technical questions to Guru via `sessions_send`:
+- Suggest-then-route: Main detects technical content, asks user before forwarding
+- Guru mode: User explicitly enters extended technical session ("guru mode")
+- Explicit routing: User says "ask guru", "send to guru", etc.
 - Status check: User asks what Guru is working on
+
+**On-demand reference:** Full routing details (modes, response handling, context forwarding) are in `Prompt - Guru Routing.md`, loaded from memory when triggered.
 
 ---
 
@@ -727,6 +730,7 @@ For cron job details, schedules, state files, and processing flow, see [Cron Sys
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 4.2.0 | 2026-02-06 | **On-demand prompts:** Updated guru routing description (auto-route → suggest-then-route). Added on-demand prompt reference note. |
 | 4.1.0 | 2026-02-06 | **Per-user routing + model fix:** Fixed bruba-rex model (Sonnet → Opus per config.yaml). Added per-user document routing context to bruba-rex spec (`users:` frontmatter field). |
 | 4.0.0 | 2026-02-06 | **Masterdoc split:** Extracted Parts 6-14 to dedicated docs (cron-system, security-model, operations-guide, troubleshooting, configuration-reference, prompt-management, vault-strategy, known-issues). Core architecture (Parts 1-5) retained. ~2187 lines → ~700 lines. |
 | 3.13.0 | 2026-02-05 | **Vault mode (symlinks):** Replaced rsync + private branch vault model with symlink-based integration. Gitignored dirs become symlinks into a separate vault repo. New `vault-setup.sh` (enable/disable/status), rewritten `vault-sync.sh` (simple commit) and `vault-propose.sh` (direct vault→PR, no private branch). Added `load_vault_config()` to lib.sh, `vault:` config section, `docs/vault-strategy.md`. |

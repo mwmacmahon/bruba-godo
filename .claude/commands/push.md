@@ -55,7 +55,6 @@ Component tools are automatically synced to the bot's `~/clawd/tools/` directory
 
 Tools from these components are synced:
 - `components/voice/tools/` (tts.sh, whisper-clean.sh, voice-status.sh)
-- `components/web-search/tools/` (web-search.sh, ensure-web-reader.sh)
 - `components/reminders/tools/` (cleanup-reminders.sh, helpers/)
 
 To sync only tools (skip content):
@@ -80,7 +79,6 @@ Component tools need exec-approvals entries to be callable by the bot. Use `--up
 
 Each component defines required entries in `allowlist.json`:
 - `components/voice/allowlist.json`
-- `components/web-search/allowlist.json`
 - `components/reminders/allowlist.json`
 
 After allowlist changes, restart the daemon: `./tools/bot 'clawdbot daemon restart'`

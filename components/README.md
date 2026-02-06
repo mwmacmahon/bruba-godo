@@ -10,8 +10,9 @@ Optional add-ons for extending your bot's capabilities.
 | [Distill](distill/) | **Ready** | Conversation-to-knowledge pipeline (full Python lib) |
 | [Reminders](reminders/) | Partial | Scheduled reminders (tools, allowlist, prompts) |
 | [Local Voice](local-voice/) | Partial | Voice input/output (tools, allowlist, prompts) |
+| [Web Search](web-search/) | Prompt Ready | Web research delegation via bruba-web agent |
 | [Guru Routing](guru-routing/) | Prompt Ready | Technical deep-dive routing to -guru agent |
-| [Snippets](snippets/) | **Ready** | 13 prompt-only snippets (session, memory, continuity, etc.) |
+| [Snippets](snippets/) | **Ready** | 12 prompt-only snippets (session, memory, continuity, etc.) |
 
 **Status key:**
 - **Ready** — Full setup.sh, validate.sh, or self-contained prompt library
@@ -31,6 +32,7 @@ These have `setup.sh`, `validate.sh`, tools, or config fragments:
 ### Standalone prompt components
 
 These contribute prompt snippets and may grow into full components:
+- `web-search/` — Consumer-side web research delegation to bruba-web
 - `guru-routing/` — Routing logic for technical specialist agent
 
 ### Snippets catch-all

@@ -1,48 +1,5 @@
-## 📂 bruba-godo Repository Access
+## bruba-godo Repository Access
 
-**Path:** `${WORKSPACE}/memory/repos/bruba-godo/`
+**Path:** `${WORKSPACE}/memory/repos/bruba-godo/` — Read-only snapshot of the operator's codebase. Read freely, don't modify (changes overwritten on sync). To change something, write a packet.
 
-This is a read-only snapshot of bruba-godo, synced to your memory so you can reference the codebase without asking where it is.
-
-### What's Inside
-| Path | Contents |
-|------|----------|
-| `scripts/` | convert-doc.py and other utilities |
-| `tools/` | Shell tool wrappers |
-| `docs/` | Pipeline and system documentation |
-| `templates/` | Prompt and config templates |
-| `components/` | Component definitions for AGENTS.md |
-| `CLAUDE.md` | CC's workspace instructions |
-
-### Rules
-- **Read freely** — understand the code, reference it in conversations
-- **Don't modify** — changes get overwritten on sync
-- **To change something:** Write a packet → CC implements in the actual repo
-
-### Finding Files
-
-Use `memory_search` to discover files in the repo:
-```
-memory_search "guru-routing component"
-  → Returns: .../memory/repos/bruba-godo/components/guru-routing/...
-```
-
-Then read:
-```
-read ${WORKSPACE}/memory/repos/bruba-godo/components/guru-routing/...
-```
-
-### Example Usage
-```
-# Read a file:
-read ${WORKSPACE}/memory/repos/bruba-godo/CLAUDE.md
-
-# Search for content:
-memory_search "exec-approvals"
-  → Returns relevant files
-
-# Read config:
-read ${WORKSPACE}/memory/repos/bruba-godo/config.yaml
-```
-
-**Note:** The repo snapshot is synced from the operator machine. You can read it, but don't modify — write a packet instead.
+**For file discovery and usage examples:** Load `Prompt - Repo Reference.md` from memory.
