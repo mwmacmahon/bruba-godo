@@ -133,7 +133,7 @@ def test_routing_type_doc():
         type="doc",
         scope="reference"
     )
-    path = Path("docs/README.md")
+    path = Path("docs/INDEX.md")
 
     subdir, prefix = _get_content_subdirectory_and_prefix(path, config)
 
