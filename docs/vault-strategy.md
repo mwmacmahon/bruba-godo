@@ -59,6 +59,7 @@ vault:
   dirs:                            # Directories to symlink
     - agents
     - reference
+    - exports
     - logs
     - docs/cc_logs
     - docs/meta
@@ -75,11 +76,11 @@ Format: one pattern per line, `#` comments, blank lines ignored.
 
 ```
 # Example vault.deny
+agents/
 config.yaml
-agents/*/sessions/
-agents/*/mirror/
-*.env
 ```
+
+The single `agents/` entry covers all per-agent data (sessions, intake, mirror, exports). Fine-grained patterns like `agents/*/sessions/` are possible but usually unnecessary.
 
 ## Setup
 

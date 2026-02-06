@@ -9,28 +9,17 @@ config.yaml
 # Environment variables
 .env
 
-# Per-agent data (all content under agents/)
-agents/
+# Vault setup artifacts
+.gitignore.pre-vault
 
-# Global state and output
-logs/*
-!logs/.gitkeep
-
-reference/*
-!reference/.gitkeep
-!reference/transcripts/
-!reference/refdocs/
-reference/transcripts/*
-reference/refdocs/*
-!reference/transcripts/.gitkeep
-!reference/refdocs/.gitkeep
-
-# Non-agent exports
-exports/*
-!exports/.gitkeep
-!exports/claude/
-exports/claude/*
-!exports/claude/.gitkeep
+# Vault-managed directories (symlinked when vault mode enabled)
+agents
+reference
+exports
+logs
+docs/cc_logs
+docs/meta
+docs/packets
 
 # Generated cronjob files (source of truth: templates/cronjobs/ + config.yaml)
 cronjobs/nightly-reset-prep.yaml
@@ -40,15 +29,6 @@ cronjobs/morning-briefing.yaml
 
 # User customizations (personal, not committed)
 user/
-
-# Planning docs (internal only)
-docs/meta/
-
-# Phase packets (internal planning, not committed)
-docs/packets/
-
-# Claude Code work logs (local only, exported to bot)
-docs/cc_logs/
 
 # macOS
 .DS_Store

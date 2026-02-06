@@ -1,5 +1,5 @@
 ---
-version: 1.11.0
+version: 1.12.0
 updated: 2026-02-05
 type: refdoc
 project: planning
@@ -554,6 +554,8 @@ HTTP API → bruba-main
 ### Vault Mode (Symlink-Based Content Storage)
 
 When vault mode is enabled (`vault.enabled: true` in config.yaml), gitignored directories become symlinks into a separate vault repo. All pipelines above work unchanged — they follow symlinks transparently.
+
+**Status (2026-02-05):** Vault mode is **active**. All gitignored content directories are symlinked into `~/source/bruba-vault/`.
 
 ```
 ~/bruba-godo/                        ~/bruba-vault/
@@ -1214,6 +1216,7 @@ docker exec -it openclaw-sandbox-bruba-main /bin/sh
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.12.0 | 2026-02-05 | **Vault mode active:** Vault symlinks enabled — all content dirs now symlinked into `bruba-vault/`. Vault internal structure migrated from flat `sessions/{agent}/` to `agents/{agent}/sessions/`. Cleaned up stale leftovers (empty `intake/`, doubled-prefix duplicates). Updated vault.deny to single `agents/` pattern. |
 | 1.11.0 | 2026-02-05 | **Directory reorganization:** Moved per-agent directories (`sessions/`, `intake/`, `exports/bot/`, `mirror/`) under `agents/{agent}/`. Each agent now has its own `exports/`, `intake/`, `mirror/`, and `sessions/` subdirectories. Updated all pipeline diagrams, vault symlinks, quick reference, and section type references. |
 | 1.10.0 | 2026-02-05 | **Vault mode:** Added vault symlink documentation to directory tree (vault tools, vault-strategy.md), new "Vault Mode" section in Part 4 (Data Flow Pipelines) showing symlink layout and management commands. |
 | 1.9.0 | 2026-02-05 | **Phase 3-4 updates:** Removed signal-media-filter component, added cross-comms and local-voice components, updated cronjobs to generated model (templates/cronjobs/ + generate-cronjobs.sh), replaced REDACTED artifacts with config variable references. |
