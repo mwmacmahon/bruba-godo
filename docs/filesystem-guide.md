@@ -412,7 +412,7 @@ reference/transcripts/{slug}.md (canonical, agents: in frontmatter)
 ┌─────────────────────────────────────────────────────────────┐
 │                        /export                               │
 │  Standalone profiles (claude-gus, claude-rex, tests):        │
-│  - Filter by include/exclude rules (type, scope, tags, users)│
+│  - Filter by include/exclude rules (type, tags, users)       │
 │  Agent profiles (bruba-main, bruba-rex):                     │
 │  - Route via agents: frontmatter field                       │
 │  - Default to [bruba-main] if no agents: field               │

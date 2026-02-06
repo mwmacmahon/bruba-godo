@@ -210,7 +210,6 @@ agents:
     # Export config for this agent's memory content
     remote_path: memory
     include:
-      scope: [meta, reference, transcripts]
       type: [prompt, doc, refdoc, claude_code_log]
       # users: [user1]          # Per-user routing: only export docs tagged for this user
                                  # Auto-derived from identity.human_name if not set
@@ -417,7 +416,6 @@ exports:
     output_dir: exports/claude-user1
     flatten_export: true
     include:
-      scope: [meta, reference, transcripts]
       type: [prompt, doc, refdoc, claude_code_log]
       users: [user1]            # Only docs tagged for user1 (or untagged)
     exclude:
@@ -429,7 +427,6 @@ exports:
     output_dir: exports/claude-user2
     flatten_export: true
     include:
-      scope: [meta, reference, transcripts]
       type: [prompt, doc, refdoc, claude_code_log]
       users: [user2]            # Only docs tagged for user2 (or untagged)
     exclude:
@@ -442,7 +439,6 @@ exports:
     skip_auto_export: true
     include:
       type: [prompt]
-      scope: [meta, reference, transcripts]
 
 # Message routing bindings (synced to openclaw.json via sync-openclaw-config.sh)
 # Maps channels/peers to specific agents

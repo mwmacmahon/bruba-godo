@@ -310,7 +310,6 @@ Follow-up meeting scheduled for Friday.
 - title: descriptive title
 - date: 2026-01-31
 - type: transcript
-- scope: reference
 - tags: list of relevant tags
 - participants: list of attendee names
 
@@ -324,7 +323,6 @@ Return ONLY the frontmatter block (--- to ---), nothing else."""],
 
         # Verify frontmatter structure
         assert output3.strip().startswith("---"), "Should start with frontmatter delimiter"
-        assert "scope:" in output3.lower(), "Scope field missing"
         assert "participants:" in output3.lower() or "attendees:" in output3.lower(), \
             "Participants field missing"
 

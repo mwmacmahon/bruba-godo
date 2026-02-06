@@ -29,7 +29,7 @@ reference/transcripts/*.md (canonical with YAML frontmatter)
   ↓ /export (NOT AI)
   │  - Applies sections_remove (actually removes content)
   │  - Applies redaction per profile
-  │  - Filters by type/scope/tags/agents/users
+  │  - Filters by type/tags/agents/users
   │  - Stale file reconciliation
 agents/{agent}/exports/ + exports/claude-*/ (filtered, redacted)
   ↓ /push
@@ -120,7 +120,7 @@ The `CanonicalConfig` dataclass (`components/distill/lib/models.py`) is the V2 f
 | `source` | str | `claude`, `bruba`, `claude-projects`, `claude-code`, `voice-memo`, `manual` |
 | `tags` | List[str] | Categorization tags |
 | `type` | str | `doc`, `refdoc`, `transcript`, `prompt`, `artifact`, `claude_code_log` |
-| `scope` | str | `reference`, `meta`, `transcripts` |
+| `scope` | str | *(Legacy, not used for filtering)* `reference`, `meta`, `transcripts` |
 | `description` | str | One-line summary for inventory display |
 
 ### Routing Fields
@@ -153,7 +153,6 @@ source: bruba
 description: "One-line summary"
 tags: [voice, technical]
 type: transcript
-scope: transcripts
 users: [gus]                  # Routes to gus's profiles + auto-derives agents: [bruba-main]
 # agents: [bruba-main]       # Optional — auto-derived from users
 
@@ -209,7 +208,6 @@ agents:
   bruba-main:
     content_pipeline: true
     include:
-      scope: [meta, reference]
       type: [prompt, doc, refdoc]
       users: [gus]
     exclude:
@@ -220,7 +218,6 @@ agents:
 exports:
   claude-gus:
     include:
-      scope: [meta, reference]
       type: [prompt, doc, refdoc]
       users: [gus]
     exclude:
@@ -240,9 +237,8 @@ Standalone profiles (e.g. `claude-gus`, `claude-rex`) apply **one filter pass** 
 1. Check `exclude.sensitivity` — reject if file has excluded sensitivity tags
 2. Check `exclude.tags` — reject if file has any excluded tags
 3. Check `include.type` — file's `type` must be in the list (e.g. `[prompt, doc, refdoc]`)
-4. Check `include.scope` — file's `scope` must be in the list (e.g. `[meta, reference]`)
-5. Check `include.tags` — file must have at least one listed tag (if specified)
-6. Check `include.users` — file's `users` must match profile's `users`
+4. Check `include.tags` — file must have at least one listed tag (if specified)
+5. Check `include.users` — file's `users` must match profile's `users`
 
 If all checks pass, the file is exported.
 
@@ -255,7 +251,7 @@ Agent profiles (e.g. `bruba-main`, `bruba-rex`) apply **two filter passes**:
 - No `agents`, has `users` → auto-derived from user→agent mapping in config (e.g. `users: [rex]` → `agents: [bruba-rex]`)
 - No `agents`, no `users` → defaults to `['bruba-main']` with a warning
 
-**Pass 2: Include/exclude filters** — Same `_matches_filters()` as standalone profiles. This is where `type`, `scope`, `tags`, and `users` are checked against the agent's config.
+**Pass 2: Include/exclude filters** — Same `_matches_filters()` as standalone profiles. This is where `type`, `tags`, and `users` are checked against the agent's config.
 
 Both passes must succeed for the file to be exported.
 
@@ -266,7 +262,6 @@ Both passes must succeed for the file to be exported.
 | `users` | **Who is this for?** Routes to the right human's profiles. | `users: [gus]` → only gus's profiles |
 | `agents` | **Which bot agents?** Optional override for agent routing. Usually auto-derived from `users`. | `agents: [bruba-main, bruba-rex]` |
 | `type` | **What kind of content?** Each profile picks which types it wants. | bruba-main accepts `[prompt, doc, refdoc]` but not `transcript` |
-| `scope` | **Which content area?** Broadly categorizes content. | `[meta, reference]` but not `transcripts` |
 | `tags` | **Exclusion only.** Keeps out unwanted content categories. | `exclude.tags: [legacy, do-not-sync]` |
 | `sensitivity` | **Exclusion only.** Redacts or skips sensitive content. | `exclude.sensitivity: [sensitive, restricted]` |
 
@@ -275,7 +270,6 @@ Both passes must succeed for the file to be exported.
 | Frontmatter Field | Required? | Used By | Purpose |
 |-------------------|-----------|---------|---------|
 | `type` | Yes | Both paths | Content type: `doc`, `refdoc`, `transcript`, `prompt`, `artifact`, `claude_code_log` |
-| `scope` | Yes | Both paths | Content scope: `reference`, `meta`, `transcripts` |
 | `users` | Recommended | Both paths | Which human's profiles receive the file. Auto-derives agent routing. |
 | `tags` | Optional | Both paths | Freeform categorization tags |
 | `agents` | Optional | Agent path only | Override: which bot agents receive the file. Auto-derived from `users` if omitted. |
@@ -286,7 +280,6 @@ Both passes must succeed for the file to be exported.
 | Filter | Section | Behavior |
 |--------|---------|----------|
 | `include.type` | include | File must match one of the listed types |
-| `include.scope` | include | File must match one of the listed scopes |
 | `include.tags` | include | File must have at least one listed tag |
 | `include.users` | include | File's `users` must match profile's `users` (see user semantics) |
 | `exclude.sensitivity` | exclude | Skip files with these sensitivity levels |
@@ -327,7 +320,6 @@ In most cases, **you only need to set `users`**. The export system auto-derives 
 ```yaml
 ---
 type: refdoc
-scope: reference
 users: [gus, rex]
 ---
 ```
@@ -342,7 +334,6 @@ This reaches all 4 targets automatically:
 ```yaml
 ---
 type: refdoc
-scope: reference
 users: [gus]
 ---
 ```

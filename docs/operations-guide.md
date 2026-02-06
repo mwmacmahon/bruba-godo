@@ -407,7 +407,7 @@ Place markdown files with YAML frontmatter in `reference/refdocs/`:
 ```yaml
 ---
 title: My Guide
-scope: [reference]
+type: refdoc
 ---
 ```
 

@@ -5,7 +5,7 @@ Tests for export pipeline routing and frontmatter preservation.
 These tests verify:
 - Export routing based on frontmatter type
 - Frontmatter preservation in variant output
-- Type/scope parsing from frontmatter
+- Type parsing from frontmatter
 
 Run with:
     python tests/run_tests.py test_export
@@ -39,7 +39,7 @@ except ImportError:
 
 
 # =============================================================================
-# Unit tests for type/scope parsing
+# Unit tests for type parsing
 # =============================================================================
 
 def test_parse_type_from_frontmatter():
@@ -54,7 +54,6 @@ scope: reference
     config = parse_v2_config_block(block)
 
     assert config.type == "doc"
-    assert config.scope == "reference"
     assert config.title == "Test Doc"
 
 
@@ -70,7 +69,6 @@ scope: reference
     config = parse_v2_config_block(block)
 
     assert config.type == "refdoc"
-    assert config.scope == "reference"
 
 
 def test_parse_type_transcript():
@@ -85,7 +83,6 @@ scope: transcripts
     config = parse_v2_config_block(block)
 
     assert config.type == "transcript"
-    assert config.scope == "transcripts"
 
 
 def test_parse_type_missing():
@@ -98,11 +95,10 @@ date: 2026-01-31
     config = parse_v2_config_block(block)
 
     assert config.type == ""
-    assert config.scope == ""
 
 
-def test_parse_canonical_file_with_type_scope():
-    """Test parse_canonical_file preserves type and scope."""
+def test_parse_canonical_file_with_type():
+    """Test parse_canonical_file preserves type."""
     content = """---
 title: "My Document"
 slug: my-doc
@@ -115,7 +111,6 @@ Document content here.
     config, main_content, backmatter = parse_canonical_file(content)
 
     assert config.type == "doc"
-    assert config.scope == "reference"
     assert config.title == "My Document"
     assert "Document content" in main_content
 
@@ -130,8 +125,7 @@ def test_routing_type_doc():
         title="Test",
         slug="test",
         date="2026-01-31",
-        type="doc",
-        scope="reference"
+        type="doc"
     )
     path = Path("docs/INDEX.md")
 
@@ -147,8 +141,7 @@ def test_routing_type_refdoc():
         title="Test",
         slug="test",
         date="2026-01-31",
-        type="refdoc",
-        scope="reference"
+        type="refdoc"
     )
     path = Path("reference/refdocs/test.md")
 
@@ -164,8 +157,7 @@ def test_routing_type_transcript():
         title="Test",
         slug="test",
         date="2026-01-31",
-        type="transcript",
-        scope="transcripts"
+        type="transcript"
     )
     path = Path("reference/transcripts/test.md")
 
@@ -182,8 +174,7 @@ def test_routing_type_takes_priority_over_path():
         title="Test",
         slug="test",
         date="2026-01-31",
-        type="doc",
-        scope="reference"
+        type="doc"
     )
     path = Path("reference/transcripts/actually-a-doc.md")
 
@@ -253,7 +244,6 @@ Document content here.
 
     # Check the output has correct type
     assert "type: doc" in result.transcript
-    assert "scope: reference" in result.transcript
     # Should NOT have "End of Transcript" footer
     assert "End of Transcript" not in result.transcript
 
@@ -272,7 +262,6 @@ Reference content.
     result = generate_variants_from_content(content)
 
     assert "type: refdoc" in result.transcript
-    assert "scope: reference" in result.transcript
     assert "End of Transcript" not in result.transcript
 
 
@@ -309,26 +298,6 @@ Some content.
     assert "End of Transcript" in result.transcript
 
 
-def test_variant_no_scope_when_missing():
-    """Test that scope is not added when not present in original."""
-    content = """---
-title: "No Scope"
-slug: no-scope
-date: 2026-01-31
-type: transcript
----
-Content.
-"""
-    result = generate_variants_from_content(content)
-
-    # Should have type but no scope line
-    assert "type: transcript" in result.transcript
-    # Scope line should not exist
-    lines = result.transcript.split('\n')
-    scope_lines = [l for l in lines if l.startswith('scope:')]
-    assert len(scope_lines) == 0
-
-
 # =============================================================================
 # Integration test
 # =============================================================================
@@ -360,7 +329,6 @@ More content.
     # Parse
     config, main_content, backmatter = parse_canonical_file(content)
     assert config.type == "doc"
-    assert config.scope == "reference"
 
     # Route
     path = Path("docs/full-test.md")
@@ -371,7 +339,6 @@ More content.
     # Generate variant
     result = generate_variants_from_content(content)
     assert "type: doc" in result.transcript
-    assert "scope: reference" in result.transcript
     assert "End of Transcript" not in result.transcript
     assert "Full Test Document" in result.transcript
 
@@ -491,12 +458,12 @@ def test_write_if_changed_handles_empty_file():
 def run_all_tests():
     """Run all tests and report results."""
     tests = [
-        # Type/scope parsing
+        # Type parsing
         test_parse_type_from_frontmatter,
         test_parse_type_refdoc,
         test_parse_type_transcript,
         test_parse_type_missing,
-        test_parse_canonical_file_with_type_scope,
+        test_parse_canonical_file_with_type,
         # Export routing
         test_routing_type_doc,
         test_routing_type_refdoc,
@@ -509,7 +476,6 @@ def run_all_tests():
         test_variant_preserves_type_refdoc,
         test_variant_adds_footer_for_transcript,
         test_variant_adds_footer_when_no_type,
-        test_variant_no_scope_when_missing,
         # Integration
         test_full_doc_export_flow,
         test_full_refdoc_export_flow,

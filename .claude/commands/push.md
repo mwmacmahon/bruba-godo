@@ -95,9 +95,9 @@ Exports are defined in `exports.yaml`:
 
 | Export | Include | Exclude | Redaction |
 |--------|---------|---------|-----------|
-| bot | scope: meta, reference, transcripts | sensitivity: sensitive, restricted | names, health |
+| bot | type: prompt, doc, refdoc | sensitivity: sensitive, restricted | names, health |
 
-Content in `reference/` with appropriate tags gets filtered into `agents/{agent}/exports/`.
+Content in `reference/` with appropriate type gets filtered into `agents/{agent}/exports/`.
 
 ## Example
 

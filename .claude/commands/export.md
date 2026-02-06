@@ -49,7 +49,6 @@ exports:
     description: "Prompts for Claude Projects / Claude Code (Gus)"
     output_dir: exports/claude-gus
     include:
-      scope: [meta, reference]
       type: [prompt, doc, refdoc]
       users: [gus]
     redaction: [names, health]
@@ -67,10 +66,12 @@ To supply a transcript to another agent's memory, add that agent to the `agents:
 
 ## Filter Rules
 
-**include.scope** - File must match at least one scope:
-- `transcripts` - All canonical transcript files (always matches)
-- `reference` - Files tagged as reference material
-- `meta` - Meta/documentation files
+**include.type** - File must match at least one type:
+- `prompt` - Assembled prompt files
+- `doc` - Documentation files
+- `refdoc` - Reference documents
+- `transcript` - Conversation transcripts
+- `claude_code_log` - Claude Code work logs
 
 **include.tags** - File must have at least one of these tags
 

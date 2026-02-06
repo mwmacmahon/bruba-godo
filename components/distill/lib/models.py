@@ -247,7 +247,7 @@ class CanonicalConfig:
     source: str = "claude"  # claude | bruba | manual
     tags: List[str] = field(default_factory=list)
     type: str = ""  # doc | refdoc | transcript | prompt
-    scope: str = ""  # reference | meta | transcripts
+    scope: str = ""  # Legacy/informational — not used for filtering (type is sufficient)
     description: str = ""  # One-line summary for inventory display
 
     # === AGENT ROUTING ===

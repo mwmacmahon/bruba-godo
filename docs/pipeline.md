@@ -70,7 +70,6 @@ exports:
     output_dir: agents/{agent}/exports
     remote_path: memory
     include:
-      scope: [meta, reference, transcripts]
       type: [prompt, doc, refdoc]
     exclude:
       sensitivity: [sensitive, restricted]
@@ -100,14 +99,12 @@ exports:
     output_dir: exports/claude
     include:
       type: [prompt, doc, refdoc]
-      scope: [meta, reference, transcripts]
 
   tests:
     description: "Local testing profile"
     output_dir: exports/tests
     include:
       type: [prompt]
-      scope: [meta, reference, transcripts]
 
 defaults:
   redaction: []
@@ -245,7 +242,6 @@ Example frontmatter for a doc:
 ```yaml
 ---
 type: doc
-scope: reference
 title: "My Document"
 ---
 ```
@@ -515,14 +511,14 @@ Files must have YAML frontmatter to be included in exports:
 ---
 title: My Guide
 date: 2026-01-28
-scope: [reference]
+type: refdoc
 ---
 
 # My Guide
 ...
 ```
 
-The `scope` tag determines which export profiles include the file (per `exports.yaml`).
+The `type` tag determines which export profiles include the file (per config.yaml `include.type`).
 
 ### How It Works
 
@@ -691,7 +687,6 @@ Check resolution order:
 
 Check frontmatter matches profile filters:
 - `type` must match `include.type` (e.g., `doc`, `refdoc`, `prompt`)
-- `scope` must match `include.scope` (e.g., `reference`, `meta`, `transcripts`)
 - `sensitivity` must not match `exclude.sensitivity`
 
 ### Export Going to Wrong Directory

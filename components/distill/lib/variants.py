@@ -551,10 +551,6 @@ def _build_transcript_output(
     else:
         lines.append(f'type: {"transcript-lite" if is_lite else "transcript"}')
 
-    # Preserve scope if present
-    if config.scope:
-        lines.append(f'scope: {config.scope}')
-
     if config.description:
         lines.append(f'description: "{config.description}"')
     if config.tags:

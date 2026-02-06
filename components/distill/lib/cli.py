@@ -908,19 +908,6 @@ def _matches_prompt_filters(config: dict, include_rules: dict, exclude_rules: di
         if file_type not in include_type:
             return False
 
-    # Check include.scope
-    include_scope = include_rules.get('scope', [])
-    if include_scope:
-        if isinstance(include_scope, str):
-            include_scope = [include_scope]
-        file_scope = config.get('scope', '')
-        if isinstance(file_scope, str):
-            file_scope = [file_scope]
-        if not any(s in include_scope for s in file_scope):
-            # Also check if 'meta' is in include_scope (prompts are meta by default)
-            if 'meta' not in include_scope:
-                return False
-
     # Check include.users (per-user routing)
     include_users = include_rules.get('users', [])
     if include_users:
@@ -1010,17 +997,6 @@ def _matches_filters(config, include_rules: dict, exclude_rules: dict) -> bool:
             include_type = [include_type]
         file_type = config.type if config.type else ''
         if not file_type or file_type not in include_type:
-            return False
-
-    # Check include.scope
-    include_scope = include_rules.get('scope', [])
-    if include_scope:
-        if isinstance(include_scope, str):
-            include_scope = [include_scope]
-        file_scope = config.scope if config.scope else ''
-        if isinstance(file_scope, str):
-            file_scope = [file_scope] if file_scope else []
-        if not file_scope or not any(s in include_scope for s in file_scope):
             return False
 
     # Check include.tags

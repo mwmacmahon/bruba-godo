@@ -60,7 +60,7 @@ generate_section() {
     fi
 }
 
-# Check if agent's include.scope contains transcripts
+# Check if agent's include.type contains transcript
 agent_has_transcript_scope() {
     local agent="$1"
     python3 -c "
@@ -68,8 +68,8 @@ import yaml
 with open('config.yaml') as f:
     c = yaml.safe_load(f)
 agent = c.get('agents', {}).get('$agent', {})
-scopes = agent.get('include', {}).get('scope', [])
-print('true' if 'transcripts' in scopes else 'false')
+types = agent.get('include', {}).get('type', [])
+print('true' if 'transcript' in types else 'false')
 "
 }
 

@@ -142,7 +142,7 @@ else
     if echo "$EXPORT_OUTPUT" | grep -q "$CANONICAL_FILE"; then
         pass "File processed by export (may have been filtered)"
     else
-        warn "File not in agents/bruba-main/exports/transcripts/ (check scope/type filters)"
+        warn "File not in agents/bruba-main/exports/transcripts/ (check type filters)"
     fi
 fi
 
