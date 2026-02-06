@@ -1,5 +1,5 @@
 ---
-version: 1.10.0
+version: 1.11.0
 updated: 2026-02-05
 type: refdoc
 project: planning
@@ -103,54 +103,57 @@ Complete reference for file locations, ownership, and data flow between operator
 │   └── refdocs/                # Reference documents
 │       └── descriptive-name.md
 │
-├── intake/                      # Pre-canonicalized files awaiting CONFIG
-│   ├── bruba-main/             # Per-agent intake (from /pull)
-│   │   ├── {uuid}.md
-│   │   └── processed/          # Moved here after canonicalization
-│   ├── bruba-rex/              # Per-agent intake
-│   │   ├── {uuid}.md
-│   │   └── processed/
-│   └── {uuid}.md               # Legacy flat intake (treated as bruba-main)
-│
-├── sessions/                    # Raw JSONL from bot
-│   ├── bruba-main/             # Per-agent sessions
-│   │   ├── {uuid}.jsonl
-│   │   └── .pulled             # Tracks pulled sessions for this agent
-│   ├── bruba-rex/
-│   │   ├── {uuid}.jsonl
-│   │   └── .pulled
-│   └── .pulled                 # Legacy (auto-migrated to bruba-main/.pulled)
-│
-├── exports/                     # Filtered content for sync
-│   ├── bot/                    # Per-agent exports (routed via agents: frontmatter)
-│   │   ├── bruba-main/
+├── agents/                      # Per-agent directories
+│   ├── bruba-main/
+│   │   ├── exports/
 │   │   │   ├── core-prompts/
+│   │   │   ├── transcripts/
+│   │   │   └── prompts/
+│   │   ├── intake/
+│   │   │   └── processed/
+│   │   ├── mirror/
+│   │   │   ├── prompts/        # Current bot prompts
+│   │   │   ├── memory/         # Date-prefixed files only
+│   │   │   ├── config/         # openclaw.json, exec-approvals.json
+│   │   │   └── tools/          # Bot scripts
+│   │   └── sessions/
+│   │       ├── {uuid}.jsonl
+│   │       └── .pulled
+│   ├── bruba-rex/
+│   │   ├── exports/
 │   │   │   └── transcripts/
-│   │   └── bruba-rex/
-│   │       └── transcripts/
+│   │   ├── intake/
+│   │   │   └── processed/
+│   │   ├── mirror/
+│   │   │   ├── prompts/
+│   │   │   └── memory/
+│   │   └── sessions/
+│   │       └── .pulled
+│   ├── bruba-guru/
+│   │   ├── exports/
+│   │   │   └── core-prompts/
+│   │   └── mirror/
+│   │       ├── prompts/
+│   │       └── memory/
+│   ├── bruba-manager/
+│   │   ├── exports/
+│   │   │   └── core-prompts/
+│   │   └── mirror/
+│   │       ├── prompts/
+│   │       └── state/
+│   └── bruba-web/
+│       ├── exports/
+│       │   └── core-prompts/
+│       └── mirror/
+│           └── prompts/
+│
+├── exports/                     # Non-agent exports
 │   └── claude/                 # For Claude Projects
 │       ├── transcripts/
 │       ├── refdocs/
 │       ├── docs/
 │       ├── summaries/
 │       └── cc_logs/
-│
-├── mirror/                      # Bot state backup (for conflict detection)
-│   ├── bruba-main/
-│   │   ├── prompts/            # Current bot prompts
-│   │   ├── memory/             # Date-prefixed files only
-│   │   ├── config/             # openclaw.json, exec-approvals.json
-│   │   ├── tools/              # Bot scripts
-│   │   └── state/              # (if applicable)
-│   ├── bruba-rex/
-│   │   ├── prompts/
-│   │   └── memory/
-│   ├── bruba-guru/
-│   │   ├── prompts/
-│   │   └── memory/
-│   └── bruba-manager/
-│       ├── prompts/
-│       └── state/
 │
 ├── cronjobs/                    # Generated cron job definitions (gitignored)
 │   ├── nightly-reset-prep.yaml
@@ -344,13 +347,13 @@ config.yaml (agents.{agent}.{prompt}_sections)
 │    manager-base → templates/prompts/manager/{NAME}.md        │
 │    web-base     → templates/prompts/web/{NAME}.md            │
 │    guru-base    → templates/prompts/guru/{NAME}.md           │
-│    bot:name     → mirror/{agent}/prompts/ (BOT-MANAGED)      │
+│    bot:name     → agents/{agent}/mirror/prompts/ (BOT-MANAGED)│
 │    component    → components/{name}/prompts/{NAME}.snippet.md│
 │    section      → templates/prompts/sections/{name}.md       │
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
-exports/bot/{agent}/core-prompts/{NAME}.md
+agents/{agent}/exports/core-prompts/{NAME}.md
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -374,13 +377,13 @@ Bot Sessions (remote, per agent)
 ┌─────────────────────────────────────────────────────────────┐
 │                  /pull (pull-sessions.sh)                    │
 │  For each agent with content_pipeline: true:                 │
-│  1. SCP closed sessions to sessions/{agent}/*.jsonl          │
-│  2. Convert via distill CLI → intake/{agent}/*.md            │
-│  3. Track in sessions/{agent}/.pulled                        │
+│  1. SCP closed sessions to agents/{agent}/sessions/*.jsonl   │
+│  2. Convert via distill CLI → agents/{agent}/intake/*.md     │
+│  3. Track in agents/{agent}/sessions/.pulled                 │
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
-intake/{agent}/{uuid}.md (delimited markdown, no CONFIG)
+agents/{agent}/intake/{uuid}.md (delimited markdown, no CONFIG)
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -391,7 +394,7 @@ intake/{agent}/{uuid}.md (delimited markdown, no CONFIG)
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
-intake/{agent}/{uuid}.md (with CONFIG block)
+agents/{agent}/intake/{uuid}.md (with CONFIG block)
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -401,7 +404,7 @@ intake/{agent}/{uuid}.md (with CONFIG block)
 │  - Apply transcription corrections                           │
 │  - Pass --agent {agent} for routing                          │
 │  - Rename to {slug}.md                                       │
-│  - Move original to intake/{agent}/processed/                │
+│  - Move original to agents/{agent}/intake/processed/         │
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
@@ -420,7 +423,7 @@ reference/transcripts/{slug}.md (canonical, agents: in frontmatter)
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
-exports/bot/{agent}/transcripts/Transcript - {slug}.md
+agents/{agent}/exports/transcripts/Transcript - {slug}.md
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -454,7 +457,7 @@ Bot Workspace (source of truth for bot-managed files)
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
-mirror/{agent}/
+agents/{agent}/mirror/
   prompts/    - Current bot prompts (for conflict detection)
   memory/     - Bot's memory files (subset)
   config/     - openclaw.json, exec-approvals.json
@@ -554,12 +557,9 @@ When vault mode is enabled (`vault.enabled: true` in config.yaml), gitignored di
 
 ```
 ~/bruba-godo/                        ~/bruba-vault/
-├── sessions/ ──────symlink──────►  ├── sessions/
-├── intake/   ──────symlink──────►  ├── intake/
+├── agents/  ──────symlink──────►  ├── agents/
 ├── reference/ ─────symlink──────►  ├── reference/
 ├── exports/  ──────symlink──────►  ├── exports/
-├── assembled/ ─────symlink──────►  ├── assembled/
-├── mirror/   ──────symlink──────►  ├── mirror/
 ├── logs/     ──────symlink──────►  ├── logs/
 ├── docs/cc_logs/ ──symlink──────►  ├── docs/cc_logs/
 ├── docs/meta/ ─────symlink──────►  ├── docs/meta/
@@ -643,7 +643,7 @@ See `docs/vault-strategy.md` for full documentation.
 | `guru-base` | `guru-base` | `templates/prompts/guru/{NAME}.md` | Full file for guru agent |
 | `component` | `component-name` | `components/{name}/prompts/{NAME}.snippet.md` | Wrapped in `<!-- COMPONENT: name -->` |
 | `section` | `section-name` | `templates/prompts/sections/{name}.md` | Wrapped in `<!-- SECTION: name -->` |
-| `bot-managed` | `bot:section-name` | `mirror/{agent}/prompts/{NAME}.md` | Extracted from `<!-- BOT-MANAGED: name -->` |
+| `bot-managed` | `bot:section-name` | `agents/{agent}/mirror/prompts/{NAME}.md` | Extracted from `<!-- BOT-MANAGED: name -->` |
 
 ### Resolution Priority (in assemble-prompts.sh)
 
@@ -672,7 +672,7 @@ agents_sections:
   - memory              # → components/memory/prompts/AGENTS.snippet.md
   - distill             # → components/distill/prompts/AGENTS.snippet.md
   - safety              # → templates/prompts/sections/safety.md
-  - bot:exec-approvals  # → mirror/bruba-main/prompts/AGENTS.md (BOT-MANAGED)
+  - bot:exec-approvals  # → agents/bruba-main/mirror/prompts/AGENTS.md (BOT-MANAGED)
   - cc-packets          # → components/cc-packets/prompts/AGENTS.snippet.md
   - external-internal   # → templates/prompts/sections/external-internal.md
   - workspace           # → components/workspace/prompts/AGENTS.snippet.md
@@ -877,10 +877,10 @@ Bot memory uses **flat structure with prefix naming**:
 ### Content Pipeline (Per-Agent)
 
 ```bash
-/pull       # Bot JSONL → sessions/{agent}/ → intake/{agent}/
+/pull       # Bot JSONL → agents/{agent}/sessions/ → agents/{agent}/intake/
 /convert    # Add CONFIG blocks + agents: routing (AI-assisted)
 /intake     # Canonicalize with --agent → reference/ (agents: in frontmatter)
-/export     # Route via agents: field → exports/bot/{agent}/
+/export     # Route via agents: field → agents/{agent}/exports/
 /push       # Sync content_pipeline agents to bot memory
 ```
 
@@ -916,9 +916,9 @@ Bot memory uses **flat structure with prefix naming**:
 
 | Issue | Location | Action Needed |
 |-------|----------|---------------|
-| `active-helpers.json` in mirror | mirror/bruba-manager/state/ | Should be `pending-tasks.json` |
+| `active-helpers.json` in mirror | agents/bruba-manager/mirror/state/ | Should be `pending-tasks.json` |
 | `web-search` component | components/web-search/ | Update for v3.2 (bruba-web pattern) |
-| `exports/bot/` empty | exports/bot/ | Verify export pipeline |
+| `agents/*/exports/` empty | agents/*/exports/ | Verify export pipeline |
 
 ### Directory Naming
 
@@ -1214,6 +1214,7 @@ docker exec -it openclaw-sandbox-bruba-main /bin/sh
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.11.0 | 2026-02-05 | **Directory reorganization:** Moved per-agent directories (`sessions/`, `intake/`, `exports/bot/`, `mirror/`) under `agents/{agent}/`. Each agent now has its own `exports/`, `intake/`, `mirror/`, and `sessions/` subdirectories. Updated all pipeline diagrams, vault symlinks, quick reference, and section type references. |
 | 1.10.0 | 2026-02-05 | **Vault mode:** Added vault symlink documentation to directory tree (vault tools, vault-strategy.md), new "Vault Mode" section in Part 4 (Data Flow Pipelines) showing symlink layout and management commands. |
 | 1.9.0 | 2026-02-05 | **Phase 3-4 updates:** Removed signal-media-filter component, added cross-comms and local-voice components, updated cronjobs to generated model (templates/cronjobs/ + generate-cronjobs.sh), replaced REDACTED artifacts with config variable references. |
 | 1.8.0 | 2026-02-05 | **Per-agent content pipeline:** Sessions, intake, and exports now use per-agent subdirs (`sessions/{agent}/`, `intake/{agent}/`, `exports/bot/{agent}/`). Pipeline 2 diagram updated to show per-agent routing via `agents:` frontmatter field. Updated quick reference. |

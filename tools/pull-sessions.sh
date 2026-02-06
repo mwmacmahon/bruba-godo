@@ -87,13 +87,6 @@ fi
 log "=== Pulling Bot Sessions ==="
 log "Content pipeline agents: ${CP_AGENTS[*]}"
 
-# Backward compat migration: move flat sessions/.pulled to sessions/bruba-main/.pulled
-if [[ -f "$SESSIONS_DIR/.pulled" && ! -f "$SESSIONS_DIR/bruba-main/.pulled" ]]; then
-    log "Migrating sessions/.pulled -> sessions/bruba-main/.pulled"
-    mkdir -p "$SESSIONS_DIR/bruba-main"
-    cp "$SESSIONS_DIR/.pulled" "$SESSIONS_DIR/bruba-main/.pulled"
-fi
-
 # Grand totals
 GRAND_PULLED=0
 GRAND_SKIPPED=0
@@ -102,9 +95,7 @@ GRAND_CONVERTED=0
 for agent in "${CP_AGENTS[@]}"; do
     load_agent_config "$agent"
 
-    # Per-agent paths
-    AGENT_SESSIONS_DIR="$SESSIONS_DIR/$agent"
-    AGENT_INTAKE_DIR="$INTAKE_DIR/$agent"
+    # Per-agent paths (from lib.sh load_agent_config)
     AGENT_STATE_FILE="$AGENT_SESSIONS_DIR/.pulled"
 
     mkdir -p "$AGENT_SESSIONS_DIR" "$AGENT_INTAKE_DIR"

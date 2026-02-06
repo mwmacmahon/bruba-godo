@@ -3,7 +3,7 @@
 #
 # Tests the full content flow:
 # 1. intake/ (file with CONFIG) → canonicalize → reference/transcripts/
-# 2. reference/ → export → exports/bot/
+# 2. reference/ → export → agents/bruba-main/exports/
 #
 # Run from repo root: ./tests/test-e2e-pipeline.sh
 
@@ -52,13 +52,13 @@ cleanup() {
     rm -f "intake/$TEST_FILE" 2>/dev/null && echo "  Removed intake/$TEST_FILE" || true
     rm -f "intake/processed/$TEST_FILE" 2>/dev/null && echo "  Removed intake/processed/$TEST_FILE" || true
     rm -f "reference/transcripts/$CANONICAL_FILE" 2>/dev/null && echo "  Removed reference/transcripts/$CANONICAL_FILE" || true
-    # Don't remove exports/bot files - they may have other content
+    # Don't remove agents/bruba-main/exports files - they may have other content
     # The export test verifies existence, that's sufficient
 }
 trap cleanup EXIT
 
 # Ensure directories exist
-mkdir -p intake reference/transcripts exports/bot
+mkdir -p intake reference/transcripts agents/bruba-main/exports
 
 # --- Test 1: Setup ---
 echo "--- Test 1: Setup ---"
@@ -123,7 +123,7 @@ echo ""
 echo "--- Test 3: Export ---"
 
 # Run export
-EXPORT_OUTPUT=$(python3 -m components.distill.lib.cli export --profile bot 2>&1) || true
+EXPORT_OUTPUT=$(python3 -m components.distill.lib.cli export --profile agent:bruba-main 2>&1) || true
 
 if echo "$EXPORT_OUTPUT" | grep -q "Export complete"; then
     pass "Export CLI completed"
@@ -133,8 +133,8 @@ else
 fi
 
 # Check if our file was exported (now goes to transcripts/ subdirectory with prefix)
-# Note: scope: meta should be included in bot profile
-EXPORT_FILE="exports/bot/transcripts/Transcript - ${CANONICAL_FILE}"
+# Note: scope: meta should be included in agent profile
+EXPORT_FILE="agents/bruba-main/exports/transcripts/Transcript - ${CANONICAL_FILE}"
 if [[ -f "$EXPORT_FILE" ]]; then
     pass "File exported to $EXPORT_FILE"
 else
@@ -142,7 +142,7 @@ else
     if echo "$EXPORT_OUTPUT" | grep -q "$CANONICAL_FILE"; then
         pass "File processed by export (may have been filtered)"
     else
-        warn "File not in exports/bot/transcripts/ (check scope/type filters)"
+        warn "File not in agents/bruba-main/exports/transcripts/ (check scope/type filters)"
     fi
 fi
 

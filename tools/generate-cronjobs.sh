@@ -53,6 +53,11 @@ while IFS= read -r agent; do
     [[ -n "$agent" ]] && WAKE_AGENTS+=("$agent")
 done < <(get_wake_agents)
 
+EXPORT_AGENTS=()
+while IFS= read -r agent; do
+    [[ -n "$agent" ]] && EXPORT_AGENTS+=("$agent")
+done < <(get_export_agents)
+
 if [[ ${#RESET_AGENTS[@]} -eq 0 ]]; then
     echo "WARNING: No agents with reset_cycle: true" >&2
 fi
@@ -62,6 +67,7 @@ fi
 
 [[ "$VERBOSE" == "true" ]] && echo "Reset agents: ${RESET_AGENTS[*]}"
 [[ "$VERBOSE" == "true" ]] && echo "Wake agents: ${WAKE_AGENTS[*]}"
+[[ "$VERBOSE" == "true" ]] && echo "Export agents: ${EXPORT_AGENTS[*]}"
 
 # Get continuation type per agent (standard or technical)
 get_continuation_type() {
@@ -95,6 +101,9 @@ STANDARD_PREP_MSG='Session reset in 7 minutes. Write a continuation packet to me
 # Prep message for technical agents (guru)
 TECHNICAL_PREP_MSG='Session reset in 7 minutes. Write a continuation packet to memory/CONTINUATION.md. Include: Technical Session Summary (topics worked on), In Progress (debugging/analysis status), Open Questions (unresolved technical issues), Handoff Notes (context for next session). Write actual content, not placeholders. Create the file now.'
 
+# Export message for agents with export_cycle
+EXPORT_MSG='Nightly export. Search memory for "Prompt - Export.md" and follow its instructions. Use these defaults: source=bruba, tags=[nightly-export]. Mark debugging tangents and large code/log blocks for sections_remove. Write the exported conversation with CONFIG block and backmatter to intake/YYYY-MM-DD-nightly-export.md. Use your best judgment for all fields — no user input is available.'
+
 # Generate a cronjob file from template
 # Args: template_name
 generate_from_template() {
@@ -114,6 +123,15 @@ generate_from_template() {
     local agent_messages=""
 
     case "$template_name" in
+        nightly-export.yaml)
+            local n=1
+            for agent in "${EXPORT_AGENTS[@]}"; do
+                agent_messages+="  $n. sessions_send to agent:${agent}:main: \"$EXPORT_MSG\""
+                agent_messages+=$'\n\n'
+                n=$((n + 1))
+            done
+            ;;
+
         nightly-reset-prep.yaml)
             local n=1
             for agent in "${RESET_AGENTS[@]}"; do
@@ -193,7 +211,7 @@ print(content.replace('{{AGENT_MESSAGES}}', messages), end='')
 
 # Generate all templated cronjobs
 GENERATED=0
-for template in nightly-reset-prep.yaml nightly-reset-execute.yaml nightly-reset-wake.yaml morning-briefing.yaml; do
+for template in nightly-export.yaml nightly-reset-prep.yaml nightly-reset-execute.yaml nightly-reset-wake.yaml morning-briefing.yaml; do
     generate_from_template "$template"
     GENERATED=$((GENERATED + 1))
 done

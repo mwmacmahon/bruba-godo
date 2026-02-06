@@ -1,0 +1,17 @@
+name: nightly-manager-wake
+description: bruba-main wakes bruba-manager after reset
+status: active
+
+schedule:
+  cron: "22 4 * * *"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-main
+
+message: |
+  Use sessions_send to agent:bruba-manager:main: "Good morning. Session initialized. Check memory/CONTINUATION.md for context from previous session."
+
+  Reply NO_REPLY when done.

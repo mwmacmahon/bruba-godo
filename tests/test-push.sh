@@ -140,23 +140,23 @@ with open('$TEMP_DIR/config.yaml') as f:
 }
 
 # ============================================================
-# Test: File counting in exports/bot/
+# Test: File counting in agents/*/exports/
 # ============================================================
 test_file_counting() {
     echo ""
-    echo "=== Test: File counting in exports/bot/ ==="
+    echo "=== Test: File counting in agents/*/exports/ ==="
     setup
 
-    mkdir -p "$TEMP_DIR/exports/bot/transcripts"
-    mkdir -p "$TEMP_DIR/exports/bot/prompts"
+    mkdir -p "$TEMP_DIR/agents/test-agent/exports/transcripts"
+    mkdir -p "$TEMP_DIR/agents/test-agent/exports/prompts"
 
     # Create some test files
-    echo "content" > "$TEMP_DIR/exports/bot/transcripts/file1.md"
-    echo "content" > "$TEMP_DIR/exports/bot/transcripts/file2.md"
-    echo "content" > "$TEMP_DIR/exports/bot/prompts/file3.md"
+    echo "content" > "$TEMP_DIR/agents/test-agent/exports/transcripts/file1.md"
+    echo "content" > "$TEMP_DIR/agents/test-agent/exports/transcripts/file2.md"
+    echo "content" > "$TEMP_DIR/agents/test-agent/exports/prompts/file3.md"
 
     local count
-    count=$(find "$TEMP_DIR/exports/bot" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+    count=$(find "$TEMP_DIR/agents/test-agent/exports" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
 
     if [[ "$count" -eq 3 ]]; then
         pass "File count is correct (3 files)"
@@ -175,10 +175,10 @@ test_zero_files() {
     echo "=== Test: Zero file case ==="
     setup
 
-    mkdir -p "$TEMP_DIR/exports/bot"
+    mkdir -p "$TEMP_DIR/agents/test-agent/exports"
 
     local count
-    count=$(find "$TEMP_DIR/exports/bot" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+    count=$(find "$TEMP_DIR/agents/test-agent/exports" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
 
     if [[ "$count" -eq 0 ]]; then
         pass "Zero files detected correctly"
@@ -227,12 +227,12 @@ test_core_prompts_detection() {
     echo "=== Test: Core-prompts directory detection ==="
     setup
 
-    mkdir -p "$TEMP_DIR/exports/bot/core-prompts"
-    echo "AGENTS content" > "$TEMP_DIR/exports/bot/core-prompts/AGENTS.md"
+    mkdir -p "$TEMP_DIR/agents/test-agent/exports/core-prompts"
+    echo "AGENTS content" > "$TEMP_DIR/agents/test-agent/exports/core-prompts/AGENTS.md"
 
-    if [[ -d "$TEMP_DIR/exports/bot/core-prompts" ]]; then
+    if [[ -d "$TEMP_DIR/agents/test-agent/exports/core-prompts" ]]; then
         local count
-        count=$(find "$TEMP_DIR/exports/bot/core-prompts" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+        count=$(find "$TEMP_DIR/agents/test-agent/exports/core-prompts" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
         if [[ "$count" -gt 0 ]]; then
             pass "Core-prompts directory detected with files"
         else
@@ -253,13 +253,13 @@ test_root_level_files() {
     echo "=== Test: Root-level files detection ==="
     setup
 
-    mkdir -p "$TEMP_DIR/exports/bot"
-    echo "root content" > "$TEMP_DIR/exports/bot/RootFile.md"
-    mkdir -p "$TEMP_DIR/exports/bot/subdir"
-    echo "subdir content" > "$TEMP_DIR/exports/bot/subdir/nested.md"
+    mkdir -p "$TEMP_DIR/agents/test-agent/exports"
+    echo "root content" > "$TEMP_DIR/agents/test-agent/exports/RootFile.md"
+    mkdir -p "$TEMP_DIR/agents/test-agent/exports/subdir"
+    echo "subdir content" > "$TEMP_DIR/agents/test-agent/exports/subdir/nested.md"
 
     local root_count
-    root_count=$(find "$TEMP_DIR/exports/bot" -maxdepth 1 -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+    root_count=$(find "$TEMP_DIR/agents/test-agent/exports" -maxdepth 1 -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
 
     if [[ "$root_count" -eq 1 ]]; then
         pass "Root-level file count correct (excludes subdirs)"

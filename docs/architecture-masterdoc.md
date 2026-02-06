@@ -30,7 +30,7 @@ Bruba uses a **five-agent architecture** with four peer agents and one service a
 
 **Proactive monitoring pattern:** Isolated cron jobs (cheap, stateless) detect conditions and write to inbox files. Manager's heartbeat (cheap, stateful) reads inbox, applies rules, delivers alerts. This separation keeps heartbeat fast while enabling rich monitoring.
 
-**Prompt budget constraint:** OpenClaw injects AGENTS.md into context at session start. **Hard limit: 20,000 characters.** Despite the multi-agent architecture, component snippets, and detailed guidance, the assembled prompt must stay under this limit or it gets truncated. This means every component snippet needs to be concise — verbose examples and duplicated explanations bloat the prompt and risk losing critical instructions. When adding new components or updating existing ones, always check the assembled size: `wc -c exports/bot/bruba-main/core-prompts/AGENTS.md`.
+**Prompt budget constraint:** OpenClaw injects AGENTS.md into context at session start. **Hard limit: 20,000 characters.** Despite the multi-agent architecture, component snippets, and detailed guidance, the assembled prompt must stay under this limit or it gets truncated. This means every component snippet needs to be concise — verbose examples and duplicated explanations bloat the prompt and risk losing critical instructions. When adding new components or updating existing ones, always check the assembled size: `wc -c agents/bruba-main/exports/core-prompts/AGENTS.md`.
 
 ---
 
@@ -1879,7 +1879,7 @@ This binary blob causes massive token inflation (~50K+ tokens for a short voice 
 | Tool restriction cleanup | ✅ | Main/Manager deny web tools, use bruba-web |
 | bruba-web Docker sandbox | ✅ | Enabled with bridge network (2026-02-04) |
 | web-search component | ✅ | Prompts for Main to use bruba-web |
-| Per-agent content pipeline | ✅ | Sessions/intake/export per agent via `content_pipeline` flag and `agents:` frontmatter routing |
+| Per-agent content pipeline | ✅ | Sessions/intake/export per agent via `content_pipeline` flag and `agents:` frontmatter routing. Per-agent dirs under `agents/{agent}/`. |
 
 ### In Progress
 
@@ -1907,11 +1907,11 @@ Prompts (AGENTS.md, TOOLS.md, etc.) are assembled from config-driven section lis
 templates/prompts/         → Base prompts (committed)
 components/*/prompts/      → Component snippets (committed)
 user/prompts/              → User customizations (gitignored)
-mirror/*/prompts/          → Bot state (gitignored)
+agents/*/mirror/prompts/   → Bot state (gitignored)
         ↓
    assemble-prompts.sh
         ↓
-exports/bot/*/core-prompts/ → Assembled output
+agents/*/exports/core-prompts/ → Assembled output
         ↓
       push.sh
         ↓
@@ -2034,17 +2034,15 @@ The system uses two git repositories:
 | Repo | Purpose | Visibility |
 |------|---------|------------|
 | **bruba-godo** | Tools, templates, components, docs | Public (GitHub) |
-| **bruba-vault** | Sessions, intake, reference, exports, config | Private (local-only) |
+| **bruba-vault** | Agents (sessions, intake, exports, mirror), reference, config | Private (local-only) |
 
 With **vault mode** enabled, gitignored directories in godo become symlinks into the vault. All tools follow symlinks transparently — no code changes required.
 
 ### How It Works
 
 ```
-bruba-godo/sessions/   →  bruba-vault/sessions/
-bruba-godo/intake/     →  bruba-vault/intake/
+bruba-godo/agents/     →  bruba-vault/agents/
 bruba-godo/reference/  →  bruba-vault/reference/
-bruba-godo/exports/    →  bruba-vault/exports/
 bruba-godo/config.yaml →  bruba-vault/config.yaml
 ...
 ```
@@ -2161,7 +2159,7 @@ See `docs/vault-strategy.md` for full documentation.
 | Version | Date | Changes |
 |---------|------|---------|
 | 3.13.0 | 2026-02-05 | **Vault mode (symlinks):** Replaced rsync + private branch vault model with symlink-based integration. Gitignored dirs become symlinks into a separate vault repo. New `vault-setup.sh` (enable/disable/status), rewritten `vault-sync.sh` (simple commit) and `vault-propose.sh` (direct vault→PR, no private branch). Added `load_vault_config()` to lib.sh, `vault:` config section, `docs/vault-strategy.md`. |
-| 3.12.0 | 2026-02-05 | **Per-agent content pipeline:** Content pipeline (`/pull` → `/convert` → `/intake` → `/export` → `/push`) now handles per-agent intake and export. Agents opt in with `content_pipeline: true` in config.yaml. Files carry `agents:` frontmatter field for routing to specific agent memories. Per-agent dirs: `sessions/{agent}/`, `intake/{agent}/`, `exports/bot/{agent}/`. Backward compatible — files without `agents:` default to bruba-main. |
+| 3.12.0 | 2026-02-05 | **Per-agent content pipeline:** Content pipeline (`/pull` → `/convert` → `/intake` → `/export` → `/push`) now handles per-agent intake and export. Agents opt in with `content_pipeline: true` in config.yaml. Files carry `agents:` frontmatter field for routing to specific agent memories. Per-agent dirs under `agents/{agent}/` (sessions, intake, exports, mirror, assembled). Backward compatible — files without `agents:` default to bruba-main. |
 | 3.11.0 | 2026-02-04 | **bruba-rex agent:** Added new alternate identity agent bound to different phone number. Same capabilities as Main, independent identity. Added bindings section to config.yaml for declarative routing management. Updated agent count to five-agent architecture. |
 | 3.10.0 | 2026-02-04 | **Component variant support:** Added `component:variant` syntax for components that need different prompts per agent. Merged `http-api` and `siri-async` components into `siri-async` with `:router` (Manager) and `:handler` (Main) variants. Added Part 13 documenting prompt assembly and component organization. |
 | 3.9.0 | 2026-02-04 | **Docker sandbox enabled for bruba-web:** Cross-agent session visibility bug fixed in OpenClaw 2026.2.1. bruba-web now runs in Docker container (`sandbox.mode: "all"`, `network: "bridge"`). Added `web-search` component to bruba-main prompts (instructions for using bruba-web via `sessions_send`). Added `~/bin/bruba-start` script and LaunchAgent for container auto-warm. |

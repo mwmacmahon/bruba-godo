@@ -494,7 +494,7 @@ ssh bruba "openclaw memory index"
 
 **Cause:** All sessions already pulled
 
-**Check:** `sessions/.pulled` contains the session IDs
+**Check:** `agents/{agent}/sessions/.pulled` contains the session IDs
 
 **Note:** Closed sessions are immutable — only need to pull once
 
@@ -509,7 +509,7 @@ ssh bruba "ls ~/clawd/"
 
 ### Mirror Gets PKM Content (Circular Sync)
 
-**Symptom:** `mirror/` contains files from exports
+**Symptom:** `agents/*/mirror/` contains files from exports
 
 **Cause:** Mirror script pulling non-dated files from memory/
 

@@ -29,27 +29,17 @@ remote:
   agent_id: <your-agent-id>
 
 local:
-  mirror: mirror
-  sessions: sessions
+  agents: agents
   logs: logs
-  intake: intake
   reference: reference
-  exports: exports
 
 # Copy repo code to bot workspace during push
 clone_repo_code: false
 
 # Export definitions (profiles for content filtering/syncing)
-exports:
-  bot:
-    description: "Content synced to bot memory"
-    output_dir: exports/bot
-    remote_path: memory
-    include:
-      scope: [meta, reference, transcripts]
-    exclude:
-      sensitivity: [sensitive, restricted]
-    redaction: [names, health]
+agents:
+  bruba-main:
+    workspace: /Users/bruba/agents/bruba-main
     agents_sections:
       - header
       - http-api
@@ -125,7 +115,7 @@ For pipes/jq, run jq locally on the output:
 | `/wake` | Wake all agents |
 | `/morning-check` | Verify post-reset wake |
 | `/mirror` | Pull bot files locally |
-| `/pull` | Pull closed sessions + convert to intake/ |
+| `/pull` | Pull closed sessions + convert to agents/{agent}/intake/ |
 | `/push` | Push content to bot memory |
 | `/sync` | Full pipeline sync (prompts + config + content + vault commit) |
 | `/prompt-sync` | Assemble prompts + push (with conflict detection) |
@@ -154,8 +144,9 @@ All prompt files (AGENTS.md, TOOLS.md, MEMORY.md, etc.) are assembled from **con
 
 **Example config (in config.yaml):**
 ```yaml
-exports:
-  bot:
+agents:
+  bruba-main:
+    workspace: /Users/bruba/agents/bruba-main
     agents_sections:
       - header              # template section
       - http-api            # component
@@ -194,7 +185,7 @@ See `templates/prompts/README.md` for full documentation, or use `/prompts` for 
 
 ## State Files
 
-- `sessions/.pulled` — List of session IDs already pulled
+- `agents/{agent}/sessions/.pulled` — List of session IDs already pulled
 - `logs/mirror.log` — Mirror script log
 - `logs/pull.log` — Pull script log
 - `logs/push.log` — Push script log
@@ -233,25 +224,25 @@ Each component can contribute:
 Full pipeline for processing conversations to bot memory:
 
 ```
-/pull                    # Pull JSONL sessions, convert to intake/*.md
+/pull                    # Pull JSONL sessions, convert to agents/{agent}/intake/*.md
   ↓
 /convert <file>          # AI-assisted: add CONFIG block + summary
   ↓
 /intake                  # Canonicalize → reference/transcripts/
   ↓
-/export                  # Filter + redact → exports/bot/
+/export                  # Filter + redact → agents/{agent}/exports/
   ↓
 /push                    # Sync exports to bot memory
 ```
 
 **Quick reference:**
-- `intake/` — Delimited markdown awaiting CONFIG
-- `intake/processed/` — Originals after canonicalization
+- `agents/{agent}/intake/` — Delimited markdown awaiting CONFIG
+- `agents/{agent}/intake/processed/` — Originals after canonicalization
 - `reference/transcripts/` — Canonical conversation files
 - `reference/refdocs/` — Reference documents (synced to bot memory)
-- `exports/bot/core-prompts/` — AGENTS.md (syncs to ~/agents/bruba-main/)
-- `exports/bot/prompts/` — Prompt files (syncs to ~/agents/bruba-main/memory/prompts/)
-- `exports/bot/transcripts/` — Transcripts (syncs to ~/agents/bruba-main/memory/transcripts/)
+- `agents/{agent}/exports/core-prompts/` — AGENTS.md (syncs to ~/agents/{agent}/)
+- `agents/{agent}/exports/prompts/` — Prompt files (syncs to ~/agents/{agent}/memory/prompts/)
+- `agents/{agent}/exports/transcripts/` — Transcripts (syncs to ~/agents/{agent}/memory/transcripts/)
 
 **Note:** `/export` scans all of `reference/` recursively. Files need YAML frontmatter with `scope` tags to be included.
 
@@ -259,7 +250,7 @@ Export profiles in `config.yaml` control filtering and redaction per destination
 
 ## Git Policy
 
-Mirror, sessions, logs, intake, reference, exports, and user are gitignored. Only commit tool/skill/component changes after review.
+Per-agent directories (agents/*/exports/, agents/*/mirror/, agents/*/sessions/, agents/*/intake/), logs, and reference are gitignored. Only commit tool/skill/component changes after review.
 
 ## Output Conventions
 

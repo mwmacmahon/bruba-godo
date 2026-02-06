@@ -161,18 +161,18 @@ Tests for `tools/helpers/convert-doc.py`, an isolated LLM document conversion sc
 - **Prompt file existence** - Export.md, Transcription.md (Export-Claude.md merged)
 - **config.yaml exports profiles** - bot, claude, tests profiles defined
 - **Unified prompts** - Single Export.md with conditional file access behavior
-- **Subdirectory structure** - Prompts go to exports/{profile}/prompts/
+- **Subdirectory structure** - Prompts go to agents/{agent}/exports/prompts/
 - **Frontmatter preservation** - YAML frontmatter retained in exports
 - **AGENTS.snippet.md exclusion** - Snippet files not exported as prompts
 - **Silent transcript mode** - Voice snippet has 6-step flow, Transcription.md has decision tree
-- **Export pipeline notes** - Distill snippet references source/output locations
+- **PKM content reference** - Distill snippet references PKM resources and prompts
 
 #### What's Tested in `test-e2e-pipeline.sh`
 
 - **Fixture setup** - Copy test file to intake/
 - **Canonicalization** - CLI processes to reference/transcripts/
 - **File movement** - Original moved to intake/processed/
-- **Export generation** - CLI exports to exports/bot/transcripts/ with prefix
+- **Export generation** - CLI exports to agents/bruba-main/exports/transcripts/ with prefix
 - **Content preservation** - Frontmatter, messages, backmatter intact
 
 #### What's Tested in `test-component-tools.sh`
@@ -229,7 +229,7 @@ Tests for `tools/push.sh` core logic:
 
 - **Config parsing** - exports.bot.remote_path extraction
 - **Default values** - Fallback to 'memory' for missing remote_path
-- **File counting** - Recursive .md file count in exports/bot/
+- **File counting** - Recursive .md file count in agents/{agent}/exports/
 - **Zero file case** - Handles empty exports directory
 - **Subdirectory list** - All expected subdirs in iteration
 - **Core-prompts routing** - Separate destination for core-prompts/
@@ -238,7 +238,7 @@ Tests for `tools/push.sh` core logic:
 - **Argument flags** - --no-index, --tools-only, --update-allowlist present
 - **Tools-only mode** - Early exit pattern
 - **Clone repo code** - Conditional check exists
-- **Subdirectory routing** - transcripts → memory/transcripts/, docs → memory/docs/
+- **Subdirectory routing** - transcripts → agents/{agent}/exports/transcripts/, docs → agents/{agent}/exports/docs/
 - **mkdir before rsync** - Target directory creation
 
 #### What's Tested in `test-sync-cronjobs.sh`
@@ -492,10 +492,10 @@ python3 tests/run_tests.py -v && \
   ./tests/test-efficiency.sh --quick
 
 # Verify profile targeting
-python3 -m components.distill.lib.cli export --profile bot --verbose
+python3 -m components.distill.lib.cli export --profile agent:bruba-main --verbose
 python3 -m components.distill.lib.cli export --profile claude --verbose
 
 # Check specific exports
-ls exports/bot/
+ls agents/bruba-main/exports/
 ls exports/claude/
 ```

@@ -85,7 +85,7 @@ Audit date: 2026-02-03
 #### detect-conflicts.sh
 | Question | Answer |
 |----------|--------|
-| SSH connections opened? | **0** — pure local (reads mirror/) |
+| SSH connections opened? | **0** — pure local (reads agents/*/mirror/) |
 | Transfers unchanged files? | **N/A** |
 | Checksum skipping possible? | **N/A** |
 | Parallelization possible? | **N/A** |
@@ -120,7 +120,7 @@ Audit date: 2026-02-03
 
 **`/pull`** — Clean but incomplete:
 - Runs pull-sessions.sh only
-- Creates intake/*.md files requiring /convert next
+- Creates agents/*/intake/*.md files requiring /convert next
 - Two-step workflow friction
 
 **`/convert`** — AI-assisted but fragile:
@@ -350,10 +350,10 @@ cat cronjobs/reminder-check.yaml | grep -v '^#' | md5sum | cut -d' ' -f1
 # sync/manifest.yaml
 last_sync: 2026-02-03T10:30:00Z
 files:
-  exports/bot/transcripts/2026-01-15-morning-chat.md:
+  agents/bruba-main/exports/transcripts/2026-01-15-morning-chat.md:
     hash: abc123
     synced_to: memory/transcripts/
-  exports/bot/prompts/coding-guidelines.md:
+  agents/bruba-main/exports/prompts/coding-guidelines.md:
     hash: def456
     synced_to: memory/prompts/
 ```

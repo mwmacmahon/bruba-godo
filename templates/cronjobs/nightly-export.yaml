@@ -1,0 +1,18 @@
+name: nightly-export
+description: Manager tells agents to export their sessions
+status: active
+
+schedule:
+  cron: "50 3 * * *"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-manager
+
+message: |
+  Nightly export. Use sessions_send to tell agents to run their export prompt:
+
+{{AGENT_MESSAGES}}
+  Reply NO_REPLY when done.

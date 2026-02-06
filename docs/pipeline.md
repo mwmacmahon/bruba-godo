@@ -21,13 +21,13 @@ bruba-godo manages content flow between your operator machine and the bot. Two m
 │                                                                     │
 │   components/*/prompts/AGENTS.snippet.md                           │
 │   templates/prompts/sections/*.md          ───► assemble ───► push │
-│   mirror/prompts/AGENTS.md (bot sections)                          │
+│   agents/*/mirror/prompts/AGENTS.md (bot sections)                 │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
 │ CONTENT PIPELINE (conversations → bot memory)                       │
 │                                                                     │
-│   sessions/*.jsonl → intake/*.md → reference/ → exports/ → push    │
+│   agents/*/sessions/*.jsonl → agents/*/intake/*.md → reference/ → agents/*/exports/ → push │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -52,13 +52,9 @@ remote:
   agent_id: bruba-main
 
 local:
-  mirror: mirror                 # Local mirror of bot files
-  sessions: sessions             # Raw JSONL session files
+  agents: agents                 # Per-agent dirs (sessions, intake, exports, mirror, assembled)
   logs: logs                     # Script logs
-  intake: intake                 # Delimited markdown awaiting CONFIG
   reference: reference           # Canonical processed content
-  exports: exports               # Filtered output for sync
-  assembled: assembled           # Assembled prompts
 ```
 
 ### exports.yaml (Export Profiles)
@@ -71,7 +67,7 @@ version: 1
 exports:
   bot:
     description: "Content synced to bot memory"
-    output_dir: exports/bot
+    output_dir: agents/{agent}/exports
     remote_path: memory
     include:
       scope: [meta, reference, transcripts]
@@ -134,9 +130,9 @@ defaults:
 
 | Skill | Command | Purpose |
 |-------|---------|---------|
-| `/mirror` | `./tools/mirror.sh` | Pull bot files to local mirror/ |
-| `/pull` | `./tools/pull-sessions.sh` | Pull closed sessions → intake/ |
-| `/push` | `./tools/push.sh` | Sync exports/bot/ → bot memory/ |
+| `/mirror` | `./tools/mirror.sh` | Pull bot files to local agents/*/mirror/ |
+| `/pull` | `./tools/pull-sessions.sh` | Pull closed sessions → agents/*/intake/ |
+| `/push` | `./tools/push.sh` | Sync agents/*/exports/ → bot memory/ |
 
 ### Content Processing
 
@@ -180,9 +176,9 @@ defaults:
 ```
 
 1. Lists closed sessions on bot
-2. Downloads JSONL to `sessions/`
-3. Converts to delimited markdown in `intake/`
-4. Records pulled sessions in `sessions/.pulled`
+2. Downloads JSONL to `agents/{agent}/sessions/`
+3. Converts to delimited markdown in `agents/{agent}/intake/`
+4. Records pulled sessions in `agents/{agent}/sessions/.pulled`
 
 ### Stage 2: Add CONFIG Block
 
@@ -196,7 +192,7 @@ AI-assisted analysis of intake file to add frontmatter + backmatter CONFIG block
 
 ```bash
 # The script (used internally by /convert)
-python3 tools/helpers/convert-doc.py intake/file.md "Analyze for CONFIG" --model opus
+python3 tools/helpers/convert-doc.py agents/{agent}/intake/file.md "Analyze for CONFIG" --model opus
 ```
 
 **`/convert` does TWO things:**
@@ -240,10 +236,10 @@ sensitivity:
 
 | type | Output directory | Prefix |
 |------|-----------------|--------|
-| `doc` | `exports/bot/docs/` | `Doc - ` |
-| `refdoc` | `exports/bot/refdocs/` | `Refdoc - ` |
-| `transcript` | `exports/bot/transcripts/` | `Transcript - ` |
-| `prompt` | `exports/bot/prompts/` | `Prompt - ` |
+| `doc` | `agents/{agent}/exports/docs/` | `Doc - ` |
+| `refdoc` | `agents/{agent}/exports/refdocs/` | `Refdoc - ` |
+| `transcript` | `agents/{agent}/exports/transcripts/` | `Transcript - ` |
+| `prompt` | `agents/{agent}/exports/prompts/` | `Prompt - ` |
 
 Example frontmatter for a doc:
 ```yaml
@@ -274,10 +270,10 @@ tags: [export-pipeline, testing]
 **`/intake` is NOT AI-powered.** It does deterministic processing:
 
 ```bash
-python -m components.distill.lib.cli canonicalize intake/*.md \
+python -m components.distill.lib.cli canonicalize agents/{agent}/intake/*.md \
     -o reference/transcripts/ \
     -c components/distill/config/corrections.yaml \
-    --move intake/processed
+    --move agents/{agent}/intake/processed
 ```
 
 Processes files with CONFIG blocks:
@@ -285,7 +281,7 @@ Processes files with CONFIG blocks:
 2. Applies transcription corrections from `corrections.yaml`
 3. Strips Signal/Telegram wrappers (`[Signal Michael id:...]`)
 4. **Content stays intact** — sections_remove, sensitivity are just in frontmatter
-5. Moves processed files to `intake/processed/` (via `--move` flag)
+5. Moves processed files to `agents/{agent}/intake/processed/` (via `--move` flag)
 
 **Output in reference/transcripts/:**
 ```yaml
@@ -324,7 +320,7 @@ Generates filtered exports per profile:
 /push
 ```
 
-Syncs `exports/bot/` subdirectories to appropriate remote locations:
+Syncs `agents/{agent}/exports/` subdirectories to appropriate remote locations:
 - `core-prompts/` → `~/clawd/` (workspace root)
 - `prompts/` → `~/clawd/memory/prompts/`
 - `transcripts/` → `~/clawd/memory/transcripts/`
@@ -421,23 +417,23 @@ bruba-godo/
 │   ├── prompts/
 │   └── exports.yaml
 │
-├── mirror/                  # GITIGNORED - Local copy of bot files
-│   └── prompts/AGENTS.md
+├── agents/                  # GITIGNORED - Per-agent working directories
+│   └── {agent}/
+│       ├── mirror/          # Local copy of bot files
+│       │   └── prompts/AGENTS.md
+│       ├── sessions/        # Raw JSONL from bot
+│       ├── intake/          # Awaiting CONFIG
+│       ├── assembled/       # Assembled prompts
+│       └── exports/         # Filtered output
+│           ├── core-prompts/    # AGENTS.md → syncs to bot workspace
+│           ├── prompts/         # Prompt - *.md → bot memory/prompts/
+│           ├── transcripts/     # Transcript - *.md → bot memory/transcripts/
+│           ├── refdocs/         # Refdoc - *.md → bot memory/refdocs/
+│           └── docs/            # Doc - *.md → bot memory/docs/
 │
-├── sessions/                # GITIGNORED - Raw JSONL from bot
-├── intake/                  # GITIGNORED - Awaiting CONFIG
 ├── reference/               # GITIGNORED - Canonical content
 │   ├── transcripts/
 │   └── refdocs/
-├── exports/                 # GITIGNORED - Filtered output
-│   ├── bot/
-│   │   ├── core-prompts/    # AGENTS.md → syncs to ~/clawd/
-│   │   ├── prompts/         # Prompt - *.md → ~/clawd/memory/prompts/
-│   │   ├── transcripts/     # Transcript - *.md → ~/clawd/memory/transcripts/
-│   │   ├── refdocs/         # Refdoc - *.md → ~/clawd/memory/refdocs/
-│   │   └── docs/            # Doc - *.md → ~/clawd/memory/docs/
-│   └── claude/
-│       └── prompts/         # Prompt - *.md for Claude Projects/Code
 │
 ├── tools/                   # COMMITTED - Shell scripts
 ├── .claude/commands/        # COMMITTED - Skill definitions
@@ -475,7 +471,7 @@ python3 -m components.distill.lib.cli export --profile bot
 
 ```bash
 /pull                    # Get sessions from bot
-/convert intake/file.md  # Add CONFIG block
+/convert agents/{agent}/intake/file.md  # Add CONFIG block
 /intake                  # Canonicalize
 /export                  # Generate exports
 /push                    # Sync to bot
@@ -709,7 +705,7 @@ If files go to wrong directory, check frontmatter has correct `type` field.
 
 1. Verify `config.yaml` exists with SSH settings
 2. Run `./tools/bot echo test` to verify connection
-3. Check `exports/bot/` has files to sync
+3. Check `agents/*/exports/` has files to sync
 
 ---
 

@@ -45,14 +45,14 @@ Sync assembled prompts to bot using the push script (handles multi-destination r
 ```
 
 This syncs:
-- `exports/bot/core-prompts/` → `~/agents/bruba-main/` (AGENTS.md)
-- `exports/bot/prompts/` → `~/agents/bruba-main/memory/prompts/`
-- `exports/bot/transcripts/` → `~/agents/bruba-main/memory/transcripts/`
+- `agents/{agent}/exports/core-prompts/` → `~/agents/{agent}/` (AGENTS.md)
+- `agents/{agent}/exports/prompts/` → `~/agents/{agent}/memory/prompts/`
+- `agents/{agent}/exports/transcripts/` → `~/agents/{agent}/memory/transcripts/`
 - Other subdirs → `~/agents/bruba-main/memory/{subdir}/`
 
 Or for specific files:
 ```bash
-scp exports/bot/core-prompts/AGENTS.md bruba:/Users/bruba/clawd/AGENTS.md
+scp agents/bruba-main/exports/core-prompts/AGENTS.md bruba:/Users/bruba/agents/bruba-main/AGENTS.md
 ```
 
 ## Conflict Resolution

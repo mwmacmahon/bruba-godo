@@ -7,8 +7,8 @@ Help manage the prompt assembly system: resolve conflicts, explain configuration
 Read these files to understand current state:
 - `exports.yaml` — section order in `exports.bot.agents_sections`
 - `templates/prompts/README.md` — full system documentation
-- `mirror/prompts/AGENTS.md` — current remote state (has BOT-MANAGED sections)
-- `exports/bot/core-prompts/AGENTS.md` — last assembled output
+- `agents/{agent}/mirror/prompts/AGENTS.md` — current remote state (has BOT-MANAGED sections)
+- `agents/{agent}/exports/core-prompts/AGENTS.md` — last assembled output
 
 ## Commands
 
@@ -33,7 +33,7 @@ Compare mirror (remote) vs assembled:
 ```bash
 echo "=== REMOTE ===" && grep "^## " mirror/prompts/AGENTS.md
 echo ""
-echo "=== ASSEMBLED ===" && grep "^## " exports/bot/core-prompts/AGENTS.md
+echo "=== ASSEMBLED ===" && grep "^## " agents/bruba-main/exports/core-prompts/AGENTS.md
 ```
 
 ### Reorder Sections
@@ -119,7 +119,7 @@ Edit `agents_sections` in exports.yaml and move entries to desired positions.
 | Assemble | `./tools/assemble-prompts.sh` |
 | Verbose assemble | `./tools/assemble-prompts.sh --verbose` |
 | Dry run | `./tools/assemble-prompts.sh --dry-run` |
-| Compare sections | `grep "^## " mirror/prompts/AGENTS.md exports/bot/core-prompts/AGENTS.md` |
+| Compare sections | `grep "^## " agents/bruba-main/mirror/prompts/AGENTS.md agents/bruba-main/exports/core-prompts/AGENTS.md` |
 | Find bot sections | `grep "BOT-MANAGED" mirror/prompts/AGENTS.md` |
 | Mirror remote | `./tools/mirror.sh` |
 

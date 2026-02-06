@@ -6,7 +6,7 @@ How private content is managed alongside the public operator repo.
 
 bruba-godo is a public repo on GitHub — it holds tools, templates, components, and docs. But most of the *content* it works with (sessions, intake files, reference docs, exports, config with secrets) is private and gitignored. Previously this content lived in real directories inside godo, backed up to a separate vault repo via periodic rsync, with a `private` git branch for staging promotions. That was three moving parts doing one job.
 
-**Vault mode replaces all of that with symlinks.** When enabled, every gitignored content directory becomes a symlink pointing into the vault repo. `sessions/` isn't a real directory anymore — it's a symlink to `bruba-vault/sessions/`. All existing tools (pull, push, export, intake, mirror) work exactly the same because they follow symlinks transparently. Content is *always* in the vault, so there's no sync step. Committing vault changes is just `git add -A && commit` in the vault repo (or `/vault-sync`). Promoting content to the public repo is a direct vault-to-PR flow filtered through `vault.deny`.
+**Vault mode replaces all of that with symlinks.** When enabled, every gitignored content directory becomes a symlink pointing into the vault repo. `agents/` isn't a real directory anymore — it's a symlink to `bruba-vault/agents/`. All existing tools (pull, push, export, intake, mirror) work exactly the same because they follow symlinks transparently. Content is *always* in the vault, so there's no sync step. Committing vault changes is just `git add -A && commit` in the vault repo (or `/vault-sync`). Promoting content to the public repo is a direct vault-to-PR flow filtered through `vault.deny`.
 
 One command to set up (`vault-setup.sh enable`), one command to reverse (`vault-setup.sh disable`), fully config-driven via the `vault:` section in config.yaml.
 
@@ -19,7 +19,7 @@ The system uses two git repositories:
 | Repo | Purpose | Visibility |
 |------|---------|------------|
 | **godo** (operator repo) | Tools, templates, components, docs | Public / GitHub |
-| **vault** (content repo) | Sessions, intake, reference, exports, config | Private / local-only |
+| **vault** (content repo) | Agents (sessions, intake, exports, mirror), reference, config | Private / local-only |
 
 With **vault mode** enabled, gitignored directories in godo become symlinks into the vault. All tools continue to work unchanged — they follow symlinks transparently.
 
@@ -30,8 +30,7 @@ With **vault mode** enabled, gitignored directories in godo become symlinks into
 When vault mode is enabled (`vault-setup.sh enable`), each configured directory is replaced with a symlink:
 
 ```
-bruba-godo/sessions/  →  vault-repo/sessions/
-bruba-godo/intake/    →  vault-repo/intake/
+bruba-godo/agents/    →  vault-repo/agents/
 bruba-godo/reference/ →  vault-repo/reference/
 ...
 ```
@@ -41,7 +40,7 @@ Individual files can also be symlinked (e.g., `config.yaml`).
 ### Transparent Operation
 
 Because symlinks are transparent to the filesystem:
-- `./tools/pull.sh` writes to `sessions/` → actually writes to `vault/sessions/`
+- `./tools/pull.sh` writes to `agents/{agent}/sessions/` → actually writes to `vault/agents/{agent}/sessions/`
 - `./tools/export.sh` reads from `reference/` → actually reads from `vault/reference/`
 - All paths in scripts, tools, and config remain unchanged
 
@@ -58,12 +57,8 @@ vault:
   enabled: true
   path: ~/source/<vault-name>     # Path to vault repo
   dirs:                            # Directories to symlink
-    - sessions
-    - intake
+    - agents
     - reference
-    - exports
-    - assembled
-    - mirror
     - logs
     - docs/cc_logs
     - docs/meta
@@ -81,8 +76,8 @@ Format: one pattern per line, `#` comments, blank lines ignored.
 ```
 # Example vault.deny
 config.yaml
-sessions/
-mirror/
+agents/*/sessions/
+agents/*/mirror/
 *.env
 ```
 
@@ -156,10 +151,8 @@ Vault mode simplifies `.gitignore`. The complex patterns with `.gitkeep` excepti
 
 ```gitignore
 # Before (without vault mode)
-sessions/*
-!sessions/.gitkeep
-intake/*
-!intake/.gitkeep
+agents/*
+!agents/.gitkeep
 ...
 ```
 
@@ -167,8 +160,7 @@ Become simple directory entries:
 
 ```gitignore
 # After (with vault mode)
-sessions
-intake
+agents
 ...
 ```
 

@@ -14,7 +14,7 @@ The content pipeline (`/pull` -> `/convert` -> `/intake` -> `/export` -> `/push`
 
 Previously, the pipeline was hardcoded to bruba-main:
 - Sessions pulled from one agent's session dir
-- All content exported to `exports/bot/bruba-main/`
+- All content exported to `agents/bruba-main/exports/`
 - Push synced only bruba-main's memory
 
 Now, the pipeline is agent-aware:
@@ -62,12 +62,12 @@ agents: [bruba-main, bruba-rex]
 ```
 Bot sessions (per agent)
   ↓ /pull
-sessions/{agent}/*.jsonl → intake/{agent}/*.md
+agents/{agent}/sessions/*.jsonl → agents/{agent}/intake/*.md
   ↓ /convert (adds agents: field to CONFIG)
   ↓ /intake (canonicalizes with --agent)
 reference/transcripts/*.md (agents: in frontmatter)
   ↓ /export (routes via agents: field)
-exports/bot/{agent}/ (per-agent exports)
+agents/{agent}/exports/ (per-agent exports)
   ↓ /push (syncs content_pipeline agents)
 Bot memory (per agent)
 ```
@@ -76,10 +76,10 @@ Bot memory (per agent)
 
 | Scenario | Behavior |
 |----------|----------|
-| Files in flat `intake/` | Treated as bruba-main |
+| Files in flat `agents/bruba-main/intake/` | Treated as bruba-main |
 | Canonical files without `agents:` | Default to `[bruba-main]` during export |
-| Existing `sessions/.pulled` | Auto-migrates to `sessions/bruba-main/.pulled` |
-| Existing `sessions/*.jsonl` | Left in place, new pulls go to per-agent dirs |
+| Existing `.pulled` | Auto-migrates to `agents/bruba-main/sessions/.pulled` |
+| Existing `*.jsonl` | Left in place, new pulls go to per-agent dirs |
 | Standalone export profiles (claude, tests) | Unchanged -- process all files regardless of agents |
 
 ## Key Files Changed

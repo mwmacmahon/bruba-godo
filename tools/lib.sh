@@ -28,18 +28,14 @@ load_config() {
     REMOTE_AGENT_ID=$(grep "^  agent_id:" "$config_file" | awk '{print $2}' | tr -d '"')
 
     # Local paths (relative to ROOT_DIR)
-    LOCAL_MIRROR=$(grep "^  mirror:" "$config_file" | awk '{print $2}' | tr -d '"')
-    LOCAL_SESSIONS=$(grep "^  sessions:" "$config_file" | awk '{print $2}' | tr -d '"')
+    LOCAL_AGENTS=$(grep "^  agents:" "$config_file" | awk '{print $2}' | tr -d '"')
     LOCAL_LOGS=$(grep "^  logs:" "$config_file" | awk '{print $2}' | tr -d '"')
-    LOCAL_INTAKE=$(grep "^  intake:" "$config_file" | awk '{print $2}' | tr -d '"')
     LOCAL_REFERENCE=$(grep "^  reference:" "$config_file" | awk '{print $2}' | tr -d '"')
     LOCAL_EXPORTS=$(grep "^  exports:" "$config_file" | awk '{print $2}' | tr -d '"')
 
     # Make local paths absolute
-    MIRROR_DIR="$ROOT_DIR/${LOCAL_MIRROR:-mirror}"
-    SESSIONS_DIR="$ROOT_DIR/${LOCAL_SESSIONS:-sessions}"
+    AGENTS_DIR="$ROOT_DIR/${LOCAL_AGENTS:-agents}"
     LOG_DIR="$ROOT_DIR/${LOCAL_LOGS:-logs}"
-    INTAKE_DIR="$ROOT_DIR/${LOCAL_INTAKE:-intake}"
     REFERENCE_DIR="$ROOT_DIR/${LOCAL_REFERENCE:-reference}"
     EXPORTS_DIR="$ROOT_DIR/${LOCAL_EXPORTS:-exports}"
 
@@ -48,7 +44,7 @@ load_config() {
     CLONE_REPO_CODE="${CLONE_REPO_CODE:-false}"
 
     # Shared tools location (all agents use same tools directory)
-    SHARED_TOOLS=$(grep "^  shared_tools:" "$config_file" | awk '{print $2}' | tr -d '"')
+    SHARED_TOOLS=$(grep "^  shared_tools:" "$config_file" 2>/dev/null | awk '{print $2}' | tr -d '"' || true)
     SHARED_TOOLS="${SHARED_TOOLS:-${REMOTE_HOME}/agents/bruba-shared/tools}"
 
     # Derived remote paths
@@ -175,6 +171,25 @@ except Exception as e:
 " 2>/dev/null
 }
 
+# Get list of agents with export_cycle: true
+# Usage: mapfile -t EXPORT_AGENTS < <(get_export_agents)
+get_export_agents() {
+    local config_file="$ROOT_DIR/config.yaml"
+
+    python3 -c "
+import yaml, sys
+try:
+    with open('$config_file') as f:
+        config = yaml.safe_load(f)
+    for name, cfg in config.get('agents', {}).items():
+        if cfg.get('export_cycle', False):
+            print(name)
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
+}
+
 # Get list of agents with wake_cycle: true
 # Usage: mapfile -t WAKE_AGENTS < <(get_wake_agents)
 get_wake_agents() {
@@ -246,9 +261,13 @@ except Exception as e:
     # Custom variables as JSON (applied via Python in apply_substitutions)
     AGENT_CUSTOM_VARIABLES=$(echo "$agent_data" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d.get('variables', {})))" 2>/dev/null)
 
-    # Derived paths
-    AGENT_MIRROR_DIR="$MIRROR_DIR/$agent"
-    AGENT_EXPORT_DIR="$EXPORTS_DIR/bot/$agent"
+    # Derived paths (all per-agent dirs live under agents/{name}/)
+    AGENT_DIR="$AGENTS_DIR/$agent"
+    AGENT_MIRROR_DIR="$AGENT_DIR/mirror"
+    AGENT_EXPORT_DIR="$AGENT_DIR/exports"
+    AGENT_SESSIONS_DIR="$AGENT_DIR/sessions"
+    AGENT_INTAKE_DIR="$AGENT_DIR/intake"
+    AGENT_ASSEMBLED_DIR="$AGENT_DIR/assembled"
     AGENT_REMOTE_SESSIONS="$REMOTE_OPENCLAW/agents/$agent/sessions"
 }
 

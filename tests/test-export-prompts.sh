@@ -73,10 +73,10 @@ echo ""
 # Test 2: Check config.yaml profiles
 echo "--- Test 2: config.yaml Profiles ---"
 
-if grep -q "^  bot:" config.yaml; then
-    pass "bot profile exists"
+if grep -q "content_pipeline: true" config.yaml; then
+    pass "agent content_pipeline profile exists"
 else
-    fail "bot profile not found in config.yaml"
+    fail "content_pipeline agent not found in config.yaml"
 fi
 
 if grep -q "^  claude:" config.yaml; then
@@ -171,10 +171,10 @@ echo ""
 echo "--- Test 5: Profile-Targeted Export ---"
 
 # Clean exports for fresh test
-rm -rf exports/bot exports/claude
+rm -rf agents/bruba-main/exports exports/claude
 
-# Run export with bot profile
-BOT_OUTPUT=$(python3 -m components.distill.lib.cli --verbose export --profile bot 2>&1 || true)
+# Run export with agent:bruba-main profile (agent content_pipeline export)
+BOT_OUTPUT=$(python3 -m components.distill.lib.cli --verbose export --profile agent:bruba-main 2>&1 || true)
 
 if echo "$BOT_OUTPUT" | grep -q "prompts)"; then
     pass "Export CLI found prompt files"
@@ -182,34 +182,34 @@ else
     fail "Export CLI didn't find prompts: $BOT_OUTPUT"
 fi
 
-if echo "$BOT_OUTPUT" | grep -q "Profile: bot"; then
-    pass "Export CLI runs for bot profile"
+if echo "$BOT_OUTPUT" | grep -q "Agent: bruba-main"; then
+    pass "Export CLI runs for agent:bruba-main profile"
 else
-    fail "Export CLI failed to run bot profile"
+    fail "Export CLI failed to run agent:bruba-main profile"
 fi
 
-# Bot profile should get Export.md and Transcription.md in prompts/ subdirectory
-if [[ -f "exports/bot/prompts/Prompt - Export.md" ]]; then
-    pass "Export.md exported to bot profile (prompts/)"
+# Agent profile should get Export.md and Transcription.md in prompts/ subdirectory
+if [[ -f "agents/bruba-main/exports/prompts/Prompt - Export.md" ]]; then
+    pass "Export.md exported to agent profile (prompts/)"
 else
-    fail "Export.md not exported to bot profile prompts/"
+    fail "Export.md not exported to agent profile prompts/"
 fi
 
-if [[ -f "exports/bot/prompts/Prompt - Transcription.md" ]]; then
-    pass "Transcription.md exported to bot profile (prompts/)"
+if [[ -f "agents/bruba-main/exports/prompts/Prompt - Transcription.md" ]]; then
+    pass "Transcription.md exported to agent profile (prompts/)"
 else
-    fail "Transcription.md not exported to bot profile prompts/"
+    fail "Transcription.md not exported to agent profile prompts/"
 fi
 
 # Check frontmatter preserved
-if head -1 "exports/bot/prompts/Prompt - Export.md" | grep -q "^---"; then
+if head -1 "agents/bruba-main/exports/prompts/Prompt - Export.md" | grep -q "^---"; then
     pass "Frontmatter preserved in exported prompt"
 else
     fail "Frontmatter missing from exported prompt"
 fi
 
 # Check Export.md has file access conditional (merged content)
-if grep -q "file write access" "exports/bot/prompts/Prompt - Export.md"; then
+if grep -q "file write access" "agents/bruba-main/exports/prompts/Prompt - Export.md"; then
     pass "Export.md has Claude Code conditional (merged)"
 else
     fail "Export.md missing Claude Code conditional"
@@ -261,14 +261,14 @@ else
 fi
 
 # Check exported Transcription.md has silent mode section
-if grep -q "## Bruba Silent Mode" "exports/bot/prompts/Prompt - Transcription.md"; then
+if grep -q "## Bruba Silent Mode" "agents/bruba-main/exports/prompts/Prompt - Transcription.md"; then
     pass "Exported Transcription.md has Bruba Silent Mode section"
 else
     fail "Exported Transcription.md missing Bruba Silent Mode section"
 fi
 
 # Check silent mode has key instructions (updated for expanded version)
-SILENT_MODE_CONTENT=$(grep -A 50 "## Bruba Silent Mode" "exports/bot/prompts/Prompt - Transcription.md" 2>/dev/null || true)
+SILENT_MODE_CONTENT=$(grep -A 50 "## Bruba Silent Mode" "agents/bruba-main/exports/prompts/Prompt - Transcription.md" 2>/dev/null || true)
 
 if echo "$SILENT_MODE_CONTENT" | grep -q "Decision Tree"; then
     pass "Silent mode has Decision Tree section"
@@ -346,28 +346,27 @@ fi
 
 echo ""
 
-# Test 9: AGENTS.snippet Export Pipeline Note
-echo "--- Test 9: AGENTS.snippet Export Pipeline Note ---"
+# Test 9: AGENTS.snippet PKM Content Reference
+echo "--- Test 9: AGENTS.snippet PKM Content Reference ---"
 
 DISTILL_SNIPPET="components/distill/prompts/AGENTS.snippet.md"
 
-if grep -q "export pipeline" "$DISTILL_SNIPPET"; then
-    pass "Distill snippet mentions export pipeline"
+if grep -q "PKM" "$DISTILL_SNIPPET"; then
+    pass "Distill snippet mentions PKM knowledge resources"
 else
-    fail "Distill snippet missing export pipeline reference"
+    fail "Distill snippet missing PKM reference"
 fi
 
-if grep -q "components/distill/prompts/" "$DISTILL_SNIPPET"; then
-    pass "Distill snippet references source location"
+if grep -q "Prompt - Export.md" "$DISTILL_SNIPPET"; then
+    pass "Distill snippet references Export prompt"
 else
-    fail "Distill snippet missing source location reference"
+    fail "Distill snippet missing Export prompt reference"
 fi
 
-# Updated: exports now go to exports/bot/prompts/ (with subdirectory)
-if grep -q "exports/bot/" "$DISTILL_SNIPPET"; then
-    pass "Distill snippet references export output location"
+if grep -q "memory_search\|memory" "$DISTILL_SNIPPET"; then
+    pass "Distill snippet references memory search"
 else
-    fail "Distill snippet missing export output reference"
+    fail "Distill snippet missing memory search reference"
 fi
 
 echo ""

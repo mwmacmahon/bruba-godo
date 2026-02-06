@@ -9,21 +9,12 @@ config.yaml
 # Environment variables
 .env
 
-# Local state and output (keep directory structure via .gitkeep)
+# Per-agent data (all content under agents/)
+agents/
+
+# Global state and output
 logs/*
 !logs/.gitkeep
-
-mirror/*
-!mirror/.gitkeep
-
-sessions/*
-!sessions/.gitkeep
-
-intake/*
-!intake/.gitkeep
-!intake/processed/
-intake/processed/*
-!intake/processed/.gitkeep
 
 reference/*
 !reference/.gitkeep
@@ -34,13 +25,11 @@ reference/refdocs/*
 !reference/transcripts/.gitkeep
 !reference/refdocs/.gitkeep
 
+# Non-agent exports
 exports/*
 !exports/.gitkeep
-!exports/bot/
 !exports/claude/
-exports/bot/*
 exports/claude/*
-!exports/bot/.gitkeep
 !exports/claude/.gitkeep
 
 # Generated cronjob files (source of truth: templates/cronjobs/ + config.yaml)
@@ -48,9 +37,6 @@ cronjobs/nightly-reset-prep.yaml
 cronjobs/nightly-reset-execute.yaml
 cronjobs/nightly-reset-wake.yaml
 cronjobs/morning-briefing.yaml
-
-# Assembled outputs (generated from templates + components + user)
-assembled/
 
 # User customizations (personal, not committed)
 user/

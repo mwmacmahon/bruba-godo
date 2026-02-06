@@ -6,9 +6,9 @@ AI-assisted generation of CONFIG blocks for intake files. **Interactive, one fil
 
 $ARGUMENTS
 
-The path to a file in `intake/{agent}/` (without CONFIG). If omitted, show available files and ask which one.
+The path to a file in `agents/{agent}/intake/` (without CONFIG). If omitted, show available files and ask which one.
 
-Files live in per-agent subdirs: `intake/bruba-main/`, `intake/bruba-rex/`, etc.
+Files live in per-agent subdirs: `agents/bruba-main/intake/`, `agents/bruba-rex/intake/`, etc.
 
 ## How It Works
 
@@ -44,7 +44,7 @@ find intake -name "*.md" -not -path "*/processed/*" -not -path "*/split/*" -not 
 done
 ```
 
-Show a numbered list with agent, message count and size. Detect agent from path (e.g., `intake/bruba-rex/abc.md` → bruba-rex).
+Show a numbered list with agent, message count and size. Detect agent from path (e.g., `agents/bruba-rex/intake/abc.md` → bruba-rex).
 
 ### 2. Remove Noise (Automatic)
 

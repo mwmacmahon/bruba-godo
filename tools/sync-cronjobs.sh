@@ -35,9 +35,18 @@ LOG_FILE="$LOG_DIR/sync-cronjobs.log"
 
 mkdir -p "$LOG_DIR"
 
-# Get existing cron jobs from bot (using --json for reliable parsing)
+# Cache bot job data (avoid repeated API calls)
+BOT_JOBS_CACHE=""
+get_bot_jobs_cache() {
+    if [[ -z "$BOT_JOBS_CACHE" ]]; then
+        BOT_JOBS_CACHE=$(./tools/bot 'openclaw cron list --json' 2>/dev/null || echo '{"jobs":[]}')
+    fi
+    echo "$BOT_JOBS_CACHE"
+}
+
+# Get existing cron job names from bot
 get_existing_jobs() {
-    ./tools/bot openclaw cron list --json 2>/dev/null | python3 -c "
+    get_bot_jobs_cache | python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
@@ -51,14 +60,15 @@ except:
 # Get schedule for a specific job (returns "cron|timezone" or empty)
 get_job_schedule() {
     local name="$1"
-    ./tools/bot openclaw cron list --json 2>/dev/null | python3 -c "
+    get_bot_jobs_cache | python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
     for job in data.get('jobs', []):
         if job.get('name', '') == '$name':
-            cron = job.get('cron', '')
-            tz = job.get('timezone', 'UTC')
+            sched = job.get('schedule', {})
+            cron = sched.get('expr', '')
+            tz = sched.get('tz', 'UTC')
             print(f'{cron}|{tz}')
             break
 except:
@@ -68,14 +78,15 @@ except:
 
 # Get all bot jobs with their schedules (returns "name|cron|timezone" per line)
 get_all_bot_jobs() {
-    ./tools/bot openclaw cron list --json 2>/dev/null | python3 -c "
+    get_bot_jobs_cache | python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
     for job in data.get('jobs', []):
         name = job.get('name', '')
-        cron = job.get('cron', '')
-        tz = job.get('timezone', 'UTC')
+        sched = job.get('schedule', {})
+        cron = sched.get('expr', '')
+        tz = sched.get('tz', 'UTC')
         if name:
             print(f'{name}|{cron}|{tz}')
 except:
@@ -131,7 +142,7 @@ register_job() {
 
     # Write message to temp file on bot to avoid quoting issues
     local tmp_file="/Users/bruba/.openclaw/tmp-cron-msg-$$.txt"
-    echo "$message" | ssh "$SSH_HOST" "cat > '$tmp_file'"
+    echo "$message" | bot_exec "cat > '$tmp_file'"
 
     # Main sessions use --system-event + --wake now (agent has no heartbeat)
     # Isolated sessions use --message (default wake mode is fine)
@@ -144,7 +155,7 @@ register_job() {
 
     # Build and run the openclaw cron add command on bot
     local result
-    if result=$(ssh "$SSH_HOST" "openclaw cron add \
+    if result=$(bot_exec "openclaw cron add \
         --name '$name' \
         --description '$description' \
         --cron '$cron' \
@@ -158,7 +169,7 @@ register_job() {
         return 0
     else
         echo "ERROR: $result" >&2
-        ssh "$SSH_HOST" "rm -f '$tmp_file'" 2>/dev/null || true
+        bot_exec "rm -f '$tmp_file'" 2>/dev/null || true
         return 1
     fi
 }
@@ -176,7 +187,7 @@ update_job() {
 
     # Get job ID from name
     local job_id
-    job_id=$(./tools/bot openclaw cron list --json 2>/dev/null | python3 -c "
+    job_id=$(get_bot_jobs_cache | python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
@@ -204,6 +215,89 @@ except:
     fi
 }
 
+# Check mode: compare local YAML vs bot and report differences
+run_check() {
+    echo "Checking cron job sync status..."
+    echo ""
+
+    # Use Python to do all comparison in one pass (avoids bash associative arrays)
+    local result
+    result=$(python3 -c "
+import yaml, json, sys, os, glob
+
+# Parse all local YAML files
+local_jobs = {}
+for f in sorted(glob.glob('$CRONJOBS_DIR/*.yaml')):
+    if os.path.basename(f) == 'README.yaml':
+        continue
+    try:
+        with open(f) as fh:
+            data = yaml.safe_load(fh)
+        if data.get('status') == 'active' and data.get('name'):
+            name = data['name']
+            local_jobs[name] = {
+                'cron': data.get('schedule', {}).get('cron', ''),
+                'tz': data.get('schedule', {}).get('timezone', 'UTC')
+            }
+    except:
+        pass
+
+# Parse bot JSON from stdin
+bot_jobs = {}
+try:
+    data = json.load(sys.stdin)
+    for job in data.get('jobs', []):
+        name = job.get('name', '')
+        if name:
+            sched = job.get('schedule', {})
+            bot_jobs[name] = {
+                'cron': sched.get('expr', ''),
+                'tz': sched.get('tz', 'UTC')
+            }
+except:
+    pass
+
+has_diff = False
+
+# Schedule mismatches
+for name in sorted(local_jobs):
+    if name in bot_jobs:
+        l = local_jobs[name]
+        b = bot_jobs[name]
+        if l['cron'] != b['cron'] or l['tz'] != b['tz']:
+            print(f'Schedule mismatch: {name}')
+            print(f\"  Local: {l['cron']} @ {l['tz']}\")
+            print(f\"  Bot:   {b['cron']} @ {b['tz']}\")
+            has_diff = True
+
+# Missing from bot
+for name in sorted(local_jobs):
+    if name not in bot_jobs:
+        print(f'Missing from bot: {name}')
+        has_diff = True
+
+# Bot-only
+for name in sorted(bot_jobs):
+    if name not in local_jobs:
+        print(f'Bot-only job: {name}')
+        has_diff = True
+
+sys.exit(1 if has_diff else 0)
+" < <(get_bot_jobs_cache) 2>&1)
+
+    local exit_code=$?
+    echo "$result"
+    echo ""
+
+    if [[ $exit_code -ne 0 ]]; then
+        echo "Differences found. Use --update to sync schedules, or run without flags to add missing jobs."
+        exit 1
+    else
+        echo "All jobs in sync."
+        exit 0
+    fi
+}
+
 main() {
     log "Starting cron job sync..."
 
@@ -213,101 +307,15 @@ main() {
         exit 1
     fi
 
+    # Check mode
+    if [[ "$CHECK" == "true" ]]; then
+        run_check
+    fi
+
     # Get existing jobs from bot
     local existing
     existing=$(get_existing_jobs)
-    [[ "$VERBOSE" == "true" ]] && echo "Existing jobs: $existing"
-
-    # Build list of local job names (active only)
-    local local_jobs=()
-    declare -A local_schedules
-
-    for file in "$CRONJOBS_DIR"/*.yaml; do
-        [[ ! -f "$file" ]] && continue
-        [[ "$(basename "$file")" == "README.yaml" ]] && continue
-
-        local job_data
-        job_data=$(parse_cron_yaml "$file")
-
-        local name status cron timezone
-        name=$(echo "$job_data" | python3 -c "import json,sys; print(json.load(sys.stdin).get('name',''))")
-        status=$(echo "$job_data" | python3 -c "import json,sys; print(json.load(sys.stdin).get('status','proposed'))")
-        cron=$(echo "$job_data" | python3 -c "import json,sys; print(json.load(sys.stdin).get('cron',''))")
-        timezone=$(echo "$job_data" | python3 -c "import json,sys; print(json.load(sys.stdin).get('timezone','UTC'))")
-
-        if [[ "$status" == "active" && -n "$name" ]]; then
-            local_jobs+=("$name")
-            local_schedules["$name"]="$cron|$timezone"
-        fi
-    done
-
-    # Check mode: compare local vs bot and report differences
-    if [[ "$CHECK" == "true" ]]; then
-        local has_differences=false
-
-        echo "Checking cron job sync status..."
-        echo ""
-
-        # Get all bot jobs with schedules
-        local bot_jobs_data
-        bot_jobs_data=$(get_all_bot_jobs)
-
-        # Build bot job map
-        declare -A bot_schedules
-        while IFS='|' read -r bot_name bot_cron bot_tz; do
-            [[ -z "$bot_name" ]] && continue
-            bot_schedules["$bot_name"]="$bot_cron|$bot_tz"
-        done <<< "$bot_jobs_data"
-
-        # Check for schedule mismatches (jobs in both local and bot)
-        for name in "${local_jobs[@]}"; do
-            if [[ -n "${bot_schedules[$name]:-}" ]]; then
-                local local_sched="${local_schedules[$name]}"
-                local bot_sched="${bot_schedules[$name]}"
-                if [[ "$local_sched" != "$bot_sched" ]]; then
-                    local local_cron local_tz bot_cron bot_tz
-                    IFS='|' read -r local_cron local_tz <<< "$local_sched"
-                    IFS='|' read -r bot_cron bot_tz <<< "$bot_sched"
-                    echo "Schedule mismatch: $name"
-                    echo "  Local: $local_cron @ $local_tz"
-                    echo "  Bot:   $bot_cron @ $bot_tz"
-                    has_differences=true
-                fi
-            fi
-        done
-
-        # Check for YAML-only jobs (exist locally but not on bot)
-        for name in "${local_jobs[@]}"; do
-            if [[ -z "${bot_schedules[$name]:-}" ]]; then
-                echo "Missing from bot: $name"
-                has_differences=true
-            fi
-        done
-
-        # Check for bot-only jobs (exist on bot but not in YAML)
-        for bot_name in "${!bot_schedules[@]}"; do
-            local found=false
-            for name in "${local_jobs[@]}"; do
-                if [[ "$name" == "$bot_name" ]]; then
-                    found=true
-                    break
-                fi
-            done
-            if [[ "$found" == "false" ]]; then
-                echo "Bot-only job: $bot_name"
-                has_differences=true
-            fi
-        done
-
-        echo ""
-        if [[ "$has_differences" == "true" ]]; then
-            echo "Differences found. Use --update to sync schedules, or run without flags to add missing jobs."
-            exit 1
-        else
-            echo "All jobs in sync."
-            exit 0
-        fi
-    fi
+    [[ "$VERBOSE" == "true" ]] && echo "Existing jobs on bot: $(echo "$existing" | tr '\n' ', ')"
 
     # Normal sync mode
     local synced=0
@@ -315,6 +323,9 @@ main() {
     local skipped=0
     local warned=0
     local errors=0
+
+    # Track local active job names for bot-only detection
+    local local_job_names=""
 
     for file in "$CRONJOBS_DIR"/*.yaml; do
         [[ ! -f "$file" ]] && continue
@@ -342,9 +353,11 @@ main() {
         # Skip non-active jobs
         if [[ "$status" != "active" ]]; then
             [[ "$VERBOSE" == "true" ]] && echo "Skipping $name (status: $status)"
-            ((skipped++))
+            ((skipped++)) || true
             continue
         fi
+
+        local_job_names="${local_job_names}${name}\n"
 
         # Handle existing jobs
         if echo "$existing" | grep -q "^$name\$"; then
@@ -359,10 +372,10 @@ main() {
                     [[ "$VERBOSE" == "true" ]] && echo "  $current_schedule -> $local_schedule"
                     if update_job "$name" "$cron" "$timezone"; then
                         log "Updated cron job: $name"
-                        ((updated++))
+                        ((updated++)) || true
                     else
                         echo "ERROR: Failed to update $name" >&2
-                        ((errors++))
+                        ((errors++)) || true
                     fi
                 else
                     # Warn about schedule difference (not silently skip)
@@ -371,12 +384,12 @@ main() {
                     echo "WARNING: Schedule mismatch for $name (use --update to sync)"
                     echo "  Local: $cron @ $timezone"
                     echo "  Bot:   $current_cron @ $current_tz"
-                    ((warned++))
-                    ((skipped++))
+                    ((warned++)) || true
+                    ((skipped++)) || true
                 fi
             else
                 [[ "$VERBOSE" == "true" ]] && echo "Skipping $name (schedule unchanged)"
-                ((skipped++))
+                ((skipped++)) || true
             fi
             continue
         fi
@@ -384,7 +397,7 @@ main() {
         # Validate required fields
         if [[ -z "$name" || -z "$cron" || -z "$message" ]]; then
             echo "ERROR: Invalid job definition in $filename" >&2
-            ((errors++))
+            ((errors++)) || true
             continue
         fi
 
@@ -392,10 +405,10 @@ main() {
         echo "Registering: $name"
         if register_job "$name" "$cron" "$timezone" "$agent" "$session" "$message" "$description"; then
             log "Registered cron job: $name"
-            ((synced++))
+            ((synced++)) || true
         else
             echo "ERROR: Failed to register $name" >&2
-            ((errors++))
+            ((errors++)) || true
         fi
     done
 
@@ -404,14 +417,7 @@ main() {
     bot_jobs_data=$(get_all_bot_jobs)
     while IFS='|' read -r bot_name bot_cron bot_tz; do
         [[ -z "$bot_name" ]] && continue
-        local found=false
-        for name in "${local_jobs[@]}"; do
-            if [[ "$name" == "$bot_name" ]]; then
-                found=true
-                break
-            fi
-        done
-        if [[ "$found" == "false" ]]; then
+        if ! echo -e "$local_job_names" | grep -q "^${bot_name}\$"; then
             echo "INFO: Bot-only job (not in local YAML): $bot_name"
         fi
     done <<< "$bot_jobs_data"
@@ -422,7 +428,7 @@ main() {
     echo "  Created: $synced"
     echo "  Updated: $updated"
     echo "  Skipped: $skipped"
-    [[ $warned -gt 0 ]] && echo "  Warnings: $warned (schedule mismatches)"
+    [[ $warned -gt 0 ]] && echo "  Warnings: $warned (schedule mismatches)" || true
     echo "  Errors: $errors"
 
     log "Cron sync complete: created=$synced, updated=$updated, skipped=$skipped, errors=$errors"

@@ -312,7 +312,7 @@ reference/transcripts/*.md (canonical, agents: in frontmatter)
   ↓
 /export (routes to per-agent exports via agents: frontmatter)
   ↓
-exports/bot/{agent}/*.md
+agents/{agent}/exports/*.md
   ↓
 /push (syncs content_pipeline agents)
 ```

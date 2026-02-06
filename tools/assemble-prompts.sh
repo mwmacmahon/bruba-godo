@@ -562,9 +562,9 @@ PROMPT_LIMIT=20000
 echo ""
 echo "Prompt sizes:"
 for agent in "${AGENTS[@]}"; do
-    agent_export_dir="$EXPORTS_DIR/bot/$agent"
-    if [[ -d "$agent_export_dir/core-prompts" ]]; then
-        for prompt_file in "$agent_export_dir/core-prompts"/*.md; do
+    load_agent_config "$agent"
+    if [[ -d "$AGENT_EXPORT_DIR/core-prompts" ]]; then
+        for prompt_file in "$AGENT_EXPORT_DIR/core-prompts"/*.md; do
             [[ -f "$prompt_file" ]] || continue
             chars=$(wc -c < "$prompt_file")
             filename=$(basename "$prompt_file")

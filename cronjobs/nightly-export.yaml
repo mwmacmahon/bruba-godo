@@ -1,0 +1,21 @@
+name: nightly-export
+description: Manager tells agents to export their sessions
+status: active
+
+schedule:
+  cron: "50 3 * * *"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-haiku-4-5
+  agent: bruba-manager
+
+message: |
+  Nightly export. Use sessions_send to tell agents to run their export prompt:
+
+  1. sessions_send to agent:bruba-main:main: "Nightly export. Search memory for "Prompt - Export.md" and follow its instructions. Use these defaults: source=bruba, tags=[nightly-export]. Mark debugging tangents and large code/log blocks for sections_remove. Write the exported conversation with CONFIG block and backmatter to intake/YYYY-MM-DD-nightly-export.md. Use your best judgment for all fields — no user input is available."
+
+  2. sessions_send to agent:bruba-rex:main: "Nightly export. Search memory for "Prompt - Export.md" and follow its instructions. Use these defaults: source=bruba, tags=[nightly-export]. Mark debugging tangents and large code/log blocks for sections_remove. Write the exported conversation with CONFIG block and backmatter to intake/YYYY-MM-DD-nightly-export.md. Use your best judgment for all fields — no user input is available."
+
+  Reply NO_REPLY when done.

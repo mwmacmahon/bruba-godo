@@ -306,7 +306,7 @@ This pattern ensures the bot doesn't miss async inputs that arrived between mess
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     BIDIRECTIONAL SYNC                               │
 │                                                                      │
-│   bruba-godo/mirror/          ◄── /mirror ──►      Bot's ~/clawd/   │
+│   agents/*/mirror/            ◄── /mirror ──►      Bot's workspaces │
 │   (operator's copy)                                (bot's live)      │
 │                                                                      │
 │   templates/prompts/          ─── /push ───►      (only if clean)   │
@@ -314,7 +314,7 @@ This pattern ensures the bot doesn't miss async inputs that arrived between mess
 │                                                                      │
 │   WORKFLOW:                                                          │
 │   1. /mirror pulls latest                                            │
-│   2. Compare mirror/ to last-known state                            │
+│   2. Compare agents/*/mirror/ to last-known state                   │
 │   3. If bot changed files → flag for review                         │
 │   4. /review shows diffs, operator decides                          │
 │   5. /push only after conflicts resolved                            │

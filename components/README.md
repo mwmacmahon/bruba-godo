@@ -4,38 +4,40 @@ Optional add-ons for extending your bot's capabilities.
 
 ## Available Components
 
-| Component | Status | Prompts | Description |
-|-----------|--------|---------|-------------|
-| [Signal](signal/) | **Ready** | ✅ | Connect via Signal messenger |
-| [Voice](voice/) | Partial | ✅ | Voice input/output (whisper, TTS) |
-| [Session](session/) | Prompt Ready | ✅ | Every Session, Greeting, Continuation |
-| [Memory](memory/) | Prompt Ready | ✅ | Memory management workflow |
-| [Heartbeats](heartbeats/) | Prompt Ready | ✅ | Proactive behavior on heartbeat polls |
-| [Group-chats](group-chats/) | Prompt Ready | ✅ | Social behavior in group contexts |
-| [Workspace](workspace/) | Prompt Ready | ✅ | Generated content paths |
-| [HTTP-API](http-api/) | Prompt Ready | ✅ | Siri/Shortcuts integration |
-| [Continuity](continuity/) | Prompt Ready | ✅ | Continuation packet announce |
-| [CC-Packets](cc-packets/) | Prompt Ready | ✅ | Claude Code packet exchange |
-| [Distill](distill/) | **Ready** | ✅ | Conversation → knowledge pipeline (full) |
-| [Reminders](reminders/) | Partial | ✅ | Scheduled reminders |
-| [Web Search](web-search/) | Partial | ✅ | Web search integration |
-| Calendar | Planned | — | Apple Calendar integration |
+| Component | Status | Description |
+|-----------|--------|-------------|
+| [Signal](signal/) | **Ready** | Connect via Signal messenger (setup, validate, config) |
+| [Distill](distill/) | **Ready** | Conversation-to-knowledge pipeline (full Python lib) |
+| [Reminders](reminders/) | Partial | Scheduled reminders (tools, allowlist, prompts) |
+| [Local Voice](local-voice/) | Partial | Voice input/output (tools, allowlist, prompts) |
+| [Guru Routing](guru-routing/) | Prompt Ready | Technical deep-dive routing to -guru agent |
+| [Snippets](snippets/) | **Ready** | 13 prompt-only snippets (session, memory, continuity, etc.) |
 
 **Status key:**
-- **Ready** — Full setup.sh, validate.sh, prompts, and working code
-- **Prompt Ready** — Prompt snippet extracted, setup TBD
-- **Partial** — Some pieces (snippet or tools) but not complete
-- **Planned** — README only
+- **Ready** — Full setup.sh, validate.sh, or self-contained prompt library
+- **Partial** — Some pieces (tools or prompts) but not complete
+- **Prompt Ready** — Prompt snippet only, may grow into full component
 
-## How Components Work
+## Component Types
 
-Each component provides:
+### Full components (setup, tools, config)
 
-1. **README.md** — What it does, prerequisites, how to use
-2. **setup.sh** — Interactive setup script (run from bruba-godo root)
-3. **validate.sh** — Validation checks (run after setup to verify)
-4. **config.json** — Config fragment to merge into clawdbot.json
-5. **prompts/** — (Optional) Prompt snippets that extend AGENTS.md, TOOLS.md, etc.
+These have `setup.sh`, `validate.sh`, tools, or config fragments:
+- `signal/` — Signal messaging channel
+- `distill/` — Full Python pipeline for conversation processing
+- `reminders/` — Reminder tools with exec allowlist
+- `local-voice/` — Voice tools with exec allowlist
+
+### Standalone prompt components
+
+These contribute prompt snippets and may grow into full components:
+- `guru-routing/` — Routing logic for technical specialist agent
+
+### Snippets catch-all
+
+Prompt-only additions consolidated in `snippets/` using variant naming:
+- Use `snippets:variant-name` in config.yaml section lists
+- See [snippets/README.md](snippets/README.md) for full variant list
 
 ## Prompt Snippets
 
@@ -49,6 +51,12 @@ components/voice/
 └── prompts/
     ├── AGENTS.snippet.md    # Added to AGENTS.md
     └── TOOLS.snippet.md     # Added to TOOLS.md
+
+components/snippets/
+└── prompts/
+    ├── AGENTS.session.snippet.md      # snippets:session
+    ├── AGENTS.memory.snippet.md       # snippets:memory
+    └── ...                            # 13 variants total
 ```
 
 Snippets are assembled into final prompts by the prompt assembly system. See `templates/prompts/README.md` for details, or use the `/prompts` skill.
@@ -69,42 +77,19 @@ Snippets are assembled into final prompts by the prompt assembly system. See `te
 
 ## Creating New Components
 
+For prompt-only additions, add a variant to `snippets/`:
+1. Create `components/snippets/prompts/AGENTS.{name}.snippet.md`
+2. Add `snippets:{name}` to agents' section lists in config.yaml
+
+For full components with code/tools/setup:
 1. Create directory under `components/`
-2. Add README.md with:
-   - Overview
-   - Prerequisites
-   - Setup steps
-   - Configuration options
-   - Troubleshooting
-3. Add setup.sh with:
-   - Prerequisite checks
-   - Interactive configuration
-   - Config file updates
-   - Verification
-4. Add validate.sh with:
-   - Configuration checks
-   - Dependency verification
-   - `--fix` flag for remediation hints
-   - `--quick` flag to skip slow checks
-5. Add config.json with the config fragment
-6. (Optional) Add prompts/ directory with snippet files
-
-### Template
-
-```
-components/
-└── my-component/
-    ├── README.md        # Documentation
-    ├── setup.sh         # Setup script
-    ├── validate.sh      # Validation checks
-    ├── config.json      # Config to merge
-    └── prompts/         # Optional prompt additions
-        └── AGENTS.snippet.md
-```
+2. Add README.md, setup.sh, validate.sh, config.json as needed
+3. Add `prompts/` directory with snippet files
+4. Add component name to agents' section lists in config.yaml
 
 ## Component Tools
 
-Some components include executable tools in `tools/` directories. These are automatically synced to the bot's `~/clawd/tools/` during `/push`:
+Some components include executable tools in `tools/` directories. These are automatically synced to the bot's shared tools during `/push`:
 
 ```bash
 # Sync all component tools
@@ -115,8 +100,7 @@ Some components include executable tools in `tools/` directories. These are auto
 ```
 
 Components with tools:
-- `voice/tools/` — TTS, transcription, voice status
-- `web-search/tools/` — Web search wrapper, container management
+- `local-voice/tools/` — TTS, transcription, voice status
 - `reminders/tools/` — Reminder cleanup utilities
 
 ## Notes

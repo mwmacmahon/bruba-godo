@@ -347,9 +347,9 @@ if [[ "$DRY_RUN" != "true" && "$NO_INDEX" != "true" ]]; then
     HASH_FILE="$ROOT_DIR/.last-sync-hash"
     CURRENT_HASH=""
 
-    # Compute hash of exported content
-    if [[ -d "$EXPORTS_DIR/bot" ]]; then
-        CURRENT_HASH=$(find "$EXPORTS_DIR/bot" -type f -exec md5 -q {} \; 2>/dev/null | sort | md5 -q 2>/dev/null || echo "")
+    # Compute hash of exported content (across all agent export dirs)
+    if [[ -d "$AGENTS_DIR" ]]; then
+        CURRENT_HASH=$(find "$AGENTS_DIR" -path "*/exports/*" -type f -exec md5 -q {} \; 2>/dev/null | sort | md5 -q 2>/dev/null || echo "")
     fi
 
     PREV_HASH=""

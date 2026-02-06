@@ -63,7 +63,7 @@ As of 2026-02-03:
 
 ```bash
 # After assembly
-wc -c exports/bot/bruba-main/core-prompts/AGENTS.md
+wc -c agents/bruba-main/exports/core-prompts/AGENTS.md
 
 # Or check deployed version
 ./tools/bot 'wc -c /Users/bruba/agents/bruba-main/AGENTS.md'
@@ -88,11 +88,11 @@ config.yaml (section definitions)
 │   • base → templates/       │
 │   • component → components/ │
 │   • section → sections/     │
-│   • bot:* → mirror/         │
+│   • bot:* → agents/*/mirror/ │
 └─────────────────────────────┘
         │
         ▼
-exports/bot/{agent}/core-prompts/     push.sh →    /Users/bruba/agents/{agent}/
+agents/{agent}/exports/core-prompts/  push.sh →    /Users/bruba/agents/{agent}/
         │                                                    │
    AGENTS.md (assembled)                               AGENTS.md (deployed)
    TOOLS.md (assembled)                                TOOLS.md (deployed)
@@ -106,7 +106,7 @@ exports/bot/{agent}/core-prompts/     push.sh →    /Users/bruba/agents/{agent}
 | `{agent}-base` | `guru-base` | `templates/prompts/guru/{NAME}.md` | Agent-specific base |
 | `component` | `component-name` | `components/{name}/prompts/{NAME}.snippet.md` | Modular capability |
 | `section` | `section-name` | `templates/prompts/sections/{name}.md` | Shared fragment |
-| `bot-managed` | `bot:section-name` | `mirror/{agent}/prompts/{NAME}.md` | Extracted from bot |
+| `bot-managed` | `bot:section-name` | `agents/{agent}/mirror/prompts/{NAME}.md` | Extracted from bot |
 
 ### Config Example
 
@@ -143,7 +143,7 @@ agents:
 ./tools/assemble-prompts.sh --force
 
 # Check output
-wc -c exports/bot/*/core-prompts/AGENTS.md
+wc -c agents/*/exports/core-prompts/AGENTS.md
 ```
 
 ---
@@ -355,7 +355,7 @@ Before adding a component:
 
 1. **Check current budget:**
    ```bash
-   wc -c exports/bot/bruba-main/core-prompts/AGENTS.md
+   wc -c agents/bruba-main/exports/core-prompts/AGENTS.md
    ```
 
 2. **Estimate new component size:**
@@ -385,7 +385,7 @@ agents:
 ./tools/assemble-prompts.sh --force
 
 # Check size
-wc -c exports/bot/bruba-main/core-prompts/AGENTS.md
+wc -c agents/bruba-main/exports/core-prompts/AGENTS.md
 # Must be < 20000
 
 # Deploy
@@ -407,7 +407,7 @@ When you need to reduce prompt size:
 # Get section sizes from assembled output
 # Look for <!-- COMPONENT: name --> markers
 
-grep -n "COMPONENT:" exports/bot/bruba-main/core-prompts/AGENTS.md
+grep -n "COMPONENT:" agents/bruba-main/exports/core-prompts/AGENTS.md
 ```
 
 ### 2. Prioritize Cuts
@@ -430,7 +430,7 @@ Edit the source files in `components/` or `templates/`, not the assembled output
 
 ```bash
 ./tools/assemble-prompts.sh --force
-wc -c exports/bot/bruba-main/core-prompts/AGENTS.md
+wc -c agents/bruba-main/exports/core-prompts/AGENTS.md
 
 # Test critical flows still work
 ./tools/bot 'openclaw agent --agent bruba-main --message "test voice workflow"'
@@ -531,14 +531,14 @@ The agent is smart. It can figure out edge cases. What it can't do is recover in
 | Section sources | `bruba-godo/templates/prompts/sections/` |
 | Base templates | `bruba-godo/templates/prompts/` |
 | Assembly config | `bruba-godo/config.yaml` |
-| Assembled output | `bruba-godo/exports/bot/{agent}/core-prompts/` |
+| Assembled output | `bruba-godo/agents/{agent}/exports/core-prompts/` |
 | Deployed prompts | `/Users/bruba/agents/{agent}/` |
 
 ### Commands
 
 ```bash
 # Check budget
-wc -c exports/bot/bruba-main/core-prompts/AGENTS.md
+wc -c agents/bruba-main/exports/core-prompts/AGENTS.md
 
 # Assemble
 ./tools/assemble-prompts.sh --force

@@ -50,8 +50,8 @@ Vault mode: enabled
 Vault: /Users/dadbook/source/bruba-vault
 
 Pending changes:
- M sessions/bruba-main/abc123.jsonl
- A intake/bruba-main/def456.md
+ M agents/bruba-main/sessions/abc123.jsonl
+ A agents/bruba-main/intake/def456.md
  M config.yaml
 
 3 files changed. Committing...

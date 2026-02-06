@@ -17,13 +17,10 @@ remote:
   shared_tools: /Users/<bot-username>/agents/bruba-shared/tools  # Shared tools location
 
 local:
-  mirror: mirror
-  sessions: sessions
+  agents: agents           # Per-agent dirs (mirror, sessions, intake, exports, assembled)
   logs: logs
-  intake: intake
   reference: reference
-  exports: exports
-  assembled: assembled
+  exports: exports         # Non-agent exports only (claude, tests)
 
 # Vault mode: symlink gitignored content into a separate vault repo
 # When enabled, content dirs (sessions, intake, reference, etc.) become
@@ -33,12 +30,9 @@ vault:
   enabled: false
   path: ~/source/<vault-name>         # Path to vault repo
   dirs:                                # Dirs to symlink into vault
-    - sessions
-    - intake
+    - agents
     - reference
     - exports
-    - assembled
-    - mirror
     - logs
     - docs/cc_logs
     - docs/meta
@@ -191,24 +185,24 @@ agents:
       - header
       - http-api
       - first-run
-      - session
-      - continuity
-      - memory
+      - snippets:session
+      - snippets:continuity
+      - snippets:memory
       - distill
       - safety
       - bot:exec-approvals
       - cc-packets
       - external-internal
-      - workspace
-      - repo-reference
-      - group-chats
+      - snippets:workspace
+      - snippets:repo-reference
+      - snippets:group-chats
       - tools
-      # - web-search           # Enable for web search capability
-      # - reminders            # Enable for reminders integration
+      # - snippets:web-search     # Enable for web search capability
+      # - reminders               # Enable for reminders integration
       - voice
-      # - heartbeats           # Enable for heartbeat mode
+      # - snippets:heartbeats     # Enable for heartbeat mode
       - signal
-      # - guru-routing         # Enable for technical deep-dive routing to -guru agent
+      # - guru-routing            # Enable for technical deep-dive routing to -guru agent
       # - make-it-yours
     tools_sections:
       - base
@@ -329,7 +323,7 @@ agents:
       - message           # Guru doesn't send media directly
     agents_sections:
       - guru-base         # Uses templates/prompts/guru/AGENTS.md
-      - continuity        # Same continuation pattern as Main
+      - snippets:continuity  # Same continuation pattern as Main
     tools_sections:
       - guru-base         # Uses templates/prompts/guru/TOOLS.md
 
@@ -360,15 +354,15 @@ agents:
   #   agents_sections:
   #     - header
   #     - first-run
-  #     - session
-  #     - continuity
-  #     - memory
+  #     - snippets:session
+  #     - snippets:continuity
+  #     - snippets:memory
   #     - distill
   #     - safety
   #     - bot:exec-approvals
   #     - external-internal
-  #     - workspace
-  #     - repo-reference
+  #     - snippets:workspace
+  #     - snippets:repo-reference
   #     - tools
   #     - signal
   #   tools_sections:

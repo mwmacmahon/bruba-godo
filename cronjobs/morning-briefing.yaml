@@ -16,7 +16,7 @@ delivery:
   channel: signal
 
 message: |
-  Create a brief morning briefing for <REDACTED-NAME>.
+  Create a brief morning briefing for Gus.
 
   Check:
   1. Run: icalBuddy eventsToday - any important meetings?

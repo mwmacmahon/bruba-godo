@@ -288,16 +288,16 @@ ssh bruba 'openclaw config set tools.exec.security allowlist'
 │  Operator Machine                          Bot Machine                      │
 │  ────────────────                          ───────────                      │
 │                                                                             │
-│  exports/bot/  ─────────── push ─────────► ~/clawd/memory/                  │
+│  agents/*/exports/ ─────── push ─────────► ~/agents/*/memory/               │
 │  (content to sync)                         (searchable via memory_search)   │
 │                                                                             │
 │  components/*/tools/ ───── push ─────────► ~/clawd/tools/                   │
 │  (component tools)                         (executable scripts)             │
 │                                                                             │
-│  mirror/       ◄────────── mirror ──────── ~/clawd/                         │
+│  agents/*/mirror/ ◄─────── mirror ──────── ~/agents/*/                      │
 │  (local backup)                            MEMORY.md, journals, etc.        │
 │                                                                             │
-│  sessions/     ◄────────── pull ────────── ~/.openclaw/sessions/*.jsonl     │
+│  agents/*/sessions/ ◄───── pull ────────── ~/.openclaw/agents/*/sessions/*.jsonl │
 │  (transcripts)                             (immutable after close)          │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -346,8 +346,8 @@ Full pipeline for importing transcripts to bot memory:
 /pull → /convert → /intake → /export → /push
   │         │          │         │         │
   ▼         ▼          ▼         ▼         ▼
-intake/   CONFIG    reference/  exports/  bot
-*.md      blocks    transcripts/ bot/     memory
+agents/*/  CONFIG    reference/  agents/*/ bot
+intake/    blocks    transcripts/ exports/ memory
 ```
 
 **Using /sync (recommended):**
@@ -361,10 +361,10 @@ intake/   CONFIG    reference/  exports/  bot
 
 **Manual steps:**
 ```bash
-./tools/pull-sessions.sh              # Pull JSONL → intake/*.md
-/convert intake/<file>.md             # AI-assisted: add CONFIG block
+./tools/pull-sessions.sh              # Pull JSONL → agents/*/intake/*.md
+/convert agents/{agent}/intake/<file>.md  # AI-assisted: add CONFIG block
 /intake                               # Canonicalize → reference/transcripts/
-/export                               # Filter → exports/bot/
+/export                               # Filter → agents/*/exports/
 ./tools/push.sh                       # Sync to bot memory
 ```
 
@@ -387,10 +387,10 @@ See [Pipeline Documentation](pipeline.md) for full details.
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Push succeeds but memory search empty | Index stale | `ssh bruba "openclaw memory index"` |
-| Pull finds no new sessions | All sessions already pulled | Check `sessions/.pulled` |
+| Pull finds no new sessions | All sessions already pulled | Check `agents/{agent}/sessions/.pulled` |
 | Mirror missing files | Bot hasn't created them | Check bot's `~/clawd/` directly |
 
-**State tracking:** Session UUIDs tracked in `sessions/.pulled`. Closed sessions are immutable, so no need to re-pull.
+**State tracking:** Session UUIDs tracked in `agents/{agent}/sessions/.pulled`. Closed sessions are immutable, so no need to re-pull.
 
 ---
 

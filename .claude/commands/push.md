@@ -18,18 +18,13 @@ If no content in `reference/`, inform user they need to add content first.
 
 ### 2. Generate Export (if needed)
 
-Check if exports/bot/ exists and is up-to-date:
+Check if agent exports exist and are up-to-date:
 
 ```bash
-ls -la exports/bot/ 2>/dev/null || echo "No export found"
+ls -la agents/*/exports/ 2>/dev/null || echo "No exports found"
 ```
 
-If no export or user requests regeneration, the export needs to be built from `reference/` with filters from `exports.yaml`. This is a simplified pipeline — for now, manual copy:
-
-```bash
-mkdir -p exports/bot
-cp reference/*.md exports/bot/
-```
+If no exports or user requests regeneration, run the export pipeline to build from `reference/` with filters from config:
 
 For full filtering/redaction support, a more advanced document processing pipeline would be used.
 
@@ -49,7 +44,7 @@ Or with options:
 ```
 
 This:
-1. Rsyncs `exports/bot/` → Bot's `~/clawd/memory/`
+1. Rsyncs `agents/{agent}/exports/` → Bot's `~/agents/{agent}/memory/`
 2. Syncs component tools (`components/*/tools/`) → Bot's `~/clawd/tools/`
 3. Optionally updates exec-approvals allowlist (with `--update-allowlist`)
 4. Triggers `clawdbot memory index` to reindex
@@ -102,7 +97,7 @@ Exports are defined in `exports.yaml`:
 |--------|---------|---------|-----------|
 | bot | scope: meta, reference, transcripts | sensitivity: sensitive, restricted | names, health |
 
-Content in `reference/` with appropriate tags gets filtered into `exports/bot/`.
+Content in `reference/` with appropriate tags gets filtered into `agents/{agent}/exports/`.
 
 ## Example
 

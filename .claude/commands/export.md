@@ -58,7 +58,7 @@ exports:
 
 Agents with `content_pipeline: true` AND `include:` rules automatically get export profiles. Files are routed via the `agents:` field in frontmatter:
 
-- File with `agents: [bruba-main]` -> exported to `exports/bot/bruba-main/`
+- File with `agents: [bruba-main]` -> exported to `agents/bruba-main/exports/`
 - File with `agents: [bruba-main, bruba-rex]` -> exported to both
 - File with no `agents:` field -> defaults to `[bruba-main]`
 
@@ -111,12 +111,12 @@ Found 12 canonical files
 === Agent: bruba-main ===
   Content for bruba-main memory
   Written: 11, Unchanged: 0, Skipped: 1
-  Output: exports/bot/bruba-main/
+  Output: agents/bruba-main/exports/
 
 === Agent: bruba-rex ===
   Content for bruba-rex memory
   Written: 3, Unchanged: 0, Skipped: 9
-  Output: exports/bot/bruba-rex/
+  Output: agents/bruba-rex/exports/
 
 Export complete.
 ```
@@ -126,7 +126,7 @@ Export complete.
 ```
 /pull
   ↓
-intake/{agent}/*.md
+agents/{agent}/intake/*.md
   ↓
 /convert (sets agents: field)
   ↓
@@ -136,7 +136,7 @@ reference/transcripts/*.md (agents: in frontmatter)
   ↓
 /export (this skill)  ← YOU ARE HERE
   ↓
-exports/bot/{agent}/*.md (per-agent filtered + redacted)
+agents/{agent}/exports/*.md (per-agent filtered + redacted)
   ↓
 /push (syncs content_pipeline agents)
   ↓
@@ -149,11 +149,11 @@ After export, verify output:
 
 ```bash
 # Check per-agent export counts
-find exports/bot/bruba-main -name "*.md" | wc -l
-find exports/bot/bruba-rex -name "*.md" | wc -l
+find agents/bruba-main/exports -name "*.md" | wc -l
+find agents/bruba-rex/exports -name "*.md" | wc -l
 
 # Verify multi-agent routing (file in both dirs)
-ls exports/bot/bruba-main/transcripts/ exports/bot/bruba-rex/transcripts/
+ls agents/bruba-main/exports/transcripts/ agents/bruba-rex/exports/transcripts/
 ```
 
 ## Related Skills

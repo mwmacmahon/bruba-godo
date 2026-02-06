@@ -288,7 +288,7 @@ def cmd_export(args):
         if agent_cfg.get('content_pipeline', False) and 'include' in agent_cfg:
             agent_profiles[agent_name] = {
                 'description': f"Content for {agent_name} memory",
-                'output_dir': f'exports/bot/{agent_name}',
+                'output_dir': f'agents/{agent_name}/exports',
                 'include': agent_cfg.get('include', {}),
                 'exclude': agent_cfg.get('exclude', {}),
                 'redaction': agent_cfg.get('redaction', []),
@@ -496,7 +496,7 @@ def cmd_export(args):
             print(f"\n=== Agent: {agent_name} ===")
             print(f"  {agent_config.get('description', 'No description')}")
 
-            agent_output_dir = Path(agent_config.get('output_dir', f'exports/bot/{agent_name}'))
+            agent_output_dir = Path(agent_config.get('output_dir', f'agents/{agent_name}/exports'))
             agent_output_dir.mkdir(parents=True, exist_ok=True)
 
             agent_include = agent_config.get('include', {})

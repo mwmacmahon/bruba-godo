@@ -4,7 +4,7 @@ This is a test conversation for e2e pipeline testing.
 === MESSAGE 1 | ASSISTANT ===
 Understood. This file will flow through the full pipeline:
 1. intake/ → canonicalize → reference/transcripts/
-2. reference/ → export → exports/bot/
+2. reference/ → export → agents/{agent}/exports/
 
 This validates the complete content flow.
 

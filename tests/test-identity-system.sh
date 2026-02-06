@@ -409,7 +409,7 @@ test_substitution_completeness() {
 
     # 4.2 No unresolved ${...} in output
     local unresolved
-    unresolved=$(grep -r '\${[A-Z_]*}' exports/bot/*/core-prompts/*.md 2>/dev/null || true)
+    unresolved=$(grep -r '\${[A-Z_]*}' agents/*/exports/core-prompts/*.md 2>/dev/null || true)
     if [[ -z "$unresolved" ]]; then
         pass "4.2 No unresolved \${...} in output"
     else
@@ -420,7 +420,7 @@ test_substitution_completeness() {
     fi
 
     # 4.3 No unresolved {{...}} in output
-    unresolved=$(grep -r '{{[A-Z_]*}}' exports/bot/*/core-prompts/*.md 2>/dev/null || true)
+    unresolved=$(grep -r '{{[A-Z_]*}}' agents/*/exports/core-prompts/*.md 2>/dev/null || true)
     if [[ -z "$unresolved" ]]; then
         pass "4.3 No unresolved {{...}} in output"
     else
@@ -442,7 +442,7 @@ test_substitution_completeness() {
         if [[ "$AGENT_PROMPTS" == "[]" || -z "$AGENT_PROMPTS" ]]; then
             continue
         fi
-        if [[ ! -d "exports/bot/$agent/core-prompts" ]]; then
+        if [[ ! -d "agents/$agent/exports/core-prompts" ]]; then
             missing_dirs="$missing_dirs $agent"
         fi
     done < <(get_agents)
@@ -472,8 +472,8 @@ if 'bruba-main' not in c.get('agents', {}):
         load_agent_config "bruba-main"
         if [[ -z "$AGENT_HUMAN_NAME" ]]; then
             skip "5.1 bruba-main output has human_name (no human_name configured)"
-        elif [[ -f "exports/bot/bruba-main/core-prompts/AGENTS.md" ]]; then
-            if grep -q "$AGENT_HUMAN_NAME" "exports/bot/bruba-main/core-prompts/AGENTS.md" 2>/dev/null; then
+        elif [[ -f "agents/bruba-main/exports/core-prompts/AGENTS.md" ]]; then
+            if grep -q "$AGENT_HUMAN_NAME" "agents/bruba-main/exports/core-prompts/AGENTS.md" 2>/dev/null; then
                 pass "5.1 bruba-main output has main's human_name ($AGENT_HUMAN_NAME)"
             else
                 fail "5.1 bruba-main output has main's human_name" "Expected '$AGENT_HUMAN_NAME' in AGENTS.md"
@@ -500,8 +500,8 @@ if 'bruba-rex' not in c.get('agents', {}):
 
         if [[ -z "$rex_name" ]]; then
             skip "5.2 bruba-rex output has rex's human_name (no human_name configured)"
-        elif [[ -f "exports/bot/bruba-rex/core-prompts/AGENTS.md" ]]; then
-            if grep -q "$rex_name" "exports/bot/bruba-rex/core-prompts/AGENTS.md" 2>/dev/null; then
+        elif [[ -f "agents/bruba-rex/exports/core-prompts/AGENTS.md" ]]; then
+            if grep -q "$rex_name" "agents/bruba-rex/exports/core-prompts/AGENTS.md" 2>/dev/null; then
                 # Also check main's name is absent (if names differ)
                 if [[ "$rex_name" != "$main_name" && -n "$main_name" ]]; then
                     # Main's name should not appear (except possibly in peer references where it's expected)
@@ -533,12 +533,12 @@ if 'bruba-guru' not in c.get('agents', {}):
         load_agent_config "bruba-guru"
         if [[ -z "$AGENT_SIGNAL_UUID" ]]; then
             skip "5.3 bruba-guru output has signal_uuid (not configured)"
-        elif [[ -f "exports/bot/bruba-guru/core-prompts/TOOLS.md" ]]; then
-            if grep -q "$AGENT_SIGNAL_UUID" "exports/bot/bruba-guru/core-prompts/TOOLS.md" 2>/dev/null; then
+        elif [[ -f "agents/bruba-guru/exports/core-prompts/TOOLS.md" ]]; then
+            if grep -q "$AGENT_SIGNAL_UUID" "agents/bruba-guru/exports/core-prompts/TOOLS.md" 2>/dev/null; then
                 pass "5.3 bruba-guru output has correct signal_uuid"
             else
                 # Also check AGENTS.md as fallback
-                if grep -q "$AGENT_SIGNAL_UUID" "exports/bot/bruba-guru/core-prompts/AGENTS.md" 2>/dev/null; then
+                if grep -q "$AGENT_SIGNAL_UUID" "agents/bruba-guru/exports/core-prompts/AGENTS.md" 2>/dev/null; then
                     pass "5.3 bruba-guru output has correct signal_uuid (in AGENTS.md)"
                 else
                     fail "5.3 bruba-guru output has correct signal_uuid" "UUID not found in output"
@@ -568,8 +568,8 @@ if 'cross-comms' not in a.get('agents_sections', []):
         fi
 
         load_agent_config "$agent"
-        if [[ -n "$AGENT_PEER_AGENT" && -f "exports/bot/$agent/core-prompts/AGENTS.md" ]]; then
-            if grep -q "$AGENT_PEER_AGENT" "exports/bot/$agent/core-prompts/AGENTS.md" 2>/dev/null; then
+        if [[ -n "$AGENT_PEER_AGENT" && -f "agents/$agent/exports/core-prompts/AGENTS.md" ]]; then
+            if grep -q "$AGENT_PEER_AGENT" "agents/$agent/exports/core-prompts/AGENTS.md" 2>/dev/null; then
                 tested_any=true
                 tlog "  $agent: peer_agent '$AGENT_PEER_AGENT' found in output"
             else
@@ -605,11 +605,11 @@ if 'bruba-main' not in agents or 'bruba-guru' not in agents:
         elif [[ "$main_ws" != "$guru_ws" ]]; then
             # Verify the actual values appear in output
             local main_found=false guru_found=false
-            if [[ -f "exports/bot/bruba-main/core-prompts/AGENTS.md" ]]; then
-                grep -q "$main_ws" "exports/bot/bruba-main/core-prompts/AGENTS.md" 2>/dev/null && main_found=true
+            if [[ -f "agents/bruba-main/exports/core-prompts/AGENTS.md" ]]; then
+                grep -q "$main_ws" "agents/bruba-main/exports/core-prompts/AGENTS.md" 2>/dev/null && main_found=true
             fi
-            if [[ -f "exports/bot/bruba-guru/core-prompts/AGENTS.md" ]]; then
-                grep -q "$guru_ws" "exports/bot/bruba-guru/core-prompts/AGENTS.md" 2>/dev/null && guru_found=true
+            if [[ -f "agents/bruba-guru/exports/core-prompts/AGENTS.md" ]]; then
+                grep -q "$guru_ws" "agents/bruba-guru/exports/core-prompts/AGENTS.md" 2>/dev/null && guru_found=true
             fi
 
             if [[ "$main_found" == "true" && "$guru_found" == "true" ]]; then
