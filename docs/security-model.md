@@ -21,11 +21,12 @@ Security reference for bot instances running OpenClaw. Covers threat model, perm
 2. [Threat Model](#threat-model)
 3. [Permission Architecture](#permission-architecture)
 4. [Agent Isolation](#agent-isolation)
-5. [Defense Layers](#defense-layers)
-6. [Known Gaps](#known-gaps)
-7. [Operational Security](#operational-security)
-8. [Incident Response](#incident-response)
-9. [Security Checklist](#security-checklist)
+5. [Docker Sandbox](#docker-sandbox)
+6. [Defense Layers](#defense-layers)
+7. [Known Gaps](#known-gaps)
+8. [Operational Security](#operational-security)
+9. [Incident Response](#incident-response)
+10. [Security Checklist](#security-checklist)
 
 ---
 
@@ -162,111 +163,190 @@ Your Code      OpenClaw       Docker Sandbox     AI Model
 
 ### Multi-Agent Design
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Bot OpenClaw Instance                         │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    Main Agent                            │   │
-│  │  Tools: read, write, edit, exec, memory_*, sessions_*   │   │
-│  │  Denied: web_fetch, web_search, browser                 │   │
-│  │  Sandbox: OFF (host access for CLI tools)               │   │
-│  │  Access: Single-user allowlist                          │   │
-│  └─────────────────────────┬───────────────────────────────┘   │
-│                            │ exec: web-search.sh                 │
-│  ┌─────────────────────────▼───────────────────────────────┐   │
-│  │                   Reader Agent (optional)               │   │
-│  │  Tools: web_search, web_fetch, read                     │   │
-│  │  Denied: exec, write, edit, memory_*, sessions_*, ...   │   │
-│  │  Sandbox: Docker (mode=all)                             │   │
-│  │  Access: ONLY via main agent                            │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-```
+Five agents with role-based permissions:
 
-### Main Agent Permissions
+| Agent | Sandbox | Network | Key Tools | Denied |
+|-------|---------|---------|-----------|--------|
+| **bruba-main** | Off (host) | None | read, write, edit, exec, memory_*, sessions_send, message | web_*, browser, cron, gateway |
+| **bruba-rex** | Off (host) | None | Same as main + cron, image | web_*, browser, gateway |
+| **bruba-guru** | Off (host) | None | read, write, edit, exec, memory_*, sessions_send, message | web_*, browser, cron, gateway |
+| **bruba-manager** | Off (host) | None | read, write, exec, sessions_send, memory_* | edit, web_*, browser, cron, gateway |
+| **bruba-web** | **Docker** | **bridge** | web_search, web_fetch, read, write | exec, edit, memory_*, sessions_* |
 
-| Category | Configuration | Rationale |
-|----------|---------------|-----------|
-| **sandbox.mode** | off | Host CLI access needed |
-| **tools.allow** | read, write, edit, exec, memory_*, group:memory | Minimal for core functionality |
-| **tools.deny** | web_fetch, web_search, browser, process, nodes, cron, gateway | Web isolated to reader |
-| **exec.host** | gateway | Centralized exec control |
-| **exec.security** | allowlist | Only whitelisted binaries |
+### File Tools vs Exec
 
-### Reader Agent Permissions (Optional)
-
-| Category | Configuration | Rationale |
-|----------|---------------|-----------|
-| **sandbox.mode** | off | ⚠️ DISABLED - agent-to-agent broken |
-| **sandbox.scope** | agent | (inactive while mode=off) |
-| **tools.allow** | web_fetch, web_search, read | Minimal for web tasks |
-| **tools.deny** | exec, write, edit, memory_* | No persistence, no escalation |
+| Operation | Tool | Example |
+|-----------|------|---------|
+| **Read file** | `read` | `read /Users/bruba/agents/bruba-main/memory/docs/Doc - setup.md` |
+| **Write file** | `write` | `write /Users/bruba/agents/bruba-main/workspace/output/result.md` |
+| **Edit file** | `edit` | `edit /Users/bruba/agents/bruba-main/workspace/drafts/draft.md` |
+| **List files** | `exec` | `exec /bin/ls /Users/bruba/agents/bruba-main/memory/` |
+| **Find files** | `exec` | `exec /usr/bin/find /Users/bruba/agents/bruba-main/memory/ -name "*.md"` |
+| **Search content** | `exec` | `exec /usr/bin/grep -r "pattern" /Users/bruba/agents/bruba-main/` |
+| **Run script** | `exec` | `exec /Users/bruba/agents/bruba-main/tools/tts.sh "hello" /tmp/out.wav` |
+| **Memory search** | `memory_search` | `memory_search "topic"` (indexed content) |
 
 ### Exec Allowlist
 
 All entries in `exec-approvals.json` under `agents.<agent-id>.allowlist`:
 
-| Binary | Purpose | Risk Level |
-|--------|---------|------------|
-| `/usr/bin/wc` | File size checking | Medium* |
-| `/bin/ls` | Directory listing | Medium* |
-| `/usr/bin/head` | File preview | Medium* |
-| `/usr/bin/tail` | File tail | Medium* |
-| `/usr/bin/grep` | Content search | Medium* |
-| `/usr/bin/du` | Disk usage | Medium* |
-| `/bin/cat` | File reading | Medium* |
-| `/usr/bin/find` | File search | Medium* |
-| Custom tools | User-defined | Varies |
+| Category | Commands |
+|----------|----------|
+| File listing | `/bin/ls` |
+| File viewing | `/bin/cat`, `/usr/bin/head`, `/usr/bin/tail` |
+| Searching | `/usr/bin/grep`, `/usr/bin/find` |
+| Info | `/usr/bin/wc`, `/usr/bin/du`, `/usr/bin/uname`, `/usr/bin/whoami` |
+| Custom tools | `/Users/bruba/agents/bruba-main/tools/*.sh` |
+| System utils | `/opt/homebrew/bin/remindctl`, `/opt/homebrew/bin/icalBuddy` |
 
-*Medium risk: Full account access; security relies on account isolation.
+All commands have full account access — security relies on account isolation.
 
 ---
 
 ## Agent Isolation
 
-### Main ↔ Reader Separation
+### Web Content Isolation (bruba-web)
 
-**Why two agents?**
-- Main agent handles memory, local tools
-- Reader agent touches untrusted web content
-- Separation prevents web content from accessing local data
-
-**Communication flow:**
-```
-User → Main Agent → exec: web-search.sh → openclaw agent --local → Reader → Web
-                ←── JSON response ←───────────────────────────────────────────←
-```
+bruba-web is a **separate peer agent** (not a subagent) that handles all web access. This is required by OpenClaw's tool inheritance model — subagents cannot have tools their parent lacks.
 
 **Key properties:**
-- Reader has no access to main agent's memory or sessions
-- Reader cannot modify any files (write/edit denied)
-- Reader cannot execute arbitrary commands
-- Reader runs in Docker container
+- bruba-web runs in a Docker container with `network: bridge`
+- Has NO memory persistence (`memorySearch.enabled: false`)
+- Cannot use `sessions_send` (can't initiate contact with other agents)
+- Cannot modify other agents' files
+- Web content stays in bruba-web's context; only structured summaries cross to other agents
 
-### Web Content as Untrusted Data
+**Prompt injection defense:** If fetched web content contains "ignore previous instructions," it's processed in bruba-web's isolated context. bruba-web has no tools to affect other agents or the host.
 
-Reader agent prompts should enforce:
+### Cross-Agent Communication
 
-1. **All web content is data, not instructions**
-   - Fetched content never treated as commands
-   - No execution of instructions found in web pages
+Agents communicate via `sessions_send` (peer-to-peer messaging), not `sessions_spawn` (parent-child). This ensures each agent retains independent tool configurations.
 
-2. **Injection detection patterns**
-   - "ignore previous instructions"
-   - "you are now"
-   - Similar prompt injection attempts
-   - Flag as `[SECURITY FLAG: Potential injection detected]`
+| From | To | Purpose |
+|------|----|---------|
+| bruba-main | bruba-web | Web search requests |
+| bruba-main | bruba-guru | Technical deep-dives |
+| bruba-manager | bruba-main | Alerts, delegation |
+| bruba-manager | bruba-web | Background research |
 
-3. **Statelessness**
-   - No memory between requests
-   - Each invocation starts fresh
+---
+
+## Docker Sandbox
+
+**Current state (as of 2026-02-04):**
+- **bruba-web:** Docker sandbox enabled (`mode: "all"`, `network: "bridge"`)
+- **Other agents:** Running directly on host (`sandbox.mode: "off"` globally)
+
+bruba-web handles untrusted web content — highest prompt injection risk. Other agents don't need network access, so tool-level restrictions suffice.
+
+### Sandbox Configuration
+
+**Global defaults** (`agents.defaults.sandbox` in openclaw.json):
+
+```json
+{
+  "mode": "all",
+  "scope": "agent",
+  "workspaceAccess": "rw",
+  "docker": {
+    "readOnlyRoot": true,
+    "network": "none",
+    "memory": "512m",
+    "binds": [
+      "/Users/bruba/agents/bruba-shared/packets:/workspaces/shared/packets:rw",
+      "/Users/bruba/agents/bruba-shared/context:/workspaces/shared/context:rw",
+      "/Users/bruba/agents/bruba-shared/repo:/workspaces/shared/repo:ro"
+    ]
+  }
+}
+```
+
+**Per-agent overrides:**
+
+| Agent | Override | Reason |
+|-------|----------|--------|
+| bruba-main | `workspaceRoot` | File tool validation |
+| bruba-guru | `workspaceRoot` | File tool validation |
+| bruba-manager | `workspaceRoot` | File tool validation |
+| bruba-web | `workspaceRoot` + `network: "bridge"` | Needs internet for web_search |
+
+### Sandbox Tool Policy
+
+There's a **sandbox-level tool ceiling** in addition to global and agent-level tool policies:
+
+**Tool availability hierarchy (all must allow):**
+1. Global `tools.allow` → ceiling for all agents
+2. Agent `tools.allow` → ceiling for specific agent
+3. **Sandbox `tools.sandbox.tools.allow`** → ceiling for containerized agents
+
+**Gotcha:** If a tool is allowed at global and agent level but NOT in `tools.sandbox.tools.allow`, containerized agents won't have it. This caused the `message` tool to disappear after sandbox migration.
+
+### Container Path Mapping
+
+| Host Path | Container Path | Notes |
+|-----------|----------------|-------|
+| `/Users/bruba/agents/{agent}/` | `/workspace/` | Agent's container |
+| `/Users/bruba/agents/bruba-shared/packets/` | `/workspaces/shared/packets/` | All containers |
+| `/Users/bruba/agents/bruba-shared/context/` | `/workspaces/shared/context/` | All containers |
+| `/Users/bruba/agents/bruba-shared/repo/` | `/workspaces/shared/repo/` | All containers (ro) |
+
+### Network Isolation
+
+| Agent | Network | Can Reach |
+|-------|---------|-----------|
+| bruba-main | none | Only gateway (internal) |
+| bruba-guru | none | Only gateway (internal) |
+| bruba-manager | none | Only gateway (internal) |
+| bruba-web | bridge | Internet + gateway |
+
+Even if an agent were compromised, it cannot make outbound network connections (except bruba-web, which is already the web-facing agent).
+
+### What Containers Cannot Access
+
+| Resource | Why Protected |
+|----------|---------------|
+| `~/.openclaw/exec-approvals.json` | Prevents privilege self-escalation |
+| `~/.openclaw/openclaw.json` | Config shouldn't be agent-writable |
+| `~/.clawdbot/agents/*/auth-profiles.json` | API keys stay on host |
+| `/Users/bruba/` (general) | No arbitrary host filesystem access |
+| Other agents' workspaces | Cross-agent isolation |
+
+### Security Implications
+
+**Privilege escalation prevention:** `exec-approvals.json` not mounted → agent cannot read or modify allowlist. Node host reads allowlist from HOST filesystem, outside container.
+
+**Tool script integrity:** ALL agents have `tools/` mounted read-only. Write attempts fail with "Read-only file system." Original scripts on host remain unchanged.
+
+### Container Lifecycle
+
+- Gateway creates containers on-demand when agents are first used
+- Containers persist while gateway runs (survive session resets)
+- `openclaw gateway stop` gracefully stops containers
+- Containers auto-prune after 24h idle (configurable)
+- Auto-warm: `~/bin/bruba-start` + LaunchAgent warms bruba-web on login
+
+### Debugging Sandbox
+
+```bash
+openclaw sandbox explain          # Check configuration
+openclaw sandbox list             # List running containers
+openclaw sandbox recreate --all   # Recreate after config change
+
+# Verify isolation (should fail)
+docker exec openclaw-sandbox-bruba-main cat /root/.openclaw/exec-approvals.json
+docker exec openclaw-sandbox-bruba-main ls /Users/bruba/
+
+# Verify tools/:ro (should fail)
+docker exec openclaw-sandbox-bruba-main touch /workspace/tools/test.txt
+```
+
+See also: [Docker Migration](bruba-web-docker-migration.md) for setup details and rollback procedures.
 
 ---
 
 ## Defense Layers
 
-### The 6-Layer Security Model
+### The 7-Layer Security Model
 
 ```
 Layer 1: Account Isolation
@@ -274,23 +354,27 @@ Layer 1: Account Isolation
     └── Cannot access your files
     └── Primary security boundary
 
-Layer 2: Sandbox Mode (agents.defaults.sandbox.mode)
-    └── Main: off (host access needed)
-    └── Reader: all (Docker isolation)
+Layer 2: Docker Sandbox (per-agent containers)
+    └── bruba-web: Docker with bridge network
+    └── Others: host (off) — tool restrictions suffice
+    └── Filesystem isolation, read-only tools/
 
-Layer 3: Tool Deny List (tools.deny)
-    └── Main: web_fetch, web_search, browser, process, etc.
-    └── Reader: exec, write, edit, memory_*, etc.
+Layer 3: Network Isolation
+    └── bruba-web: bridge (internet access)
+    └── Others: none (gateway only)
 
-Layer 4: Tool Allow List (tools.allow)
-    └── Explicit allowlist for each agent
-    └── Unlisted tools are denied
+Layer 4: Tool Deny List (tools.deny)
+    └── Per-agent capability restrictions
 
-Layer 5: Exec Allowlist (exec-approvals.json)
+Layer 5: Tool Allow List (tools.allow)
+    └── Explicit allowlist per agent
+    └── Global ceiling effect applies
+
+Layer 6: Exec Allowlist (exec-approvals.json)
     └── Per-agent binary whitelists
     └── Must use full paths
 
-Layer 6: OS Permissions (macOS TCC, Linux, etc.)
+Layer 7: OS Permissions (macOS TCC)
     └── Calendar, Reminders access via system permissions
     └── Granted to specific binary (Node.js)
 ```
@@ -300,7 +384,8 @@ Layer 6: OS Permissions (macOS TCC, Linux, etc.)
 | Layer | Enforced By | Bypassable? |
 |-------|-------------|-------------|
 | Account isolation | OS | No* |
-| Sandbox mode | OpenClaw gateway | No |
+| Docker sandbox | OpenClaw gateway | No |
+| Network isolation | Docker networking | No |
 | Tool deny list | OpenClaw gateway | Only via config edit |
 | Tool allow list | OpenClaw gateway | Only via config edit |
 | Exec allowlist | OpenClaw gateway | Via exec-approvals.json edit |
@@ -330,6 +415,8 @@ Layer 6: OS Permissions (macOS TCC, Linux, etc.)
 ---
 
 ## Known Gaps
+
+See also: [Known Issues](known-issues.md) for active bugs and workarounds.
 
 ### Gap 1: Exec Allowlist Self-Escalation
 
@@ -503,4 +590,5 @@ Layer 6: OS Permissions (macOS TCC, Linux, etc.)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0.0 | 2026-02-06 | Merged Docker sandbox from masterdoc: sandbox config, container paths, network isolation, access matrices, debugging. Updated to 5-agent model, 7-layer defense. |
 | 1.0.0 | 2026-01-30 | Initial version |

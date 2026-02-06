@@ -517,6 +517,73 @@ ssh bruba "ls ~/clawd/"
 
 ---
 
+## Multi-Agent Issues
+
+### Heartbeat Not Delivering
+
+**Symptom:** No alerts even when overdue reminders exist.
+
+**Check:**
+1. Is inbox file being created? `ls -la ~/agents/bruba-manager/inbox/`
+2. Is cron job running? `openclaw cron runs --name reminder-check`
+3. Is heartbeat running? `openclaw cron runs --name heartbeat`
+4. Check Manager logs for errors
+
+**Common causes:**
+- Cron job failed silently (check `remindctl status`)
+- Heartbeat processing error (check logs)
+- Bug #3589 if using system events instead of files
+
+### Heartbeat Always Returns HEARTBEAT_OK
+
+**Symptom:** Manager never sends alerts.
+
+**Check:**
+1. Are inbox files being created with content?
+2. Is nag-history.json capping all items at nagCount 4+?
+3. Is heartbeat reading the right directory?
+
+### Agent Can't Reach Another Agent
+
+**Symptom:** `sessions_send` fails with "agent not found".
+
+**Check:**
+1. Is target agent configured? `openclaw config show`
+2. Is agentToAgent enabled? Check `tools.agentToAgent.enabled`
+3. Is target agent in allow list? Check `tools.agentToAgent.allow`
+
+### Context Bloat
+
+**Symptom:** Responses getting slow, compaction warnings.
+
+**Check:**
+1. Is Manager running checks directly instead of via cron?
+2. Are inbox files being deleted after processing?
+3. Check session size: `openclaw sessions list --agent bruba-manager`
+
+**Fix:** Reset session: `openclaw sessions reset --agent bruba-manager`
+
+### New Agent Has No API Key
+
+**Symptom:** `No API key found for provider "anthropic". Auth store: ~/.clawdbot/agents/<id>/auth-profiles.json`
+
+**Fix:**
+```bash
+cp ~/.clawdbot/agents/bruba-main/auth-profiles.json \
+   ~/.clawdbot/agents/<new-agent-id>/
+```
+
+### Agent Tools Not Available
+
+**Symptom:** Agent claims it doesn't have tools that are in its config.
+
+**Possible causes:**
+1. **No session yet** — Send a test message: `openclaw agent --agent <id> --message "Test initialization"`
+2. **Global allowlist ceiling** — Tools must be in global `tools.allow`. See [Known Issues](known-issues.md).
+3. **Config not reloaded** — `openclaw gateway restart`
+
+---
+
 ## Key Insights & Gotchas
 
 ### Shell Config That Works
@@ -575,6 +642,7 @@ Response depends on ownership model:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2.0 | 2026-02-06 | Merged multi-agent troubleshooting from masterdoc: heartbeat, agent comms, context bloat, auth, tools |
 | 1.1.1 | 2026-02-02 | Added Siri async troubleshooting (USER.md Signal UUID requirement) |
 | 1.1.0 | 2026-02-02 | Added message tool troubleshooting (media attachments, voice responses, NO_REPLY pattern) |
 | 1.0.1 | 2026-02-01 | Fixed Tailscale serve docs — must run on bot account due to localhost isolation |

@@ -6,8 +6,6 @@ project: planning
 tags: [bruba, prompts, assembly, components, budget, openclaw]
 ---
 
-# WARNING: NEEDS UPDATING
-
 # Bruba Prompt Management Reference
 
 How prompts are structured, assembled, and deployed. Covers the component system, character budgets, and best practices for keeping prompts effective without bloating.
@@ -133,6 +131,45 @@ agents:
       - continuity          # → components/continuity/prompts/AGENTS.snippet.md
 ```
 
+### Component Variants
+
+Components can provide multiple prompt snippets for different agents or roles using the `component:variant` syntax.
+
+**Why variants?** Some capabilities need different prompts depending on the agent's role:
+
+| Component | Variant | Agent | Purpose |
+|-----------|---------|-------|---------|
+| `siri-async` | `:router` | bruba-manager | Receives HTTP, forwards to Main |
+| `siri-async` | `:handler` | bruba-main | Processes forwarded requests |
+| `web-search` | `:consumer` | bruba-main | How to use bruba-web |
+| `web-search` | `:service` | bruba-web | How to be bruba-web (planned) |
+
+**File naming:**
+- Default: `components/{name}/prompts/{NAME}.snippet.md`
+- Variant: `components/{name}/prompts/{NAME}.{variant}.snippet.md`
+
+**Config example:**
+```yaml
+agents:
+  bruba-main:
+    agents_sections:
+      - siri-async:handler    # → AGENTS.handler.snippet.md
+      - web-search            # → AGENTS.snippet.md (default)
+
+  bruba-manager:
+    agents_sections:
+      - siri-async:router     # → AGENTS.router.snippet.md
+```
+
+**No fallback rule:** If you specify `:variant`, that exact file must exist. The system won't fall back to the default file — this prevents silent misconfiguration.
+
+### Allowlist Variants
+
+Allowlist files can also have variants for component-specific exec permissions:
+
+- Default: `components/{name}/allowlist.json`
+- Variant: `components/{name}/allowlist.{variant}.json`
+
 ### Assembly Commands
 
 ```bash
@@ -145,6 +182,19 @@ agents:
 # Check output
 wc -c agents/*/exports/core-prompts/AGENTS.md
 ```
+
+### Conflict Detection
+
+Before pushing, detect if the bot has made changes that would be overwritten:
+
+```bash
+./tools/detect-conflicts.sh                        # Check for conflicts
+./tools/detect-conflicts.sh --diff siri-async:handler  # Show specific diff
+```
+
+**Conflict types:**
+1. New bot-managed sections (bot created a new `<!-- BOT-MANAGED: x -->`)
+2. Edited components (bot modified content inside a `<!-- COMPONENT: x -->`)
 
 ---
 
@@ -565,4 +615,5 @@ wc -c agents/bruba-main/exports/core-prompts/AGENTS.md
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-02-06 | Merged from masterdoc: component variants, allowlist variants, conflict detection. Removed stale WARNING header. |
 | 1.0.0 | 2026-02-03 | Initial version after AGENTS.md trimming effort |

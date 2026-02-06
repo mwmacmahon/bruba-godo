@@ -26,7 +26,7 @@ Quick reference for all docs in bruba-godo.
 
 | File | Description |
 |------|-------------|
-| [architecture-masterdoc.md](architecture-masterdoc.md) | **Master reference** — multi-agent architecture, tool policies, cron, security, operations |
+| [architecture-masterdoc.md](architecture-masterdoc.md) | **Core architecture** — agent topology, tool policies, communication patterns, heartbeat/cron design |
 | [setup.md](setup.md) | End-to-end setup: bot account, SSH, onboarding, security hardening, exec lockdown |
 | [operations-guide.md](operations-guide.md) | Daily driver — daemon, sessions, sync, code review, memory search, logs |
 | [troubleshooting.md](troubleshooting.md) | Organized by symptom — daemon, SSH, exec, Signal/voice, config gotchas |
@@ -44,7 +44,10 @@ Quick reference for all docs in bruba-godo.
 
 | File | Description |
 |------|-------------|
-| [security-model.md](security-model.md) | Threat model, trust boundaries, exec allowlist, config protection |
+| [security-model.md](security-model.md) | Threat model, trust boundaries, exec allowlist, Docker sandbox, config protection |
+| [cron-system.md](cron-system.md) | Cron architecture, job table, manager coordination, heartbeat flow, cost estimates |
+| [configuration-reference.md](configuration-reference.md) | config.yaml and openclaw.json field reference |
+| [known-issues.md](known-issues.md) | Active bugs and known limitations |
 | [filesystem-guide.md](filesystem-guide.md) | Directory structure, file locations, path conventions |
 | [session-lifecycles.md](session-lifecycles.md) | Agent session management, reset patterns |
 | [voice-integration.md](voice-integration.md) | Voice handling (STT/TTS) and Siri integration |

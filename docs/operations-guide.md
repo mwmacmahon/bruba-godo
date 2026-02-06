@@ -25,31 +25,64 @@ Day-to-day operations reference for managing your bot. For initial setup, see [S
 
 ---
 
+## Signal Rate Limits (Critical)
+
+**NEVER repeatedly trigger Signal messages during testing.** Signal has strict rate limits and anti-spam detection that WILL get the account logged out.
+
+**Safe testing patterns:**
+- Use `NO_REPLY` in cron job messages to suppress unnecessary Signal delivery
+- Test with direct agent messages that don't go to Signal
+- Use isolated sessions that write to files instead of messaging
+- When testing post-reset-wake or similar multi-agent pings, do ONE test run, not repeated runs
+
+**Unsafe patterns (AVOID):**
+- Running cron job tests multiple times in quick succession
+- Triggering heartbeats repeatedly to "see if it works"
+- Using `cron run --force` repeatedly on Signal-delivering jobs
+
+**If logged out:** You'll need to re-link the Signal account via signal-cli. This requires the phone and is disruptive.
+
+---
+
 ## 1. Daemon Management
 
 The OpenClaw daemon runs as a LaunchAgent on the bot account.
 
 ```bash
-# Start the daemon
-ssh bruba "openclaw daemon start"
+# Start OpenClaw gateway
+openclaw gateway start
 
-# Stop the daemon
-ssh bruba "openclaw daemon stop"
+# Stop
+openclaw gateway stop
 
-# Restart (required after config changes)
-ssh bruba "openclaw daemon restart"
+# Force stop if stuck
+openclaw gateway stop --force
 
-# Check daemon status
-ssh bruba "openclaw daemon status"
-
-# Comprehensive status (daemon + agents + sessions + memory)
-ssh bruba "openclaw status"
+# Check status
+openclaw gateway status
 ```
 
 **When to restart:**
 - After editing `~/.openclaw/openclaw.json`
 - After editing `~/.openclaw/exec-approvals.json`
 - If bot becomes unresponsive
+
+### Health Checks
+
+```bash
+openclaw health                                          # Overall status
+openclaw sessions list --agent bruba-main                # Check specific agent
+openclaw cron list                                       # Check cron jobs
+openclaw cron runs --name heartbeat --limit 5            # Recent heartbeats
+```
+
+### Log Locations
+
+```
+~/.openclaw/logs/gateway.log     # Gateway process
+~/.openclaw/logs/agents/         # Per-agent logs
+~/.openclaw/sessions/            # Session transcripts
+```
 
 ---
 
@@ -474,8 +507,133 @@ ssh bruba "openclaw status"
 
 ---
 
+## 11. Bot Transport
+
+The `./tools/bot` wrapper supports multiple transports for running commands as the bot user:
+
+| Transport | `BOT_TRANSPORT=` | Use Case |
+|-----------|------------------|----------|
+| **sudo** | `sudo` | Same machine, different user (fastest) |
+| **Tailscale SSH** | `tailscale-ssh` | Remote via Tailscale's SSH server |
+| **SSH** | `ssh` | Remote via regular SSH with multiplexing (default) |
+
+**Configuration in config.yaml:**
+```yaml
+transport: sudo  # Options: sudo, tailscale-ssh, ssh
+```
+
+Override per-command: `BOT_TRANSPORT=ssh ./tools/bot ls ~/agents`
+
+**For same-machine setups** (bruba is a local account):
+1. Add sudoers entry: `dadbook ALL=(bruba) NOPASSWD: ALL` in `/etc/sudoers.d/bruba-admin`
+2. Set `transport: sudo` in config.yaml
+
+Scripts using `lib.sh` (mirror.sh, push.sh, etc.) automatically use the configured transport via `bot_exec()`.
+
+---
+
+## 12. Signal-CLI Installation
+
+**Use the brew version, not OpenClaw's bundled version.**
+
+OpenClaw may auto-download signal-cli to `~/.openclaw/tools/signal-cli/`. On macOS ARM64, this can download the wrong architecture, causing "exec format error" or "spawn ENOEXEC" errors.
+
+```bash
+brew install signal-cli
+jq '.channels.signal.cliPath = "/opt/homebrew/bin/signal-cli"' \
+  ~/.openclaw/openclaw.json > /tmp/oc.json && mv /tmp/oc.json ~/.openclaw/openclaw.json
+openclaw gateway restart
+openclaw doctor | grep Signal
+```
+
+**Signal data location:** Account credentials are in `~/.local/share/signal-cli/`, not the installation directory.
+
+---
+
+## 13. Prerequisites
+
+**remindctl** — CLI for Apple Reminders
+```bash
+brew install steipete/formulae/remindctl
+remindctl authorize  # Grant permissions
+remindctl status     # Verify
+```
+
+**icalBuddy** — CLI for macOS Calendar
+```bash
+brew install ical-buddy
+icalBuddy eventsToday  # Verify
+```
+
+---
+
+## 14. New Agent Setup
+
+### Directory Structure
+
+```
+/Users/bruba/
+├── agents/
+│   ├── bruba-main/
+│   │   ├── IDENTITY.md, SOUL.md, TOOLS.md, AGENTS.md
+│   │   ├── workspace/
+│   │   ├── memory/
+│   │   └── tools/          # Scripts (read-only post-migration)
+│   ├── bruba-manager/
+│   │   ├── IDENTITY.md, SOUL.md, TOOLS.md, HEARTBEAT.md
+│   │   ├── inbox/          # Cron job outputs
+│   │   ├── state/          # Persistent tracking
+│   │   └── results/
+│   └── bruba-web/
+│       ├── AGENTS.md
+│       └── results/
+└── .openclaw/
+    ├── openclaw.json
+    ├── exec-approvals.json
+    ├── cron/jobs.json
+    └── agents/*/sessions/
+```
+
+### First-Time Directory Setup
+
+```bash
+# Create Manager workspace
+mkdir -p /Users/bruba/agents/bruba-manager/{inbox,state,results}
+echo '{"reminders": {}, "lastUpdated": null}' > /Users/bruba/agents/bruba-manager/state/nag-history.json
+echo '{"projects": {}, "lastUpdated": null}' > /Users/bruba/agents/bruba-manager/state/staleness-history.json
+echo '{"tasks": [], "lastUpdated": null}' > /Users/bruba/agents/bruba-manager/state/pending-tasks.json
+
+# Create bruba-web workspace
+mkdir -p /Users/bruba/agents/bruba-web/results
+```
+
+### Auth Profile Setup
+
+Each agent needs `auth-profiles.json` in its agentDir:
+
+```bash
+mkdir -p ~/.clawdbot/agents/<new-agent-id>
+cp ~/.clawdbot/agents/bruba-main/auth-profiles.json \
+   ~/.clawdbot/agents/<new-agent-id>/
+```
+
+**Important:** Auth profiles live in `~/.clawdbot/agents/`, NOT `~/.openclaw/agents/`.
+
+### Priming New Sessions
+
+New agents have no session until their first message:
+
+```bash
+openclaw agent --agent <agent-id> --message "Test initialization. Confirm you're operational."
+```
+
+Some features (like tool availability reporting) only work after a session exists.
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0.0 | 2026-02-06 | Merged from masterdoc: Signal rate limits, health checks, log locations, transport, signal-cli install, prerequisites, agent setup, auth, priming |
 | 1.0.0 | 2026-01-30 | Initial version |
