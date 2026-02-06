@@ -1,3 +1,9 @@
+---
+title: "bruba-web Docker Sandbox Migration"
+scope: reference
+type: doc
+---
+
 # bruba-web Docker Sandbox Migration
 
 Re-enable OpenClaw's native Docker sandbox for bruba-web with network access.

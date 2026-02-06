@@ -1,0 +1,1 @@
+Nightly export. Search memory for "Prompt - Export.md" and follow its Non-Interactive Mode instructions. source=bruba, tags include [nightly-export]. Write output to intake/. Use your best judgment — no user input is available.

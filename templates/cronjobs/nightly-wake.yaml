@@ -1,9 +1,9 @@
-name: nightly-reset-execute
-description: Manager resets agent sessions
+name: nightly-wake
+description: Initialize fresh agent sessions after reset
 status: active
 
 schedule:
-  cron: "2 4 * * *"
+  cron: "10 4 * * *"
   timezone: America/New_York
 
 execution:
@@ -12,7 +12,7 @@ execution:
   agent: bruba-manager
 
 message: |
-  Nightly reset. Use sessions_send:
+  Post-reset wake. Use sessions_send:
 
 {{AGENT_MESSAGES}}
   Reply NO_REPLY when done.

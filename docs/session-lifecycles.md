@@ -53,16 +53,16 @@ Bruba uses a **three-layer continuity system** to preserve context across sessio
 
 OpenClaw provides multiple session reset triggers:
 
-| Trigger | Config | Effect |
+| Trigger | Method | Effect |
 |---------|--------|--------|
-| **Daily reset** | `session.reset.mode: "daily"` | Fresh session at configured hour (default 4am) |
-| **Idle timeout** | `session.reset.mode: "idle"` | Fresh session after N minutes of inactivity |
-| **Manual reset** | `/reset` or `/new` command | Immediate fresh session |
+| **Nightly cron** | `exec session-reset.sh all` | Manager runs script at 4:08 AM via cron |
+| **Manual CLI** | `openclaw gateway call sessions.reset --params '{"key":"..."}'` | Immediate real reset |
+| **Manual script** | `session-reset.sh <agent>` | Wrapper around gateway call |
 | **Gateway restart** | N/A | Sessions persist (stored in JSONL) |
 
-When both daily and idle are configured, **whichever expires first** triggers the reset.
+**Our config:** Nightly reset via cron (not config-based `session.reset.mode` — that was never added to openclaw.json).
 
-**Our config:** Daily reset at 4am for all agents.
+**What does NOT work:** `sessions_send "/reset"`, `openclaw agent --message "/reset"`, `openclaw sessions reset --agent <id>` — all silently fail or are interpreted as text.
 
 ### What Happens on Reset?
 
@@ -481,44 +481,46 @@ openclaw cron add \
 ### Monitoring Session Health
 
 ```bash
-# Check session size
-openclaw sessions list --agent bruba-main
+# Check all sessions (via session-control scripts on bot)
+./tools/bot '/Users/bruba/agents/bruba-shared/tools/session-status.sh all'
 
-# Check compaction history
-openclaw sessions info --agent bruba-main --session main
+# Check single agent
+./tools/bot '/Users/bruba/agents/bruba-shared/tools/session-status.sh bruba-main'
 
 # Check if memoryFlush fired
-grep "memoryFlush" ~/.openclaw/logs/agents/bruba-main.log
+./tools/bot 'grep "memoryFlush" ~/.openclaw/logs/agents/bruba-main.log'
 ```
 
 ### Manual Interventions
 
 ```bash
 # Force compaction (memoryFlush will NOT fire)
-openclaw agent --agent bruba-main --message "/compact"
+./tools/bot '/Users/bruba/agents/bruba-shared/tools/session-compact.sh bruba-main'
 
-# Reset session (start fresh)
-openclaw agent --agent bruba-main --message "/reset"
+# Reset single agent session
+./tools/bot '/Users/bruba/agents/bruba-shared/tools/session-reset.sh bruba-web'
 
-# Request continuation packet before reset
-openclaw agent --agent bruba-main --message "Write a continuation packet to memory/CONTINUATION.md, then I'll reset"
+# Reset ALL agents (same as nightly cron)
+./tools/bot '/Users/bruba/agents/bruba-shared/tools/session-reset.sh all'
 
-# Reset bruba-web if it accumulates too much context
-openclaw sessions reset --agent bruba-web
+# Or via gateway call directly
+./tools/bot 'openclaw gateway call sessions.reset --params '\''{"key":"agent:bruba-main:main"}'\'''
 ```
+
+**Important:** `sessions_send "/reset"` and `openclaw agent --message "/reset"` do NOT work. Agents interpret them as text. Only `openclaw gateway call sessions.reset` performs a real reset.
 
 ### Debugging Context Issues
 
 **Symptom:** Responses getting slow, agent forgetting recent context.
 
 **Check:**
-1. Session size: `openclaw sessions list --agent bruba-main`
+1. Session health: `./tools/bot 'session-status.sh all'` (shows tokens per agent)
 2. Recent compactions in logs
 3. Whether memoryFlush ran (check for memory/CONTINUATION.md updates)
 
 **Fix:**
 1. Request manual continuation packet
-2. Reset session: `/reset`
+2. Reset session: `./tools/bot 'session-reset.sh bruba-main'`
 3. Agent reads CONTINUATION.md on next interaction
 
 ---
@@ -531,7 +533,7 @@ All agents share the same `session.reset` config. We cannot give bruba-web a sep
 
 **Workaround:** Manually reset bruba-web if it accumulates too much context:
 ```bash
-openclaw sessions reset --agent bruba-web
+./tools/bot '/Users/bruba/agents/bruba-shared/tools/session-reset.sh bruba-web'
 ```
 
 In practice, bruba-web sessions stay small (just search/summarize), so daily reset is likely sufficient.

@@ -856,22 +856,27 @@ def _matches_filters(config, include_rules: dict, exclude_rules: dict) -> bool:
                     if tag in exclude_sensitivity:
                         return False
 
-    # Check include rules
+    # Check include.type
+    include_type = include_rules.get('type', [])
+    if include_type:
+        if isinstance(include_type, str):
+            include_type = [include_type]
+        file_type = config.type if config.type else ''
+        if not file_type or file_type not in include_type:
+            return False
+
+    # Check include.scope
     include_scope = include_rules.get('scope', [])
     if include_scope:
         if isinstance(include_scope, str):
             include_scope = [include_scope]
-        # Check if file matches any of the required scopes
-        # Scopes are matched against tags or source
-        file_scopes = set(config.tags) if config.tags else set()
-        if config.source:
-            file_scopes.add(config.source)
-        # Add implicit scopes based on content type
-        file_scopes.add('transcripts')  # All canonical files are transcripts
-
-        if not any(scope in file_scopes for scope in include_scope):
+        file_scope = config.scope if config.scope else ''
+        if isinstance(file_scope, str):
+            file_scope = [file_scope] if file_scope else []
+        if not file_scope or not any(s in include_scope for s in file_scope):
             return False
 
+    # Check include.tags
     include_tags = include_rules.get('tags', [])
     if include_tags:
         if isinstance(include_tags, str):

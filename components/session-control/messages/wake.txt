@@ -1,0 +1,1 @@
+Good morning. Session initialized. Check memory/CONTINUATION.md for context from previous session.

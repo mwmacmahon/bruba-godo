@@ -132,7 +132,7 @@ generate_from_template() {
             done
             ;;
 
-        nightly-reset-prep.yaml)
+        nightly-prep.yaml)
             local n=1
             for agent in "${RESET_AGENTS[@]}"; do
                 local ctype
@@ -145,17 +145,11 @@ generate_from_template() {
             done
             ;;
 
-        nightly-reset-execute.yaml)
-            local n=1
-            for agent in "${RESET_AGENTS[@]}"; do
-                agent_messages+="  $n. sessions_send to agent:${agent}:main: \"/reset\""
-                agent_messages+=$'\n'
-                n=$((n + 1))
-            done
-            agent_messages+=$'\n'
+        nightly-reset.yaml)
+            # No {{AGENT_MESSAGES}} — uses exec session-reset.sh all (static template)
             ;;
 
-        nightly-reset-wake.yaml)
+        nightly-wake.yaml)
             local n=1
             for agent in "${WAKE_AGENTS[@]}"; do
                 # Reset agents get CONTINUATION.md hint, others get plain wake
@@ -211,7 +205,7 @@ print(content.replace('{{AGENT_MESSAGES}}', messages), end='')
 
 # Generate all templated cronjobs
 GENERATED=0
-for template in nightly-export.yaml nightly-reset-prep.yaml nightly-reset-execute.yaml nightly-reset-wake.yaml morning-briefing.yaml; do
+for template in nightly-export.yaml nightly-prep.yaml nightly-reset.yaml nightly-wake.yaml morning-briefing.yaml; do
     generate_from_template "$template"
     GENERATED=$((GENERATED + 1))
 done

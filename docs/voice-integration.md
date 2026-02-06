@@ -1,3 +1,9 @@
+---
+title: "Voice Integration Guide"
+scope: reference
+type: doc
+---
+
 # Voice Integration Guide
 
 How voice messages work in the Bruba system, from Signal to agent and back. Also covers Siri integration for hands-free interaction.

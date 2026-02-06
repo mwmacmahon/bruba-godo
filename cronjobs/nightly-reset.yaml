@@ -1,0 +1,19 @@
+name: nightly-reset
+description: Manager resets all agent sessions via exec
+status: active
+
+schedule:
+  cron: "8 4 * * *"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-sonnet-4-5
+  agent: bruba-manager
+
+message: |
+  Nightly session reset. Run this exec command to reset all agents (including yourself):
+
+  exec /Users/bruba/agents/bruba-shared/tools/session-reset.sh all
+
+  Reply NO_REPLY when done.

@@ -3,7 +3,7 @@ description: Manager tells agents to export their sessions
 status: active
 
 schedule:
-  cron: "50 3 * * *"
+  cron: "0 4 * * *"
   timezone: America/New_York
 
 execution:

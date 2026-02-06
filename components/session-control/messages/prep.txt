@@ -1,0 +1,1 @@
+Session reset in 7 minutes. Write a continuation packet to memory/CONTINUATION.md. Include: Session Summary (what you remember from today, or 'Nothing recorded' if empty), In Progress (current tasks and status), Open Questions (unresolved items), Next Steps (action items for tomorrow). Write actual content, not placeholders. Create the file now.

@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {"pattern": "${SHARED_TOOLS}/session-status.sh", "id": "session-status"},
+    {"pattern": "${SHARED_TOOLS}/session-status.sh *", "id": "session-status-args"},
+    {"pattern": "${SHARED_TOOLS}/session-reset.sh", "id": "session-reset"},
+    {"pattern": "${SHARED_TOOLS}/session-reset.sh *", "id": "session-reset-args"},
+    {"pattern": "${SHARED_TOOLS}/session-compact.sh", "id": "session-compact"},
+    {"pattern": "${SHARED_TOOLS}/session-compact.sh *", "id": "session-compact-args"},
+    {"pattern": "${SHARED_TOOLS}/session-broadcast.sh", "id": "session-broadcast"},
+    {"pattern": "${SHARED_TOOLS}/session-broadcast.sh *", "id": "session-broadcast-args"},
+    {"pattern": "openclaw gateway call sessions.reset *", "id": "gateway-sessions-reset"},
+    {"pattern": "openclaw gateway call sessions.compact *", "id": "gateway-sessions-compact"},
+    {"pattern": "openclaw gateway call sessions.list", "id": "gateway-sessions-list"},
+    {"pattern": "openclaw gateway call sessions.list *", "id": "gateway-sessions-list-args"}
+  ]
+}

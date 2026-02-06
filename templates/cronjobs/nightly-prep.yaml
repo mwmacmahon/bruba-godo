@@ -1,9 +1,9 @@
-name: nightly-reset-wake
-description: Initialize fresh agent sessions after reset
+name: nightly-prep
+description: Manager tells agents to write continuation packets before reset
 status: active
 
 schedule:
-  cron: "7 4 * * *"
+  cron: "0 4 * * *"
   timezone: America/New_York
 
 execution:
@@ -12,7 +12,7 @@ execution:
   agent: bruba-manager
 
 message: |
-  Post-reset wake. Use sessions_send:
+  Pre-reset preparation. Use sessions_send to tell agents to write continuation packets:
 
 {{AGENT_MESSAGES}}
   Reply NO_REPLY when done.

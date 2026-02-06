@@ -1,3 +1,9 @@
+---
+title: "Vault Strategy"
+scope: reference
+type: doc
+---
+
 # Vault Strategy
 
 How private content is managed alongside the public operator repo.

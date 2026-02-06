@@ -1,0 +1,1 @@
+Session reset in 7 minutes. Write a continuation packet to memory/CONTINUATION.md. Include: Technical Session Summary (topics worked on), In Progress (debugging/analysis status), Open Questions (unresolved technical issues), Handoff Notes (context for next session). Write actual content, not placeholders. Create the file now.

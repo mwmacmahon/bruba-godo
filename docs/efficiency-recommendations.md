@@ -1,3 +1,9 @@
+---
+title: "Sync Pipeline Efficiency Recommendations"
+scope: reference
+type: doc
+---
+
 # Sync Pipeline Efficiency Recommendations
 
 Audit date: 2026-02-03

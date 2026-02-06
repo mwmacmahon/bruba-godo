@@ -1,3 +1,9 @@
+---
+title: "Channel Integrations Reference"
+scope: reference
+type: doc
+---
+
 # Channel Integrations Reference
 
 Two messaging channels connect users to the bot system. Agents also communicate with each other via `sessions_send` (see [Inter-Agent Communication](#inter-agent-communication-sessions_send)).
@@ -189,6 +195,80 @@ This enables safe bidirectional context flow:
 3. Guru → Main: "Done: answered question about X"  (sessions_send)
 4. Main updates its context — no iMessage sent
 ```
+
+## Silent Handoff Pattern
+
+When a channel-bound agent (e.g. Main) dispatches work to a specialist agent (e.g. Guru) and the specialist delivers directly to the user, the dispatching agent must stay silent to avoid duplicate messages.
+
+### How It Works
+
+```
+1. User → Main: "Ask guru about X"
+2. Main → Guru: sessions_send(timeoutSeconds=60)
+3. Guru → User: "[Guru] ..." via message tool (iMessage)
+4. Guru → Main: full response text + REPLY_SKIP (in sessions_send reply)
+5. Main: NO_REPLY (suppresses channel-bound auto-response)
+```
+
+**Why NO_REPLY?** Main is bound to BlueBubbles — any text it returns automatically goes to iMessage. Since Guru already sent the response directly, Main must suppress its own output with `NO_REPLY`.
+
+**Why `[Guru]` prefix?** The user needs to know which agent is talking. All direct messages from Guru start with `[Guru]` so there's no confusion.
+
+**Why full text in reply?** Guru returns the complete response (not just a summary) in the `sessions_send` reply field. Main stores this for context tracking — knowing what Guru told the user — but never relays it.
+
+### Timeout and Error Handling
+
+| Scenario | Main's response |
+|----------|----------------|
+| Guru replies within timeout | `NO_REPLY` (silent) |
+| Timeout (no reply in 60s) | "Guru is still working on this — expect a direct iMessage response soon" |
+| Error (sessions_send fails) | Handles the question directly |
+
+### Prerequisites
+
+- Dispatching agent must be **channel-bound** (has inbound binding) for `NO_REPLY` to matter
+- Specialist agent must have the **message** tool to send directly
+- Specialist agent must NOT have an inbound binding (otherwise its reply would also auto-send)
+
+### Applicable Agents
+
+| Role | Agent | Channel-bound? | Uses NO_REPLY? |
+|------|-------|----------------|----------------|
+| Dispatcher | bruba-main | Yes (BB + Signal) | Yes — after guru handoff |
+| Specialist | bruba-guru | No (outbound only) | No — uses message tool directly |
+
+## Limitations: Session Management via sessions_send
+
+Slash commands like `/reset`, `/compact`, and `/status` sent via `sessions_send` **do not trigger actual OpenClaw operations**. The target agent interprets them as text messages and responds conversationally ("Session cleared. Standing by.") without any real effect.
+
+### What Doesn't Work
+
+| Command via sessions_send | Agent says | What actually happens |
+|--------------------------|------------|----------------------|
+| `/reset` | "Session cleared." | Nothing — same session ID, tokens go UP |
+| `/compact` | "Compacting context." | Nothing — no compaction event in JSONL |
+| `/status` / `session_status` tool | "Context: 0/200k" | Reports near-zero due to context pruning, not actual session size |
+
+### Why /status Shows 0
+
+`session_status` reports the **live API context window** (what's sent to Claude on this turn), not cumulative session size. With `context_pruning: cache-ttl`, old messages are dropped between turns. Each sessions_send invocation starts with a near-empty context (bootstrap + current message only).
+
+`openclaw status` (CLI) shows **cumulative total tokens** across all turns — a very different metric.
+
+### What Works (Updated 2026-02-06)
+
+| Method | Effect | Verified |
+|--------|--------|----------|
+| `openclaw gateway call sessions.reset --params '{"key":"agent:<id>:main"}'` | Real session reset — new session ID, tokens to 0 | Yes (empirically tested 2026-02-06) |
+| `openclaw gateway call sessions.compact --params '{"key":"agent:<id>:main"}'` | Real compaction | Yes (empirically tested 2026-02-06) |
+| `openclaw gateway call sessions.list --json` | All sessions with tokens, model, timestamps | Yes |
+| `exec session-reset.sh all` (from agent via cron) | Resets all agents via gateway calls | Yes (nightly cron) |
+
+### Nightly Cron (Fixed 2026-02-06)
+
+The old `nightly-reset-execute` cron (sessions_send `/reset`) was replaced with `nightly-reset` which uses `exec session-reset.sh all`. This runs `openclaw gateway call sessions.reset` for each agent — the only confirmed working reset method.
+
+4 jobs now handle the full cycle: prep (4:00) → export (4:00) → reset (4:08) → wake (4:10). See `docs/cron-system.md` for details.
 
 ## BB vs Signal Quick Reference
 

@@ -2,7 +2,7 @@
 
 **Status:** Active
 
-Provides technical deep-dive routing from bruba-main to bruba-guru. Main detects technical questions and routes them to Guru for thorough analysis.
+Provides technical deep-dive routing from bruba-main to bruba-guru. Guru is Bruba's deep-focus technical mode (she/her) — Main detects technical questions and routes them to Guru for thorough analysis.
 
 ## Architecture
 
