@@ -436,3 +436,35 @@ openclaw gateway call sessions.list --json | jq '[.sessions[] | select(.key | en
 | "The agent command is your primary scripting interface" | **PARTIALLY TRUE** — for messages yes, for lifecycle ops no |
 
 **The real scripting interface for session lifecycle is `openclaw gateway call`.**
+
+---
+
+## Tool Provisioning: `tools.allow` vs `tools.deny`
+
+OpenClaw uses two complementary lists in `openclaw.json` per agent:
+
+| Field | Behavior | When Absent |
+|-------|----------|-------------|
+| `tools.allow` | **Strict whitelist** — only these tools are provisioned | All tools available (minus deny list) |
+| `tools.deny` | **Blacklist** — these tools are removed | No tools removed |
+
+**Critical:** When `tools.allow` is present, it's a **strict whitelist**. The model will only see the listed tools — regardless of what else is available. Both lists can coexist: allow defines the ceiling, deny removes from it.
+
+### The `sync-openclaw-config.sh` Gotcha
+
+The config-sync script only writes `tools.allow` to `openclaw.json` when `tools_allow` is explicitly defined in `config.yaml` for that agent. If `tools_allow` is missing from config.yaml:
+- The script skips the allow-list entirely
+- Any existing `tools.allow` on the bot is **preserved unchanged**
+- This can leave stale whitelists that are missing newly needed tools
+
+**Example failure (2026-02-06):** Manager had `tools.allow` set to 7 tools in `openclaw.json` (from initial setup), but config.yaml only had `tools_deny`. Adding session-control (which needs `exec`) to config.yaml didn't help because `sync-openclaw-config.sh` never touched the existing allow list.
+
+**Fix:** Always define explicit `tools_allow` for every agent in `config.yaml`. If an agent should have all tools except those denied, either:
+1. List all desired tools in `tools_allow`, or
+2. Remove `tools.allow` from `openclaw.json` manually and rely solely on `tools.deny`
+
+### Isolated Cron Sessions
+
+Isolated cron sessions inherit `tools.allow`/`tools.deny` from the agent config. If `exec` is not in the allow list, the cron session cannot run exec commands — the model literally won't see exec as an available tool.
+
+**Best practice:** For cron jobs that need exec, use `sessions_send` to delegate to the agent's main session rather than running exec directly in the isolated session.

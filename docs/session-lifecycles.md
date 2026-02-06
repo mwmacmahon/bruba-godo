@@ -20,9 +20,9 @@ Bruba uses a **three-layer continuity system** to preserve context across sessio
 |-------|-----------|-------------|-------------|---------|
 | **1. memoryFlush** | Agent writes to disk before compaction | Auto-compaction threshold | Best-effort (agent can ignore) | Safety net for unexpected compaction |
 | **2. Continuation Packets** | Manual structured export | User request, conversation export | Guaranteed (explicit action) | Deliberate session handoff |
-| **3. Pre-reset Cron** | Scheduled continuity write | 5 min before daily reset | Best-effort (agent can ignore) | Overnight safety net |
+| **3. Nightly Cron Cycle** | Prep → reset → continue | Nightly at 4:00–4:10 AM | Automated (prep is best-effort) | Full overnight handoff |
 
-**Key insight:** These layers cover different gaps. memoryFlush catches surprise mid-session compaction. Manual packets handle intentional resets. Pre-reset cron catches "forgot to export before bed."
+**Key insight:** These layers cover different gaps. memoryFlush catches surprise mid-session compaction. Manual packets handle intentional resets. The nightly cron cycle (prep → reset → continue) automates overnight handoff — prep writes CONTINUATION.md, reset clears sessions, continue loads the packet into the fresh session.
 
 **Important limitation:** Session reset, compaction, and contextPruning settings are **global only** — they cannot be configured per-agent. All agents share the same session lifecycle settings.
 
@@ -43,7 +43,7 @@ Bruba uses a **three-layer continuity system** to preserve context across sessio
 | `sandbox` | ✅ Yes | `agents.list[]` |
 | `memorySearch` | ✅ Yes | `agents.list[]` |
 
-**Implication:** All agents (bruba-main, bruba-manager, bruba-web) share the same session reset schedule and compaction settings. We cannot give bruba-web a separate idle timeout — it resets at 4am daily like everyone else.
+**Note:** We do NOT use OpenClaw's built-in `session.reset` config. Instead, our nightly cron job runs `exec session-reset.sh all` via `openclaw gateway call sessions.reset`, resetting all 5 agents (Main, Manager, Guru, Rex, Web) at 4:08 AM.
 
 ---
 
@@ -55,12 +55,12 @@ OpenClaw provides multiple session reset triggers:
 
 | Trigger | Method | Effect |
 |---------|--------|--------|
-| **Nightly cron** | `exec session-reset.sh all` | Manager runs script at 4:08 AM via cron |
+| **Nightly cron** | `exec session-reset.sh all` | Isolated Manager cron at 4:08 AM resets all 5 agents; `nightly-continue` at 4:10 AM loads CONTINUATION.md for Main, Rex, Guru |
 | **Manual CLI** | `openclaw gateway call sessions.reset --params '{"key":"..."}'` | Immediate real reset |
 | **Manual script** | `session-reset.sh <agent>` | Wrapper around gateway call |
 | **Gateway restart** | N/A | Sessions persist (stored in JSONL) |
 
-**Our config:** Nightly reset via cron (not config-based `session.reset.mode` — that was never added to openclaw.json).
+**Our approach:** We do NOT use OpenClaw's built-in `session.reset` config (e.g. `session.reset.mode: daily`). Instead, the nightly cron job runs `exec session-reset.sh all` which calls `openclaw gateway call sessions.reset` per agent. This gives us explicit control over which agents reset and when.
 
 **What does NOT work:** `sessions_send "/reset"`, `openclaw agent --message "/reset"`, `openclaw sessions reset --agent <id>` — all silently fail or are interpreted as text.
 
@@ -268,22 +268,25 @@ If you `/reset` again before making progress, the context is still there. Only o
 
 **Mechanism:** Part of export flow, or explicit request to agent.
 
-### Layer 3: Pre-Reset Cron (Overnight Safety Net)
+### Layer 3: Nightly Cron Cycle (Automated Overnight Handoff)
 
-**Covers:** "Forgot to export before bed" — automatic continuity write before daily reset.
+**Covers:** Full overnight session handoff — prep writes CONTINUATION.md, reset clears all sessions, continue loads packets into fresh sessions.
 
-**Limitation:** Agent can ignore prompt. Adds tokens to session right before reset.
+**Sequence:**
+1. `nightly-prep` (4:00 AM) — asks Main, Manager, Guru, Rex to write CONTINUATION.md
+2. `nightly-reset` (4:08 AM) — resets all 5 agents via `exec session-reset.sh all`
+3. `nightly-continue` (4:10 AM) — asks Main, Rex, Guru to load CONTINUATION.md
 
-**Config:** Cron job at 3:55am running in bruba-main's session.
+**Limitation:** Prep is best-effort (agent can ignore prompt). Continue only targets agents with meaningful session state (Manager and Web excluded — stateless).
 
 ### Coverage Matrix
 
-| Event | memoryFlush | Manual Packet | Pre-reset Cron |
-|-------|-------------|---------------|----------------|
+| Event | memoryFlush | Manual Packet | Nightly Cron Cycle |
+|-------|-------------|---------------|-------------------|
 | Auto-compaction | ✅ | ❌ | ❌ |
 | Manual `/compact` | ❌ | ✅ | ❌ |
 | Manual `/reset` | ❌ | ✅ | ❌ |
-| Daily reset (4am) | ❌ | ❌ | ✅ |
+| Daily reset (4am) | ❌ | ❌ | ✅ (prep → reset → continue) |
 | Idle timeout reset | ❌ | ✅ | ❌ |
 | End of work session | ❌ | ✅ | ❌ |
 
@@ -297,11 +300,15 @@ When a cron job runs with `--session isolated --agent bruba-manager`:
 
 | Inherits from Agent | Stays Isolated |
 |--------------------|----------------|
-| Tool permissions (allowlist/denylist) | Session context (fresh each run) |
+| Tool permissions (from `tools.allow`/`tools.deny` — see note below) | Session context (fresh each run) |
 | Workspace access (directories) | No carryover between runs |
 | Auth profiles (API keys) | No impact on agent's main session |
 
 The cron job runs under the agent's *identity* but in a completely *separate session* that starts fresh each execution.
+
+**Tool availability caveat:** If the agent has a `tools.allow` whitelist in `openclaw.json`, the isolated session gets **only those tools**. This is a strict whitelist — tools not listed are simply not provisioned. If `exec` is missing from `tools.allow`, the cron job cannot run exec commands. This caused the nightly-reset failure on 2026-02-06 (Manager's allow list was stale, missing `exec`).
+
+**Best practice for exec in cron:** Ensure `exec` is in the agent's `tools_allow` in `config.yaml`, then run `sync-openclaw-config.sh`. Direct exec in isolated sessions works reliably once the whitelist is correct.
 
 ### Why This Matters for Context Bloat
 
@@ -432,46 +439,21 @@ WITH isolation (--session isolated):
 - **bruba-guru:** Uses Opus for deep research tasks
 - **bruba-manager/bruba-web:** Sonnet (cost-effective for coordination/web tasks)
 
-### Pre-Reset Continuity Cron
+### Nightly Cron Cycle
 
-**Important:** Main session cron jobs require `--system-event`, not `--message`. Shell quoting with multiline prompts is fragile — use temp file approach.
+The nightly cycle is managed by 4 cron jobs, all running as bruba-manager in isolated Sonnet sessions. See [Cron System](cron-system.md) for full details.
 
-```bash
-# Create temp file with message (avoids shell quoting issues)
-cat > /tmp/pre-reset-msg.txt << 'EOF'
-Session reset in 5 minutes. Write continuation packet to memory/CONTINUATION.md:
-
-## Session Summary
-[What we discussed/accomplished today]
-
-## In Progress
-[Tasks with status and blockers]
-
-## Open Questions
-[Unresolved items]
-
-## Next Steps
-[Action items for tomorrow]
-
-## Relevant Files
-[Paths and descriptions]
-
-Reply NO_REPLY when done.
-EOF
-
-# Add cron with --system-event (required for main session jobs)
-openclaw cron add \
-  --name "pre-reset-continuity" \
-  --cron "55 3 * * *" \
-  --tz "America/New_York" \
-  --session main \
-  --system-event "$(cat /tmp/pre-reset-msg.txt)" \
-  --agent bruba-main
+```
+4:00 AM  nightly-export    Manager → Main, Rex: "Run export prompt"
+4:00 AM  nightly-prep      Manager → Main, Manager, Guru, Rex: "Write CONTINUATION.md"
+4:08 AM  nightly-reset     Manager (isolated) → exec session-reset.sh all
+4:10 AM  nightly-continue  Manager → Main, Rex, Guru: "Load CONTINUATION.md"
 ```
 
 **Notes:**
-- Uses `--session main` (not isolated) so the cron runs inside bruba-main's conversation context
-- Uses `--system-event` (not `--message`) — required for main session cron jobs
+- `nightly-prep` uses `sessions_send` to ask agents to write CONTINUATION.md before reset
+- `nightly-reset` runs `exec session-reset.sh all` directly in an isolated session (resets all 5 agents including Manager itself)
+- `nightly-continue` asks Main, Rex, and Guru to load their continuation packets into fresh sessions (Manager and Web excluded — stateless)
 - The `continuity` prompt component handles the READ side — detects and announces loaded packets on session start
 
 ---
@@ -527,16 +509,12 @@ openclaw cron add \
 
 ## Part 10: Known Limitations
 
-### No Per-Agent Session Reset
+### Per-Agent Reset via Cron Script
 
-All agents share the same `session.reset` config. We cannot give bruba-web a separate idle timeout — it resets at 4am daily like bruba-main and bruba-manager.
-
-**Workaround:** Manually reset bruba-web if it accumulates too much context:
+We don't use OpenClaw's built-in `session.reset` config (which would be global and non-customizable). Instead, `session-reset.sh all` explicitly resets all 5 agents at 4:08 AM. Individual agents can be reset manually:
 ```bash
 ./tools/bot '/Users/bruba/agents/bruba-shared/tools/session-reset.sh bruba-web'
 ```
-
-In practice, bruba-web sessions stay small (just search/summarize), so daily reset is likely sufficient.
 
 ### No Per-Agent Context Pruning
 
@@ -573,7 +551,7 @@ memoryFlush depends on agent compliance — the agent can ignore the prompt. Com
 |-----------|-----------|----------|
 | memoryFlush | Structured details before auto-compaction | Compaction |
 | Continuation packets | Explicit session handoff | Any reset |
-| Pre-reset cron | Overnight context | Daily reset |
+| Nightly cron cycle | Overnight context (prep + reset + continue) | Daily reset |
 | State files | Operational data (manager) | Everything |
 | Memory files | Searchable knowledge | Everything |
 
@@ -581,7 +559,7 @@ memoryFlush depends on agent compliance — the agent can ignore the prompt. Com
 
 | Setting | Value | Applies To |
 |---------|-------|------------|
-| Daily reset | 4am | All agents |
+| Daily reset | 4:08 AM (all 5 agents via cron) | All agents |
 | Compaction mode | safeguard | All agents |
 | reserveTokensFloor | 20,000 tokens | All agents |
 | memoryFlush | Enabled, 40K threshold | All agents |

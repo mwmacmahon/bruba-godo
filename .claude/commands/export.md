@@ -9,7 +9,6 @@ $ARGUMENTS
 Options:
 - `--profile <name>` - Run specific profile only (default: all)
 - `--profile agent:<name>` - Run specific agent profile (e.g., `agent:bruba-rex`)
-- `--dry-run` - Show what would be exported without writing
 
 ## Instructions
 
@@ -42,15 +41,17 @@ Show for each profile:
 
 ### Standalone Profiles (in `exports:` section of config.yaml)
 
-Process all canonical files regardless of `agents:` frontmatter:
+Process all canonical files, filtered by include/exclude rules:
 
 ```yaml
 exports:
-  claude:
-    description: "Prompts for Claude Projects / Claude Code"
-    output_dir: exports/claude
+  claude-gus:
+    description: "Prompts for Claude Projects / Claude Code (Gus)"
+    output_dir: exports/claude-gus
     include:
-      scope: [meta, reference, transcripts]
+      scope: [meta, reference]
+      type: [prompt, doc, refdoc]
+      users: [gus]
     redaction: [names, health]
 ```
 
@@ -73,9 +74,19 @@ To supply a transcript to another agent's memory, add that agent to the `agents:
 
 **include.tags** - File must have at least one of these tags
 
+**include.users** - Per-user document routing:
+- File must match the profile's users list
+- Files with no `users:` field go to everyone
+- Supports `only-X` prefix for exclusive routing
+- Auto-derived from `identity.human_name` for agent profiles
+
 **exclude.sensitivity** - Skip files with these sensitivity levels:
 - `sensitive` - Marked as sensitive
 - `restricted` - Highly restricted content
+
+**exclude.tags** - Skip files with any of these tags:
+- `legacy` - Pre-migration PKM documents
+- `do-not-sync` - Internal planning packets
 
 **agents: frontmatter** (agent profiles only) - File must list this agent in its `agents:` field
 
@@ -103,10 +114,15 @@ Redaction uses the `sensitivity.terms` defined in each file's frontmatter.
 
 Found 12 canonical files
 
-=== Profile: claude ===
-  Prompts for Claude Projects / Claude Code
+=== Profile: claude-gus ===
+  Prompts for Claude Projects / Claude Code (Gus)
   Written: 10, Unchanged: 1, Skipped: 1
-  Output: exports/claude/
+  Output: exports/claude-gus/
+
+=== Profile: claude-rex ===
+  Prompts for Claude Projects / Claude Code (Rex)
+  Written: 10, Unchanged: 1, Skipped: 1
+  Output: exports/claude-rex/
 
 === Agent: bruba-main ===
   Content for bruba-main memory

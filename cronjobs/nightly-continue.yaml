@@ -1,0 +1,23 @@
+name: nightly-continue
+description: Ask Main, Rex, and Guru to load their continuation packets
+status: active
+
+schedule:
+  cron: "10 4 * * *"
+  timezone: America/New_York
+
+execution:
+  session: isolated
+  model: anthropic/claude-sonnet-4-5
+  agent: bruba-manager
+
+message: |
+  Send continuation packet loading instructions to three agents. For each, use sessions_send to their main session:
+
+  1. sessions_send to bruba-main:main — "Load your continuation packet. Read memory/CONTINUATION.md and use it to restore context from your previous session. Reply NO_REPLY when done."
+
+  2. sessions_send to bruba-rex:main — "Load your continuation packet. Read memory/CONTINUATION.md and use it to restore context from your previous session. Reply NO_REPLY when done."
+
+  3. sessions_send to bruba-guru:main — "Load your continuation packet. Read memory/CONTINUATION.md and use it to restore context from your previous session. Reply NO_REPLY when done."
+
+  Reply NO_REPLY when all three messages are sent.

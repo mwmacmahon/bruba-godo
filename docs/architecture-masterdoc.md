@@ -1,5 +1,5 @@
 ---
-version: 4.0.0
+version: 4.1.0
 updated: 2026-02-06
 type: refdoc
 project: planning
@@ -29,7 +29,7 @@ Bruba uses a **five-agent architecture** with four peer agents and one service a
 | Agent | Model | Role | Web Access |
 |-------|-------|------|------------|
 | **bruba-main** | Sonnet | Reactive — user conversations, file ops, routing | ❌ via bruba-web |
-| **bruba-rex** | Sonnet | Reactive — alternate identity, separate phone binding | ❌ via bruba-web |
+| **bruba-rex** | Opus | Reactive — alternate identity, separate phone binding | ❌ via bruba-web |
 | **bruba-guru** | Opus | Specialist — technical deep-dives, debugging, architecture | ❌ via bruba-web |
 | **bruba-manager** | Sonnet/Haiku | Proactive — heartbeat, cron coordination, monitoring | ❌ via bruba-web |
 | **bruba-web** | Sonnet | Service — stateless web search, prompt injection barrier | ✅ Direct |
@@ -220,7 +220,7 @@ Communication happens via `sessions_send` (agent-to-agent messaging), not `sessi
 
 **Purpose:** Alternate identity agent. Parallel to bruba-main with equivalent capabilities, bound to a different phone number for separate conversations.
 
-**Model:** Sonnet
+**Model:** Opus
 
 **Capabilities:**
 | Tool | Status | Notes |
@@ -243,8 +243,11 @@ Communication happens via `sessions_send` (agent-to-agent messaging), not `sessi
 
 **Workspace:** `/Users/bruba/agents/bruba-rex/`
 
+**User routing:** Rex serves a different human (Rex) than Main (Gus). The `users:` frontmatter field in documents controls per-user routing — files tagged `users: [rex]` only export to bruba-rex's memory and claude-rex, not to Gus's agents.
+
 **Distinction from bruba-main:**
 - Bound to different phone number (separate contact routing)
+- Serves a different human (per-user document routing via `users:` field)
 - Can evolve distinct identity/personality via IDENTITY.md, SOUL.md
 - Independent session/memory (no shared state with Main)
 - Same technical capabilities as Main
@@ -724,6 +727,7 @@ For cron job details, schedules, state files, and processing flow, see [Cron Sys
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 4.1.0 | 2026-02-06 | **Per-user routing + model fix:** Fixed bruba-rex model (Sonnet → Opus per config.yaml). Added per-user document routing context to bruba-rex spec (`users:` frontmatter field). |
 | 4.0.0 | 2026-02-06 | **Masterdoc split:** Extracted Parts 6-14 to dedicated docs (cron-system, security-model, operations-guide, troubleshooting, configuration-reference, prompt-management, vault-strategy, known-issues). Core architecture (Parts 1-5) retained. ~2187 lines → ~700 lines. |
 | 3.13.0 | 2026-02-05 | **Vault mode (symlinks):** Replaced rsync + private branch vault model with symlink-based integration. Gitignored dirs become symlinks into a separate vault repo. New `vault-setup.sh` (enable/disable/status), rewritten `vault-sync.sh` (simple commit) and `vault-propose.sh` (direct vault→PR, no private branch). Added `load_vault_config()` to lib.sh, `vault:` config section, `docs/vault-strategy.md`. |
 | 3.12.0 | 2026-02-05 | **Per-agent content pipeline:** Content pipeline (`/pull` → `/convert` → `/intake` → `/export` → `/push`) now handles per-agent intake and export. Agents opt in with `content_pipeline: true` in config.yaml. Files carry `agents:` frontmatter field for routing to specific agent memories. Per-agent dirs under `agents/{agent}/` (sessions, intake, exports, mirror, assembled). Backward compatible — files without `agents:` default to bruba-main. |

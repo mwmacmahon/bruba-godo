@@ -1,5 +1,5 @@
 name: nightly-reset
-description: Manager resets all agent sessions via exec
+description: Manager resets all agent sessions (including itself) via exec in isolated session
 status: active
 
 schedule:
@@ -12,7 +12,7 @@ execution:
   agent: bruba-manager
 
 message: |
-  Nightly session reset. Run this exec command to reset all agents (including yourself):
+  Nightly session reset. Run this exec command to reset all agent sessions:
 
   exec /Users/bruba/agents/bruba-shared/tools/session-reset.sh all
 

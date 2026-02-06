@@ -7,7 +7,7 @@ description: "Cron job architecture, nightly reset cycle, and session-control in
 
 # Cron System
 
-Cron-based nightly maintenance for the Bruba multi-agent system. A single unified cycle handles session export, prep, reset, and wake across all agents.
+Cron-based nightly maintenance for the Bruba multi-agent system. A single unified cycle handles session export, prep, reset, and continuation loading across all agents.
 
 > **Related docs:**
 > - [Session Lifecycles](session-lifecycles.md) — Compaction, memoryFlush, continuation packets
@@ -18,18 +18,20 @@ Cron-based nightly maintenance for the Bruba multi-agent system. A single unifie
 
 ## Nightly Sequence Overview
 
-One unified cycle, all managed by bruba-manager in isolated Haiku sessions:
+One unified cycle, all managed by bruba-manager in isolated Sonnet sessions:
 
 ```
 4:00 AM  nightly-export    Manager → Main, Rex: "Run export prompt"
 4:00 AM  nightly-prep      Manager → Main, Manager, Guru, Rex: "Write CONTINUATION.md"
-4:08 AM  nightly-reset     Manager → exec session-reset.sh all (resets ALL agents incl. self)
-4:10 AM  nightly-wake      Manager → Main, Manager, Web, Guru, Rex: "Good morning"
+4:08 AM  nightly-reset     Manager (isolated) → exec session-reset.sh all
+4:10 AM  nightly-continue  Manager → Main, Rex, Guru: "Load CONTINUATION.md"
 ```
 
-**Why one cycle?** The `session-reset.sh all` script resets every agent via `openclaw gateway call sessions.reset`, including Manager. No need for a separate Manager cycle run by Main.
+**Why one job for all resets?** The isolated cron session runs `exec session-reset.sh all`, which resets all 5 agents (Main, Manager, Guru, Rex, Web) via `openclaw gateway call sessions.reset`. Because the cron runs in an isolated session, resetting Manager's main session doesn't affect the cron's own session.
 
 **Why isolated sessions?** Each cron run gets a fresh context. No token accumulation in agents' main sessions.
+
+**Why only 3 agents in continue?** Manager and Web don't need continuation packets — Manager is stateless coordination, Web is a stateless research service.
 
 ---
 
@@ -41,14 +43,16 @@ As of 2026-02-06, 4 active nightly jobs:
 |-----|----------|-------|--------|---------|
 | `nightly-export` | 4:00 AM daily | bruba-manager | sessions_send | Main, Rex |
 | `nightly-prep` | 4:00 AM daily | bruba-manager | sessions_send | Main, Manager, Guru, Rex |
-| `nightly-reset` | 4:08 AM daily | bruba-manager | exec session-reset.sh | All (Main, Manager, Guru, Rex) |
-| `nightly-wake` | 4:10 AM daily | bruba-manager | sessions_send | Main, Manager, Web, Guru, Rex |
+| `nightly-reset` | 4:08 AM daily | bruba-manager | exec (isolated session) | All 5: Main, Manager, Guru, Rex, Web |
+| `nightly-continue` | 4:10 AM daily | bruba-manager | sessions_send | Main, Rex, Guru |
 
 ### How Reset Works
 
-The critical fix: `nightly-reset` uses `exec` to run `session-reset.sh all`, which calls `openclaw gateway call sessions.reset` for each agent. This is the only confirmed working reset method.
+`nightly-reset` runs `exec session-reset.sh all` directly in an isolated cron session. The script calls `openclaw gateway call sessions.reset` for each agent — all 5 including Manager itself. Because the cron runs in an isolated session (separate from Manager:main), resetting Manager's main session doesn't interfere with the cron execution.
 
-Previous broken approach: `sessions_send "/reset"` — agents interpreted as text, no actual reset occurred.
+**Previous approach (deprecated):** `sessions_send` delegation to Manager:main, which then ran exec. This was needed when Manager's `tools.allow` whitelist was missing `exec`. After fixing the whitelist, direct exec in isolated sessions works reliably.
+
+**Broken approach (never worked):** `sessions_send "/reset"` — agents interpreted as text, no actual reset occurred.
 
 ---
 
@@ -62,8 +66,8 @@ Previous broken approach: `sessions_send "/reset"` — agents interpreted as tex
 |------|----------|-------------|
 | `nightly-export.yaml` | nightly-export | Manager tells export_cycle agents to run export prompt |
 | `nightly-prep.yaml` | nightly-prep | Manager tells reset_cycle agents to write CONTINUATION.md |
-| `nightly-reset.yaml` | nightly-reset | Manager execs session-reset.sh all |
-| `nightly-wake.yaml` | nightly-wake | Manager wakes wake_cycle agents post-reset |
+| `nightly-reset.yaml` | nightly-reset | Manager resets all agents via exec in isolated session |
+| `nightly-continue.yaml` | nightly-continue | Manager tells Main, Rex, Guru to load CONTINUATION.md |
 
 ### Proposed (not synced)
 
@@ -84,17 +88,19 @@ Proposed jobs depend on the inbox/heartbeat pattern (see below) which is not yet
 Registers YAML jobs with the bot's OpenClaw instance.
 
 ```bash
-./tools/sync-cronjobs.sh              # Sync all active YAML jobs
-./tools/sync-cronjobs.sh --check      # Dry-run: show what would change
-./tools/sync-cronjobs.sh --update     # Update existing jobs (schedule, message)
+./tools/sync-cronjobs.sh              # Sync all active YAML jobs (register new ones)
+./tools/sync-cronjobs.sh --check      # Show drift across all fields (exits 1 if differences)
+./tools/sync-cronjobs.sh --update     # Update existing jobs (all fields: schedule, message, description, model)
+./tools/sync-cronjobs.sh --update --delete        # Also remove bot-only orphan jobs (prompts for confirmation)
+./tools/sync-cronjobs.sh --update --delete --force # Remove orphans without prompting
 ./tools/sync-cronjobs.sh --verbose    # Detailed output
 ```
 
-Only syncs jobs with `status: active`. Detects schedule drift and warns about mismatches.
+Compares all fields: schedule, message, description, model, agent, session. Detects orphan jobs on bot that aren't tracked in local YAML.
 
 ### generate-cronjobs.sh
 
-Generates YAML files from templates in `templates/cronjobs/`. Uses agent lists from `config.yaml` (`reset_cycle`, `wake_cycle`, `export_cycle`) to build per-agent message blocks.
+Generates YAML files from templates in `templates/cronjobs/`. Uses agent lists from `config.yaml` (`reset_cycle`, `continue_cycle`, `export_cycle`) to build per-agent message blocks.
 
 ```bash
 ./tools/generate-cronjobs.sh              # Regenerate from templates
@@ -108,7 +114,7 @@ Generates YAML files from templates in `templates/cronjobs/`. Uses agent lists f
 
 **Continuation types:** Agents with `continuation_type: technical` get a technical-flavored prep message (topics worked on, debugging status, handoff notes) instead of the standard one.
 
-**Static templates:** `nightly-reset.yaml` has no `{{AGENT_MESSAGES}}` — it uses a fixed `exec session-reset.sh all` command.
+**Static templates:** `nightly-reset.yaml` has no `{{AGENT_MESSAGES}}` — it uses a fixed `exec session-reset.sh all` pattern (direct exec in isolated session).
 
 ### config.yaml cycle membership
 
@@ -116,20 +122,19 @@ Generates YAML files from templates in `templates/cronjobs/`. Uses agent lists f
 agents:
   bruba-main:
     reset_cycle: true
-    wake_cycle: true
+    continue_cycle: true
     export_cycle: true
   bruba-manager:
     reset_cycle: true
-    wake_cycle: true
   bruba-guru:
     reset_cycle: true
-    wake_cycle: true
+    continue_cycle: true
   bruba-rex:
     reset_cycle: true
-    wake_cycle: true
+    continue_cycle: true
     export_cycle: true
   bruba-web:
-    wake_cycle: true    # wake only, no reset/export
+    reset_cycle: true
 ```
 
 ---
@@ -158,9 +163,21 @@ Deployed to `/Users/bruba/agents/bruba-shared/tools/` on the bot:
 | `session-compact.sh` | Force compaction via gateway call | `session-compact.sh <agent>` |
 | `session-broadcast.sh` | Send templated messages to agents | `session-broadcast.sh prep\|export\|wake` |
 
-All scripts are in the exec-approvals allowlist for bruba-main, bruba-manager, and bruba-rex.
+All scripts are in the exec-approvals allowlist for bruba-main, bruba-manager, bruba-guru, and bruba-rex.
 
 See `components/session-control/README.md` for full documentation.
+
+---
+
+## Tool Availability in Cron Sessions
+
+**Critical gotcha:** Isolated cron sessions inherit tool permissions from the agent's `tools.allow` whitelist in `openclaw.json`. If `tools.allow` is defined, **only those exact tools are provisioned** — it's a strict whitelist, not additive.
+
+This caused the nightly-reset failure on 2026-02-06: Manager's `tools.allow` was a stale list from before session-control was added, missing `exec`. The model literally could not see exec as an available tool.
+
+**Fix:** Always define explicit `tools_allow` for every agent in `config.yaml`, and run `sync-openclaw-config.sh` after changes. The sync script only writes `tools.allow` when `tools_allow` is defined in config.yaml — if missing, the stale value on the bot is preserved.
+
+**Best practice for cron jobs that need exec:** Ensure `exec` is in the agent's `tools_allow` in `config.yaml`, then run `sync-openclaw-config.sh`. Direct exec in isolated sessions works reliably once the whitelist is correct.
 
 ---
 
@@ -214,11 +231,11 @@ Manager heartbeat is disabled in `config.yaml` (`heartbeat: false`). Was burning
 
 | Component | Model | Frequency | Est. Monthly |
 |-----------|-------|-----------|--------------|
-| nightly-export | Haiku | 1x daily | ~$0.05 |
-| nightly-prep | Haiku | 1x daily | ~$0.05 |
-| nightly-reset | Haiku | 1x daily | ~$0.03 |
-| nightly-wake | Haiku | 1x daily | ~$0.03 |
-| **Active total** | | | **~$0.16/mo** |
+| nightly-export | Sonnet | 1x daily | ~$0.15 |
+| nightly-prep | Sonnet | 1x daily | ~$0.15 |
+| nightly-reset | Sonnet (isolated) + Sonnet (main session) | 1x daily | ~$0.20 |
+| nightly-continue | Sonnet | 1x daily | ~$0.10 |
+| **Active total** | | | **~$0.60/mo** |
 
 ### Proposed (if all enabled)
 

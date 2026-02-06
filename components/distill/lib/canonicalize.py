@@ -144,6 +144,8 @@ def generate_canonical_frontmatter(config: CanonicalConfig) -> str:
         lines.append('tags: []')
     if config.agents:
         lines.append(f'agents: [{", ".join(config.agents)}]')
+    if config.users:
+        lines.append(f'users: [{", ".join(config.users)}]')
 
     # Section handling
     if config.sections_remove:

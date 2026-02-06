@@ -15,7 +15,7 @@
 set -e
 
 VALID_AGENTS="bruba-main bruba-manager bruba-guru bruba-rex bruba-web"
-RESET_CYCLE_AGENTS="bruba-main bruba-guru bruba-rex"
+RESET_CYCLE_AGENTS="bruba-main bruba-manager bruba-guru bruba-rex bruba-web"
 
 usage() {
     echo "Usage: session-reset.sh <agent-id|all>"
@@ -50,9 +50,6 @@ if [[ "$TARGET" == "all" ]]; then
     for agent in $RESET_CYCLE_AGENTS; do
         reset_agent "$agent" || ERRORS=$((ERRORS + 1))
     done
-    # Also reset manager (separate from cycle)
-    reset_agent "bruba-manager" || ERRORS=$((ERRORS + 1))
-
     echo ""
     if [[ $ERRORS -gt 0 ]]; then
         echo "Completed with $ERRORS errors"

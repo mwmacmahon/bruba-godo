@@ -713,6 +713,7 @@ def parse_v2_config_block(block: str) -> CanonicalConfig:
     scope = parsed.get('scope', '')
     description = parsed.get('description', '')
     agents = parse_inline_list(parsed.get('agents', []))
+    users = parse_inline_list(parsed.get('users', []))
 
     # Parse sections_remove
     sections_remove = []
@@ -807,6 +808,7 @@ def parse_v2_config_block(block: str) -> CanonicalConfig:
         scope=scope,
         description=description,
         agents=agents,
+        users=users,
         sections_remove=sections_remove,
         sections_lite_remove=sections_lite_remove,
         code_blocks=code_blocks,

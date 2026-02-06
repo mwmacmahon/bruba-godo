@@ -56,12 +56,12 @@ components/session-control/
 
 ## Nightly Cron Integration
 
-The `nightly-reset` cron job (4:08 AM ET) runs:
-```
-exec /Users/bruba/agents/bruba-shared/tools/session-reset.sh all
-```
+The `nightly-reset` cron job (4:08 AM ET) runs `exec session-reset.sh all` directly in an isolated Manager session:
+1. Isolated cron session runs `exec session-reset.sh all`
+2. Script resets all 5 agents (Main, Manager, Guru, Rex, Web) via gateway calls
+3. Because the cron runs in an isolated session, resetting Manager:main doesn't affect execution
 
-This resets all agents including Manager, replacing the previous broken 7-job, 2-cycle architecture with a single working command.
+This works because Manager's `tools.allow` includes `exec`. The isolated session is separate from Manager:main, so resetting Manager:main mid-exec is safe.
 
 ## Exec Approvals
 
@@ -69,4 +69,14 @@ The `allowlist.json` provides entries for:
 - All 4 session-control scripts (with and without args)
 - Direct `openclaw gateway call` commands for sessions.reset, sessions.compact, sessions.list
 
-Added to `allowlist_sections` for: bruba-main, bruba-manager, bruba-rex.
+Added to `allowlist_sections` for: bruba-main, bruba-manager, bruba-guru, bruba-rex.
+
+## Lessons Learned
+
+### tools.allow is a strict whitelist (2026-02-06)
+
+When `tools.allow` exists in `openclaw.json`, OpenClaw provisions **only those exact tools**. If `exec` is missing from the allow list, the model cannot use exec — even in isolated cron sessions that are supposed to "inherit" from the agent.
+
+**Root cause of nightly-reset failure:** Manager had a stale `tools.allow` without `exec`. The config-sync script didn't overwrite it because `config.yaml` didn't define `tools_allow` for Manager (only `tools_deny`). Every other agent already had explicit `tools_allow`.
+
+**Fix:** Always define `tools_allow` for every agent in config.yaml. The sync script skips allow-list updates when the field is absent.

@@ -228,6 +228,7 @@ date: YYYY-MM-DD
 source: bruba
 tags: [tag1, tag2]
 agents: [bruba-main]
+users: [gus]          # Optional: per-user routing (omit for everyone)
 
 sections_remove:
   - start: "First 5-50 words of section start..."

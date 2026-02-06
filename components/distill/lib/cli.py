@@ -286,13 +286,28 @@ def cmd_export(args):
     agent_profiles = {}
     for agent_name, agent_cfg in agents_config.items():
         if agent_cfg.get('content_pipeline', False) and 'include' in agent_cfg:
+            # Auto-derive include.users from identity.human_name if not set explicitly
+            include_rules = dict(agent_cfg.get('include', {}))
+            if 'users' not in include_rules:
+                human_name = agent_cfg.get('identity', {}).get('human_name', '')
+                if human_name:
+                    include_rules['users'] = [human_name.lower()]
             agent_profiles[agent_name] = {
                 'description': f"Content for {agent_name} memory",
                 'output_dir': f'agents/{agent_name}/exports',
-                'include': agent_cfg.get('include', {}),
+                'include': include_rules,
                 'exclude': agent_cfg.get('exclude', {}),
                 'redaction': agent_cfg.get('redaction', []),
             }
+
+    # Build user→agents mapping for auto-deriving agents from users
+    # Maps lowercase human_name to list of content_pipeline agent names
+    user_to_agents = {}
+    for agent_name, agent_cfg in agents_config.items():
+        if agent_cfg.get('content_pipeline', False):
+            human_name = agent_cfg.get('identity', {}).get('human_name', '')
+            if human_name:
+                user_to_agents.setdefault(human_name.lower(), []).append(agent_name)
 
     if not exports and not agent_profiles:
         print("No export profiles defined in config.yaml")
@@ -379,6 +394,7 @@ def cmd_export(args):
         processed = 0
         unchanged = 0
         skipped = 0
+        written_paths = set()
 
         for canonical_path in canonical_files:
             try:
@@ -410,6 +426,7 @@ def cmd_export(args):
                         prompts_dir = output_dir / "prompts"
                     prompts_dir.mkdir(parents=True, exist_ok=True)
                     out_path = prompts_dir / f"Prompt - {output_name}.md"
+                    written_paths.add(out_path)
                     if _write_if_changed(out_path, content):
                         processed += 1
                         if args.verbose:
@@ -453,6 +470,7 @@ def cmd_export(args):
                     if result.transcript:
                         out_name = f"{prefix}{canonical_path.stem}.md" if prefix else f"{canonical_path.stem}.md"
                         out_path = content_output_dir / out_name
+                        written_paths.add(out_path)
                         if _write_if_changed(out_path, result.transcript):
                             processed += 1
                             if args.verbose:
@@ -471,6 +489,7 @@ def cmd_export(args):
                         summary_dir.mkdir(parents=True, exist_ok=True)
                         summary_name = f"Summary - {canonical_path.stem}.md"
                         summary_path = summary_dir / summary_name
+                        written_paths.add(summary_path)
                         if _write_if_changed(summary_path, result.summary):
                             if args.verbose:
                                 print(f"  -> {summary_path}")
@@ -485,12 +504,17 @@ def cmd_export(args):
                     traceback.print_exc()
                 skipped += 1
 
+        # Remove stale files not produced by this export run
+        stale_count = _reconcile_stale_files(output_dir, written_paths, args.verbose)
         print(f"  Written: {processed}, Unchanged: {unchanged}, Skipped: {skipped}")
+        if stale_count:
+            print(f"  Removed: {stale_count} stale files")
         print(f"  Output: {output_dir}/")
 
     # Process agent export profiles (content_pipeline agents)
     if run_agent_profiles and agent_profiles:
         from .parsing import parse_inline_list as _parse_inline_list
+        unrouted_files = set()  # Files with no agents or users (won't reach any agent)
 
         for agent_name, agent_config in agent_profiles.items():
             print(f"\n=== Agent: {agent_name} ===")
@@ -508,6 +532,7 @@ def cmd_export(args):
             processed = 0
             unchanged = 0
             skipped = 0
+            written_paths = set()
 
             for canonical_path in canonical_files:
                 try:
@@ -528,6 +553,7 @@ def cmd_export(args):
                         prompts_dir = agent_output_dir / "prompts"
                         prompts_dir.mkdir(parents=True, exist_ok=True)
                         out_path = prompts_dir / f"Prompt - {output_name}.md"
+                        written_paths.add(out_path)
                         if _write_if_changed(out_path, content):
                             processed += 1
                             if args.verbose:
@@ -538,10 +564,22 @@ def cmd_export(args):
                         # Canonical files: check agents routing
                         config, main_content, backmatter = parse_canonical_file(content)
 
-                        # Get agents list from frontmatter (default to bruba-main)
+                        # Get agents list from frontmatter
+                        # Priority: explicit agents > derived from users > bruba-main (warn)
                         file_agents = getattr(config, 'agents', [])
                         if not file_agents:
-                            file_agents = ['bruba-main']
+                            # Auto-derive from users field via user→agent mapping
+                            file_users = getattr(config, 'users', [])
+                            if file_users and user_to_agents:
+                                derived = []
+                                for u in file_users:
+                                    derived.extend(user_to_agents.get(u.lower(), []))
+                                if derived:
+                                    file_agents = derived
+                            if not file_agents:
+                                # No users or agents — default to bruba-main, track for warning
+                                file_agents = ['bruba-main']
+                                unrouted_files.add(canonical_path.name)
 
                         # Skip if this agent isn't in the file's agents list
                         if agent_name not in file_agents:
@@ -576,18 +614,22 @@ def cmd_export(args):
                         if result.transcript:
                             out_name = f"{prefix}{canonical_path.stem}.md" if prefix else f"{canonical_path.stem}.md"
                             out_path = content_output_dir / out_name
+                            written_paths.add(out_path)
                             if _write_if_changed(out_path, result.transcript):
                                 processed += 1
                                 if args.verbose:
                                     print(f"  -> {out_path}")
                             else:
                                 unchanged += 1
+                                if args.verbose:
+                                    print(f"  (unchanged) {out_path.name}")
 
                         if result.summary:
                             summary_dir = agent_output_dir / "summaries"
                             summary_dir.mkdir(parents=True, exist_ok=True)
                             summary_name = f"Summary - {canonical_path.stem}.md"
                             summary_path = summary_dir / summary_name
+                            written_paths.add(summary_path)
                             if _write_if_changed(summary_path, result.summary):
                                 if args.verbose:
                                     print(f"  -> {summary_path}")
@@ -599,8 +641,24 @@ def cmd_export(args):
                         traceback.print_exc()
                     skipped += 1
 
+            # Remove stale files not produced by this export run
+            stale_count = _reconcile_stale_files(agent_output_dir, written_paths, args.verbose)
             print(f"  Written: {processed}, Unchanged: {unchanged}, Skipped: {skipped}")
+            if stale_count:
+                print(f"  Removed: {stale_count} stale files")
             print(f"  Output: {agent_output_dir}/")
+
+        # Warn about files with no routing info
+        if unrouted_files:
+            print(f"\nWarning: {len(unrouted_files)} file(s) have no 'users' or 'agents' in frontmatter (defaulting to bruba-main):")
+            if len(unrouted_files) <= 10:
+                for name in sorted(unrouted_files):
+                    print(f"  - {name}")
+            else:
+                for name in sorted(unrouted_files)[:5]:
+                    print(f"  - {name}")
+                print(f"  ... and {len(unrouted_files) - 5} more")
+            print("  Add 'users:' to frontmatter to control routing.")
 
     print("\nExport complete.")
 
@@ -732,6 +790,36 @@ def _write_if_changed(path: Path, content: str) -> bool:
     return True
 
 
+def _reconcile_stale_files(output_dir: Path, written_paths: set, verbose: bool = False) -> int:
+    """Remove .md files from output_dir not in written_paths set."""
+    inventory_files = {'Document Inventory.md', 'Transcript Inventory.md'}
+    excluded_subdirs = {'core-prompts'}  # Managed by assemble-prompts.sh
+    deleted = 0
+    for md_file in output_dir.rglob("*.md"):
+        if md_file.parent == output_dir and md_file.name in inventory_files:
+            continue
+        try:
+            rel = md_file.relative_to(output_dir)
+            if rel.parts[0] in excluded_subdirs:
+                continue
+        except (ValueError, IndexError):
+            pass
+        if md_file not in written_paths:
+            md_file.unlink()
+            deleted += 1
+            if verbose:
+                print(f"  Removed stale: {md_file}")
+    # Clean empty subdirs
+    for subdir in sorted(output_dir.rglob("*"), reverse=True):
+        if subdir.is_dir() and subdir.name not in excluded_subdirs:
+            try:
+                if not any(subdir.iterdir()):
+                    subdir.rmdir()
+            except OSError:
+                pass
+    return deleted
+
+
 def _parse_prompt_frontmatter(content: str) -> dict:
     """
     Parse simple YAML frontmatter from a prompt file.
@@ -753,6 +841,36 @@ def _parse_prompt_frontmatter(content: str) -> dict:
         return {}
 
 
+def _matches_user_filter(file_users: list, profile_users: list) -> bool:
+    """Check if file's users list matches profile's include.users.
+
+    Semantics:
+    - No file users → everyone (return True)
+    - No profile users → accept all (return True)
+    - 'only-X' users → profile's users must be a subset of the only- set
+    - Normal users → profile's users must intersect with file's users
+    """
+    if not file_users:
+        return True
+    if not profile_users:
+        return True
+
+    only_users = set()
+    inclusive_users = set()
+    for u in file_users:
+        ul = u.lower().strip()
+        if ul.startswith('only-'):
+            only_users.add(ul[5:])
+        else:
+            inclusive_users.add(ul)
+
+    prof = set(u.lower().strip() for u in profile_users)
+
+    if only_users:
+        return prof <= only_users  # subset check
+    return bool(prof & inclusive_users)
+
+
 def _matches_prompt_filters(config: dict, include_rules: dict, exclude_rules: dict, profile_name: str = None) -> bool:
     """
     Check if a prompt config (dict) matches the include/exclude filters.
@@ -770,6 +888,15 @@ def _matches_prompt_filters(config: dict, include_rules: dict, exclude_rules: di
     prompt_profile = config.get('profile')
     if prompt_profile:
         if profile_name and prompt_profile != profile_name:
+            return False
+
+    # Check exclude.tags
+    exclude_tags = exclude_rules.get('tags', [])
+    if exclude_tags:
+        if isinstance(exclude_tags, str):
+            exclude_tags = [exclude_tags]
+        file_tags = set(config.get('tags', []) or [])
+        if file_tags & set(exclude_tags):
             return False
 
     # Check include.type
@@ -793,6 +920,17 @@ def _matches_prompt_filters(config: dict, include_rules: dict, exclude_rules: di
             # Also check if 'meta' is in include_scope (prompts are meta by default)
             if 'meta' not in include_scope:
                 return False
+
+    # Check include.users (per-user routing)
+    include_users = include_rules.get('users', [])
+    if include_users:
+        if isinstance(include_users, str):
+            include_users = [include_users]
+        file_users = config.get('users', []) or []
+        if isinstance(file_users, str):
+            file_users = [file_users]
+        if not _matches_user_filter(file_users, include_users):
+            return False
 
     return True
 
@@ -856,6 +994,15 @@ def _matches_filters(config, include_rules: dict, exclude_rules: dict) -> bool:
                     if tag in exclude_sensitivity:
                         return False
 
+    # Check exclude.tags
+    exclude_tags = exclude_rules.get('tags', [])
+    if exclude_tags:
+        if isinstance(exclude_tags, str):
+            exclude_tags = [exclude_tags]
+        file_tags = set(config.tags) if config.tags else set()
+        if file_tags & set(exclude_tags):
+            return False
+
     # Check include.type
     include_type = include_rules.get('type', [])
     if include_type:
@@ -883,6 +1030,15 @@ def _matches_filters(config, include_rules: dict, exclude_rules: dict) -> bool:
             include_tags = [include_tags]
         file_tags = set(config.tags) if config.tags else set()
         if not any(tag in file_tags for tag in include_tags):
+            return False
+
+    # Check include.users (per-user routing)
+    include_users = include_rules.get('users', [])
+    if include_users:
+        if isinstance(include_users, str):
+            include_users = [include_users]
+        file_users = config.users if hasattr(config, 'users') and config.users else []
+        if not _matches_user_filter(file_users, include_users):
             return False
 
     return True

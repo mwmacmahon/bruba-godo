@@ -1,6 +1,6 @@
 ---
-version: 1.12.0
-updated: 2026-02-05
+version: 1.14.0
+updated: 2026-02-06
 type: refdoc
 project: planning
 tags: [bruba, filesystem, data-flow, bruba-godo, operations, guru, message-tool, rex]
@@ -100,8 +100,10 @@ Complete reference for file locations, ownership, and data flow between operator
 ├── reference/                   # Canonical content (source of truth)
 │   ├── transcripts/            # Canonicalized conversation transcripts
 │   │   └── YYYY-MM-DD-slug.md
-│   └── refdocs/                # Reference documents
-│       └── descriptive-name.md
+│   ├── refdocs/                # Reference documents
+│   │   └── descriptive-name.md
+│   └── research/               # Research documents (shared across users)
+│       └── topic-name.md
 │
 ├── agents/                      # Per-agent directories
 │   ├── bruba-main/
@@ -147,13 +149,9 @@ Complete reference for file locations, ownership, and data flow between operator
 │       └── mirror/
 │           └── prompts/
 │
-├── exports/                     # Non-agent exports
-│   └── claude/                 # For Claude Projects
-│       ├── transcripts/
-│       ├── refdocs/
-│       ├── docs/
-│       ├── summaries/
-│       └── cc_logs/
+├── exports/                     # Non-agent exports (per-user)
+│   ├── claude-gus/             # For Claude Projects (Gus)
+│   └── claude-rex/             # For Claude Projects (Rex)
 │
 ├── cronjobs/                    # Generated cron job definitions (gitignored)
 │   ├── nightly-reset-prep.yaml
@@ -413,12 +411,14 @@ reference/transcripts/{slug}.md (canonical, agents: in frontmatter)
        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                        /export                               │
-│  Standalone profiles (claude, tests): all files              │
+│  Standalone profiles (claude-gus, claude-rex, tests):        │
+│  - Filter by include/exclude rules (type, scope, tags, users)│
 │  Agent profiles (bruba-main, bruba-rex):                     │
 │  - Route via agents: frontmatter field                       │
 │  - Default to [bruba-main] if no agents: field               │
-│  - Filter by include/exclude rules                           │
+│  - Filter by include.users (per-user document routing)       │
 │  - Apply sections_remove + redaction                         │
+│  - Stale file reconciliation after each profile              │
 │  - Add type prefix (Transcript -, Doc -, etc.)               │
 └─────────────────────────────────────────────────────────────┘
        │
@@ -436,7 +436,11 @@ agents/{agent}/exports/transcripts/Transcript - {slug}.md
 /Users/bruba/agents/{agent}/memory/Transcript - {slug}.md
 ```
 
-**Routing model:** Canonical files in `reference/` use `agents: [bruba-main, bruba-rex]` in YAML frontmatter to control which agents receive them during export. Files without this field default to `[bruba-main]`.
+**Routing model:** Export uses two routing fields in YAML frontmatter:
+- `agents: [bruba-main, bruba-rex]` — controls which bot agents receive the file (agent exports only; defaults to `[bruba-main]` if omitted)
+- `users: [gus, rex]` — controls which human's profiles receive the file (both standalone and agent exports; omit to send to everyone)
+
+For multi-user content, both fields are needed. See `docs/distill-pipeline.md` for the full filtering system.
 
 ### Pipeline 3: Mirror (Conflict Detection)
 
@@ -1216,6 +1220,8 @@ docker exec -it openclaw-sandbox-bruba-main /bin/sh
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.14.0 | 2026-02-06 | **Routing model docs + research dir:** Added `reference/research/` to directory tree. Clarified routing model in Pipeline 2 — both `agents` and `users` fields needed for multi-agent routing, cross-referenced to `distill-pipeline.md` for full filtering docs. |
+| 1.13.0 | 2026-02-06 | **Per-user routing + export cleanup:** Updated exports directory tree (`exports/claude/` → `exports/claude-gus/` + `exports/claude-rex/`). Updated Pipeline 2 export box to show per-user filtering, stale file reconciliation. Added `users:` field to routing model description. |
 | 1.12.0 | 2026-02-05 | **Vault mode active:** Vault symlinks enabled — all content dirs now symlinked into `bruba-vault/`. Vault internal structure migrated from flat `sessions/{agent}/` to `agents/{agent}/sessions/`. Cleaned up stale leftovers (empty `intake/`, doubled-prefix duplicates). Updated vault.deny to single `agents/` pattern. |
 | 1.11.0 | 2026-02-05 | **Directory reorganization:** Moved per-agent directories (`sessions/`, `intake/`, `exports/bot/`, `mirror/`) under `agents/{agent}/`. Each agent now has its own `exports/`, `intake/`, `mirror/`, and `sessions/` subdirectories. Updated all pipeline diagrams, vault symlinks, quick reference, and section type references. |
 | 1.10.0 | 2026-02-05 | **Vault mode:** Added vault symlink documentation to directory tree (vault tools, vault-strategy.md), new "Vault Mode" section in Part 4 (Data Flow Pipelines) showing symlink layout and management commands. |

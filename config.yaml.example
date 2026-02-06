@@ -212,6 +212,8 @@ agents:
     include:
       scope: [meta, reference, transcripts]
       type: [prompt, doc, refdoc, claude_code_log]
+      # users: [user1]          # Per-user routing: only export docs tagged for this user
+                                 # Auto-derived from identity.human_name if not set
     exclude:
       sensitivity: [sensitive, restricted]
     redaction: [names, health]
@@ -233,8 +235,18 @@ agents:
         start: "07:00"                         # Start at 7am
         end: "22:00"                           # End at 10pm
     # Tool permissions (synced to openclaw.json)
-    # Manager: coordinator agent, needs exec for CLI tools (remindctl, icalBuddy)
-    # Note: exec NOT denied - manager needs it for heartbeat checks
+    # Manager: coordinator agent, needs exec for CLI tools (remindctl, icalBuddy, session-control)
+    # IMPORTANT: tools_allow is a strict whitelist — if present, only listed tools are provisioned
+    tools_allow:
+      - exec
+      - read
+      - write
+      - memory_get
+      - memory_search
+      - sessions_send
+      - sessions_list
+      - session_status
+      - message
     tools_deny:
       - web_search        # Use -web agent via sessions_send
       - web_fetch         # Use -web agent via sessions_send
@@ -371,6 +383,7 @@ agents:
   #   include:
   #     scope: [meta, reference, transcripts]
   #     type: [prompt, doc, refdoc, claude_code_log]
+  #     users: [user2]          # Per-user routing for alternate identity
   #   exclude:
   #     sensitivity: [sensitive, restricted]
   #   redaction: [names, health]
@@ -397,14 +410,28 @@ subagents:
     - web_fetch           # Cannot have tools parent doesn't have
 
 # Export profiles for non-agent destinations
+# Per-user profiles: split by include.users so each human gets only their docs
 exports:
-  claude:
-    description: "Prompts for Claude Projects / Claude Code"
-    output_dir: exports/claude
+  claude-user1:
+    description: "Prompts for Claude Projects / Claude Code (User1)"
+    output_dir: exports/claude-user1
     flatten_export: true
     include:
       scope: [meta, reference, transcripts]
       type: [prompt, doc, refdoc, claude_code_log]
+      users: [user1]            # Only docs tagged for user1 (or untagged)
+    exclude:
+      sensitivity: [sensitive, restricted]
+    redaction: [names, health]
+
+  claude-user2:
+    description: "Prompts for Claude Projects / Claude Code (User2)"
+    output_dir: exports/claude-user2
+    flatten_export: true
+    include:
+      scope: [meta, reference, transcripts]
+      type: [prompt, doc, refdoc, claude_code_log]
+      users: [user2]            # Only docs tagged for user2 (or untagged)
     exclude:
       sensitivity: [sensitive, restricted]
     redaction: [names, health]

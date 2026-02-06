@@ -253,6 +253,9 @@ class CanonicalConfig:
     # === AGENT ROUTING ===
     agents: List[str] = field(default_factory=list)
 
+    # === USER ROUTING ===
+    users: List[str] = field(default_factory=list)
+
     # === SECTION HANDLING ===
     sections_remove: List[SectionSpec] = field(default_factory=list)
     sections_lite_remove: List[SectionSpec] = field(default_factory=list)
