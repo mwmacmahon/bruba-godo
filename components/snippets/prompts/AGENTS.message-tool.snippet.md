@@ -1,9 +1,9 @@
 <!-- COMPONENT: message-tool -->
 ## 📤 Direct Message Tool
 
-The `message` tool sends content directly to Signal, outside the normal response flow.
+The `message` tool sends content directly to messaging channels, outside the normal response flow.
 
-### Basic Syntax
+### Signal Syntax
 
 **Text only:**
 ```
@@ -15,40 +15,32 @@ message action=send target=uuid:<recipient-uuid> message="Your message"
 message action=send target=uuid:<recipient-uuid> filePath=/path/to/file message="Caption"
 ```
 
-### ${HUMAN_NAME}'s Signal UUID
+### BlueBubbles/iMessage Syntax
 
+**Text only:**
+```json
+{ "action": "send", "channel": "bluebubbles", "target": "<phone-or-email>", "message": "Your message" }
 ```
-uuid:${SIGNAL_UUID}
+
+**With attachment:**
+```json
+{ "action": "sendAttachment", "channel": "bluebubbles", "target": "<phone-or-email>", "path": "/path/to/file", "caption": "Caption" }
 ```
+
+Target accepts E.164 phone number (e.g. `+15551234567`), email, or `chat_guid:...`.
 
 ### NO_REPLY Pattern
 
-If you're bound to Signal (like bruba-main), follow message tool with `NO_REPLY`:
+If you're bound to a messaging channel (like bruba-main → BlueBubbles), follow message tool with `NO_REPLY`:
 
-```
-message action=send target=uuid:${SIGNAL_UUID} message="response"
+```json
+{ "action": "send", "channel": "bluebubbles", "target": "+1...", "message": "response" }
 NO_REPLY
 ```
 
-**Why?** Your normal response also goes to Signal. Without NO_REPLY = duplicate.
+**Why?** Your normal response also goes to the channel. Without NO_REPLY = duplicate.
 
-**Exception:** Agents NOT bound to Signal (bruba-guru, bruba-web) don't need NO_REPLY — their normal response goes back to the calling agent, not Signal.
-
-### Common Patterns
-
-**Siri async (HTTP→Signal):**
-```
-message action=send target=uuid:${SIGNAL_UUID} message="response"
-✓
-```
-(No NO_REPLY needed — HTTP responses don't go to Signal)
-
-**Guru direct response:**
-```
-message action=send target=uuid:${SIGNAL_UUID} message="[full technical response]"
-Summary: [one-liner for Main's tracking]
-```
-(No NO_REPLY — Guru returns to Main via sessions_send, not Signal)
+**Exception:** Agents NOT directly bound to a channel (bruba-guru, bruba-web) don't need NO_REPLY — their normal response goes back to the calling agent, not the channel.
 
 ### When to Use
 
@@ -56,7 +48,7 @@ Summary: [one-liner for Main's tracking]
 |----------|-------------------|-----------|
 | Normal text reply | No | N/A |
 | Voice reply | Yes | Yes |
-| Siri async | Yes | No |
+| Siri async (HTTP) | Yes | No |
 | Guru technical response | Yes | No |
 | Sending image/file | Yes | Yes |
 | Alert from Manager | No (via Main) | N/A |

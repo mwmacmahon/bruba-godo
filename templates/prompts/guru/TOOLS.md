@@ -210,21 +210,21 @@ You have the tools for deep technical work. Use them thoroughly.
 
 ## Direct Response Tools
 
-### message
+### message (BlueBubbles/iMessage)
 
-Send messages directly to Signal, bypassing Main.
+Send messages directly to ${HUMAN_NAME} via iMessage, bypassing Main.
 
 **Text only:**
-```
-message action=send target=uuid:${SIGNAL_UUID} message="Your message"
-```
-
-**With audio/media:**
-```
-message action=send target=uuid:${SIGNAL_UUID} filePath=/tmp/response.wav message="Caption"
+```json
+{ "action": "send", "channel": "bluebubbles", "target": "${BB_PHONE}", "message": "Your message" }
 ```
 
-**${HUMAN_NAME}'s UUID:** `uuid:${SIGNAL_UUID}`
+**With attachment (audio, image, file):**
+```json
+{ "action": "sendAttachment", "channel": "bluebubbles", "target": "${BB_PHONE}", "path": "/tmp/response.wav", "caption": "Caption" }
+```
+
+**${HUMAN_NAME}'s phone:** `${BB_PHONE}`
 
 **When to use:**
 - Substantial technical responses (>500 words)
@@ -234,7 +234,7 @@ message action=send target=uuid:${SIGNAL_UUID} filePath=/tmp/response.wav messag
 
 **After sending:** Return only a summary to Main, not the full content.
 
-**You don't need NO_REPLY** because you're not bound to Signal. Your return goes to Main via the sessions_send callback, not to Signal.
+**You don't need NO_REPLY** because you're not bound to a message channel directly. Your return goes to Main via the sessions_send callback, not to iMessage.
 
 ---
 
@@ -253,7 +253,7 @@ exec /Users/bruba/tools/tts.sh "Text to speak" /tmp/response.wav
 **Use with message tool:**
 ```
 exec /Users/bruba/tools/tts.sh "Here's what I found..." /tmp/response.wav
-message action=send target=uuid:${SIGNAL_UUID} filePath=/tmp/response.wav message="Here's what I found..."
+message { "action": "sendAttachment", "channel": "bluebubbles", "target": "${BB_PHONE}", "path": "/tmp/response.wav", "caption": "Here's what I found..." }
 ```
 
 ---

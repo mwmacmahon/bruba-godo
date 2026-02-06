@@ -8,7 +8,7 @@ Provides technical deep-dive routing from bruba-main to bruba-guru. Main detects
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  User (via Signal)                                          │
+│  User (via iMessage/BlueBubbles)                             │
 └─────────────────┬───────────────────────────────────────────┘
                   │
                   ▼

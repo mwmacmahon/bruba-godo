@@ -102,7 +102,7 @@ STANDARD_PREP_MSG='Session reset in 7 minutes. Write a continuation packet to me
 TECHNICAL_PREP_MSG='Session reset in 7 minutes. Write a continuation packet to memory/CONTINUATION.md. Include: Technical Session Summary (topics worked on), In Progress (debugging/analysis status), Open Questions (unresolved technical issues), Handoff Notes (context for next session). Write actual content, not placeholders. Create the file now.'
 
 # Export message for agents with export_cycle
-EXPORT_MSG='Nightly export. Search memory for "Prompt - Export.md" and follow its instructions. Use these defaults: source=bruba, tags=[nightly-export]. Mark debugging tangents and large code/log blocks for sections_remove. Write the exported conversation with CONFIG block and backmatter to intake/YYYY-MM-DD-nightly-export.md. Use your best judgment for all fields — no user input is available.'
+EXPORT_MSG='Nightly export. Search memory for "Prompt - Export.md" and follow its Non-Interactive Mode instructions. source=bruba, tags include [nightly-export]. Write output to intake/. Use your best judgment — no user input is available.'
 
 # Generate a cronjob file from template
 # Args: template_name

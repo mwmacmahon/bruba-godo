@@ -32,6 +32,10 @@ This avoids context bloat and Bug #3589 (heartbeat prompt bleeding).
 
 | Job | Agent | Status | Schedule |
 |-----|-------|--------|----------|
+| nightly-export | bruba-manager → agents | ✅ active | 3:50am daily |
+| nightly-reset-prep | bruba-manager → agents | ✅ active | 3:55am daily |
+| nightly-reset-execute | bruba-manager → agents | ✅ active | 4:02am daily |
+| nightly-reset-wake | bruba-manager → agents | ✅ active | 4:07am daily |
 | pre-reset-continuity | bruba-main | ✅ active | 3:55am daily |
 | guru-pre-reset-continuity | bruba-guru | 📋 proposed | 3:55am daily |
 | reminder-check | bruba-manager | ✅ active | 9am, 2pm, 6pm daily |
@@ -39,7 +43,7 @@ This avoids context bloat and Bug #3589 (heartbeat prompt bleeding).
 | calendar-prep | bruba-manager | 📋 proposed | 7am weekdays |
 | morning-briefing | bruba-manager | 📋 proposed | 7:15am weekdays |
 
-**Note:** Main and Guru pre-reset jobs run at same time (3:55am, before 4am reset). Edit together to keep synchronized.
+**Note:** Nightly jobs run in sequence: export (3:50) → prep (3:55) → reset (4:02) → wake (4:07). Edit together to keep synchronized. The nightly-export job tells agents to follow Export.md's Non-Interactive Mode — see `components/distill/prompts/Export.md`.
 
 ## Adding New Jobs
 

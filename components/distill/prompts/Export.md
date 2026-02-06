@@ -13,6 +13,47 @@ Generate a CONFIG block and backmatter for this conversation.
 
 Trigger words: "export", "done", "wrap up", "finished", end of session.
 
+## Non-Interactive Mode
+
+When running from a cron job or automated trigger, skip all interactive steps and use sensible defaults.
+
+### Triggers
+
+Enter non-interactive mode when ANY of these apply:
+
+- Message contains "defaults" or "non-interactive"
+- Message source is cron or systemEvent
+- Message contains "nightly export" or "auto-export"
+
+### Auto-Detect Defaults
+
+| Field | Default |
+|-------|---------|
+| `title` | First substantive topic discussed, or `"YYYY-MM-DD Nightly Export"` as fallback |
+| `source` | Detect from conversation context (default: `bruba`) |
+| `tags` | `[nightly-export]` + auto-detected topic tags |
+
+### Automatic Cleanup Rules
+
+Apply `sections_remove` automatically for these patterns:
+
+| Pattern | Threshold | Replacement |
+|---------|-----------|-------------|
+| Code blocks | >50 lines | `[Code: N lines lang - description]` |
+| Error/debug logs | >20 lines | `[Log output: N lines - what it shows]` |
+| Repeated tool calls | >3 consecutive similar calls | `[Repeated tool calls: N iterations - purpose]` |
+| Voice transcription artifacts | Raw transcription blocks | `[Transcription: topic summary]` |
+| Sensitive patterns | Names, health, financial | Flag in `sensitivity.terms` but do NOT redact — user reviews later |
+
+### Output Behavior
+
+1. Write export file to `intake/YYYY-MM-DD-[slug].md` (CONFIG + conversation + backmatter)
+2. Append brief log entry to `memory/exports-log.md`
+3. Write continuation packet per existing session rules (if applicable)
+4. Do **NOT** wait for confirmation or ask follow-up questions
+
+---
+
 ## What You'll Generate
 
 1. **CONFIG block** — metadata for processing (filtering, redaction, section removal)
@@ -253,3 +294,17 @@ When the user asks for export:
 **Without file access:**
 5. Output CONFIG and backmatter at the end of your response
 6. User copies the full conversation into a file for processing
+
+---
+
+## Manual Override
+
+Users can mix interactive and non-interactive modes:
+
+| Trigger | Behavior |
+|---------|----------|
+| `"done"` or `"export"` | Full interactive mode (current behavior) |
+| `"done, defaults"` or `"export, defaults"` | Non-interactive mode — use all auto-detected defaults |
+| `"done, skip code blocks, flag work stuff"` | Selective override — apply named defaults, ask about the rest |
+
+When partial overrides are specified, apply the named defaults and use interactive mode for remaining fields only if the user is available. If no user input is available (cron/systemEvent), fall back to auto-detect for unspecified fields.

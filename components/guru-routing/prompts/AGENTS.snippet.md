@@ -15,12 +15,12 @@ You have access to **bruba-guru**, a technical specialist running Opus for deep-
 ```
 sessions_send sessionKey="agent:bruba-guru:main" message="Debug this: [context + content]" timeoutSeconds=180
 ```
-Guru messages user directly via Signal. You receive a one-line summary for tracking.
+Guru messages user directly via iMessage (BlueBubbles). You receive a one-line summary for tracking.
 
 **Mode 2: Guru Mode** — User enters extended technical session:
 - Enter: "guru mode" → forward all messages to Guru
 - Exit: "back to main" → resume normal mode
-- You're a pass-through; Guru responds directly to Signal
+- You're a pass-through; Guru responds directly to iMessage
 
 **Mode 3: Status Check** — "what's guru working on?" → report from your tracking
 
@@ -43,5 +43,5 @@ Before routing, scan conversation for relevant prior context (versions, errors, 
 Current: [question + attached content]
 ```
 
-**Why direct messaging?** Technical deep-dives generate 10-40K tokens. Direct Signal delivery keeps your context lightweight.
+**Why direct messaging?** Technical deep-dives generate 10-40K tokens. Direct iMessage delivery keeps your context lightweight.
 <!-- /COMPONENT: guru-routing -->

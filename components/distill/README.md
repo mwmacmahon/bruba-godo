@@ -162,7 +162,9 @@ components/distill/
 ├── config/
 │   └── corrections.yaml   # Voice transcription fixes
 ├── prompts/
-│   └── AGENTS.snippet.md  # Bot instructions for distill workflow
+│   ├── AGENTS.snippet.md  # Bot instructions for distill workflow
+│   ├── Export.md           # Export prompt (interactive + non-interactive modes)
+│   └── Transcription.md   # Voice transcription second-pass prompt
 └── lib/
     ├── __init__.py
     ├── cli.py             # CLI entry point
@@ -308,6 +310,10 @@ The file needs a CONFIG block. Run `/convert <file>` to add one.
 ### "Error: exports.yaml not found"
 
 Create exports.yaml in repo root (see Configuration above).
+
+## Non-Interactive Mode (Cron)
+
+Export.md includes a Non-Interactive Mode section for automated/cron use. When triggered by the nightly-export cronjob, agents auto-detect defaults (title, source, tags), apply cleanup rules (large code blocks, error logs, repeated tool calls), and write output to `intake/` without user confirmation. See `prompts/Export.md` for triggers, defaults, and cleanup rules.
 
 ## Related Skills
 

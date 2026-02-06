@@ -314,6 +314,8 @@ Generates filtered exports per profile:
 - Applies redaction rules
 - Outputs to `exports/<profile>/`
 
+**Non-interactive (cron):** The nightly-export cronjob triggers agents to run Export.md's Non-Interactive Mode, which auto-detects defaults for title, source, tags, and cleanup rules. See `components/distill/prompts/Export.md` for full details.
+
 ### Stage 5: Push
 
 ```bash
