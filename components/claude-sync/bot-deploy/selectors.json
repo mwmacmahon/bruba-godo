@@ -1,0 +1,27 @@
+{
+  "_comment": "CSS selectors for claude.ai UI automation. Run setup.sh --inspect to discover values.",
+  "_updated": "2026-02-06",
+
+  "auth": {
+    "logged_in": "[data-testid='chat-input'], textarea[placeholder]",
+    "login_page": "button:has-text('Log in'), [data-testid='login-button']"
+  },
+
+  "chat": {
+    "input": "[data-testid='chat-input'], div[contenteditable='true']",
+    "submit": "[data-testid='send-message'], button[aria-label='Send']",
+    "new_chat": "[data-testid='new-chat'], a[href$='/new']"
+  },
+
+  "response": {
+    "message": "[data-testid='assistant-message'], div[class*='assistant']",
+    "streaming": "[data-testid='streaming-indicator'], [class*='streaming']",
+    "stop_button": "[data-testid='stop-button'], button[aria-label='Stop']",
+    "complete": "[data-testid='message-content'], div.prose"
+  },
+
+  "navigation": {
+    "project_link": "a[href*='/project/']",
+    "sidebar": "[data-testid='sidebar'], nav"
+  }
+}

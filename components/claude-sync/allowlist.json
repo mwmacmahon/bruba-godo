@@ -1,0 +1,6 @@
+{
+  "entries": [
+    {"pattern": "${SHARED_TOOLS}/claude-research.sh", "id": "claude-research"},
+    {"pattern": "${SHARED_TOOLS}/claude-research.sh *", "id": "claude-research-args"}
+  ]
+}
